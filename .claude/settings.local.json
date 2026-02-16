@@ -23,7 +23,11 @@
       "WebFetch(domain:www.wolfdynamics.com)",
       "Bash(git add:*)",
       "Bash(git commit:*)",
-      "Bash(git push:*)"
+      "Bash(git push:*)",
+      "Bash(__NEW_LINE_55350821d7c667ea__ Dilate {{0,0,0}, scaleFactor} { Volume{:})",
+      "Bash(} Mesh 2)",
+      "Bash(__NEW_LINE_55350821d7c667ea__ Save 'output.stl')",
+      "Bash(\" -0\n\nKey improvements:\n- Geometry.OCCBoundsUseVisible = 1 for OpenCASCADE kernel\n- Dilate operates on Volume{:} \\(STEP solids\\), not Surface{:}\n- Mesh 2 generates surface mesh after scaling\n- No temp files needed\n- More efficient and robust\n\nWhen no scaling needed, uses standard gmsh conversion.\n\nCo-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>\nEOF\n\\)\")"
     ]
   }
 }

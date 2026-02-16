@@ -450,58 +450,6 @@ Number of zones (connected area with consistent normal) : 5
             result.ErrorMessage.Should().Contain("normal zones");
         }
 
-        [Fact(Skip = "Requires real files for STL scaling - needs integration test")]
-        public void ConvertStepToStl_WithMillimeterUnits_SucceedsConversion()
-        {
-            // Arrange
-            var inputFile = "/path/to/model.step";
-            var outputFile = "/path/to/model.stl";
-
-            _mockProcessExecutor
-                .Setup(x => x.Execute("test", "-f /path/to/model.step"))
-                .Returns(new ProcessResult { ExitCode = 0, Output = "" });
-
-            _mockProcessExecutor
-                .Setup(x => x.Execute("gmsh", It.IsAny<string>()))
-                .Returns(new ProcessResult { ExitCode = 0, Output = "Info    : Done meshing" });
-
-            _mockProcessExecutor
-                .Setup(x => x.Execute("test", "-f /path/to/model.stl"))
-                .Returns(new ProcessResult { ExitCode = 0, Output = "" });
-
-            // Act
-            var result = _service.ConvertStepToStl(inputFile, outputFile, meshSize: 1.0, featureAngle: null, inputUnits: "mm");
-
-            // Assert - conversion succeeds (scaling via gmsh Dilate in one step)
-            result.IsSuccess.Should().BeTrue();
-        }
-
-        [Fact(Skip = "Requires real files for STL scaling - needs integration test")]
-        public void ConvertStepToStl_WithCentimeterUnits_SucceedsConversion()
-        {
-            // Arrange
-            var inputFile = "/path/to/model.step";
-            var outputFile = "/path/to/model.stl";
-
-            _mockProcessExecutor
-                .Setup(x => x.Execute("test", "-f /path/to/model.step"))
-                .Returns(new ProcessResult { ExitCode = 0, Output = "" });
-
-            _mockProcessExecutor
-                .Setup(x => x.Execute("gmsh", It.IsAny<string>()))
-                .Returns(new ProcessResult { ExitCode = 0, Output = "Info    : Done meshing" });
-
-            _mockProcessExecutor
-                .Setup(x => x.Execute("test", "-f /path/to/model.stl"))
-                .Returns(new ProcessResult { ExitCode = 0, Output = "" });
-
-            // Act
-            var result = _service.ConvertStepToStl(inputFile, outputFile, meshSize: 1.0, featureAngle: null, inputUnits: "cm");
-
-            // Assert - conversion succeeds (scaling via gmsh Dilate in one step)
-            result.IsSuccess.Should().BeTrue();
-        }
-
         [Fact]
         public void ConvertStepToStl_WithMeterUnits_SucceedsConversion()
         {
@@ -528,30 +476,7 @@ Number of zones (connected area with consistent normal) : 5
             result.IsSuccess.Should().BeTrue();
         }
 
-        [Fact(Skip = "Requires real files for STL scaling - needs integration test")]
-        public void ConvertStepToStl_WithInchUnits_SucceedsConversion()
-        {
-            // Arrange
-            var inputFile = "/path/to/model.step";
-            var outputFile = "/path/to/model.stl";
-
-            _mockProcessExecutor
-                .Setup(x => x.Execute("test", "-f /path/to/model.step"))
-                .Returns(new ProcessResult { ExitCode = 0, Output = "" });
-
-            _mockProcessExecutor
-                .Setup(x => x.Execute("gmsh", It.IsAny<string>()))
-                .Returns(new ProcessResult { ExitCode = 0, Output = "Info    : Done meshing" });
-
-            _mockProcessExecutor
-                .Setup(x => x.Execute("test", "-f /path/to/model.stl"))
-                .Returns(new ProcessResult { ExitCode = 0, Output = "" });
-
-            // Act
-            var result = _service.ConvertStepToStl(inputFile, outputFile, meshSize: 1.0, featureAngle: null, inputUnits: "in");
-
-            // Assert - conversion succeeds (scaling via gmsh Dilate in one step)
-            result.IsSuccess.Should().BeTrue();
-        }
+        // Note: Unit conversion tests (mm, cm, in) are in Integration/StlScalingIntegrationTests.cs
+        // Those tests use real file I/O to verify scaling works correctly across platforms.
     }
 }
