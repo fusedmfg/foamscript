@@ -63,6 +63,7 @@ namespace foamscript
                 builder.Services.AddSingleton<IProcessExecutor, ProcessExecutor>();
                 builder.Services.AddTransient<EnvironmentService>();
                 builder.Services.AddTransient<GeometryService>();
+                builder.Services.AddTransient<CaseService>();
                 builder.Services.AddTransient<AppService>();
                 builder.Services.AddTransient<MeshService>();
 

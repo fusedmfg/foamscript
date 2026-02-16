@@ -9,13 +9,15 @@ namespace foamscript
         private readonly MeshService _meshService;
         private readonly EnvironmentService _environmentService;
         private readonly GeometryService _geometryService;
+        private readonly CaseService _caseService;
 
-        public AppService(LoggingService loggingService, MeshService meshService, EnvironmentService environmentService, GeometryService geometryService)
+        public AppService(LoggingService loggingService, MeshService meshService, EnvironmentService environmentService, GeometryService geometryService, CaseService caseService)
         {
             _loggingService = loggingService;
             _meshService = meshService;
             _environmentService = environmentService;
             _geometryService = geometryService;
+            _caseService = caseService;
         }
 
         public int Run(VerbModel model)
@@ -40,6 +42,10 @@ namespace foamscript
                     // Handle generate-domain verb.
                     case GenerateDomainModel generateDomainModel:
                         return HandleGenerateDomain(generateDomainModel);
+
+                    // Handle new-study verb.
+                    case NewStudyModel newStudyModel:
+                        return HandleNewStudy(newStudyModel);
 
                     // Handle unimplemented verb types here.
                     default:
@@ -316,6 +322,64 @@ namespace foamscript
             {
                 Console.WriteLine($"✗ Domain generation failed: {result.ErrorMessage}");
                 _loggingService.LogError("Domain generation failed.", null!);
+                Console.WriteLine();
+                return -1;
+            }
+        }
+
+        private int HandleNewStudy(NewStudyModel model)
+        {
+            _loggingService.LogInformation($"Creating study at {model.OutputDir}");
+
+            Console.WriteLine();
+            Console.WriteLine("=== New Study Creation ===");
+            Console.WriteLine();
+            Console.WriteLine($"Study directory: {model.OutputDir}");
+            Console.WriteLine($"Template: {model.TemplatePath}");
+            Console.WriteLine($"Angles: {model.Angles}");
+            Console.WriteLine($"Velocity: {model.Velocity} m/s");
+            Console.WriteLine($"RPM: {model.Rpm}");
+            Console.WriteLine($"Cores: {model.Cores}");
+            if (!string.IsNullOrEmpty(model.StlDir))
+            {
+                Console.WriteLine($"STL directory: {model.StlDir}");
+            }
+            Console.WriteLine();
+
+            var result = _caseService.CreateStudy(
+                model.OutputDir,
+                model.TemplatePath,
+                model.Angles,
+                model.Velocity,
+                model.Rpm,
+                model.StlDir,
+                model.Cores);
+
+            if (result.IsSuccess)
+            {
+                Console.WriteLine("✓ Study creation successful!");
+                Console.WriteLine();
+                Console.WriteLine($"Study name: {result.StudyName}");
+                Console.WriteLine($"Study directory: {result.StudyDir}");
+                Console.WriteLine();
+                Console.WriteLine($"Created {result.Cases.Count} case(s):");
+
+                foreach (var caseInfo in result.Cases)
+                {
+                    Console.WriteLine($"  • {Path.GetFileName(caseInfo.CaseDir)}");
+                    Console.WriteLine($"      AoA: {caseInfo.AngleOfAttack}°");
+                    Console.WriteLine($"      Velocity: Ux={caseInfo.Ux:F3} m/s, Uy={caseInfo.Uy:F3} m/s");
+                    Console.WriteLine($"      Omega: {caseInfo.Omega:F3} rad/s ({model.Rpm} RPM)");
+                }
+
+                _loggingService.LogInformation("Study creation completed successfully.");
+                Console.WriteLine();
+                return 0;
+            }
+            else
+            {
+                Console.WriteLine($"✗ Study creation failed: {result.ErrorMessage}");
+                _loggingService.LogError("Study creation failed.", null!);
                 Console.WriteLine();
                 return -1;
             }
