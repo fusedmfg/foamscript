@@ -8,11 +8,13 @@ namespace foamscript.Services
     {
         private readonly ILogger<LoggingService> _logger;
         private readonly IProcessExecutor _processExecutor;
+        private readonly LoggingService _loggingService;
 
-        public MeshService(ILogger<LoggingService> logger, IProcessExecutor processExecutor)
+        public MeshService(ILogger<LoggingService> logger, IProcessExecutor processExecutor, LoggingService loggingService)
         {
             _logger = logger;
             _processExecutor = processExecutor;
+            _loggingService = loggingService;
         }
 
         /// <summary>
@@ -55,21 +57,18 @@ namespace foamscript.Services
                     result.IsSuccess = false;
                     result.ErrorMessage = $"blockMesh failed with exit code {blockMeshResult.ExitCode}";
 
-                    // Display the error output for debugging
-                    Console.WriteLine();
-                    Console.WriteLine("blockMesh stdout:");
-                    Console.WriteLine(new string('-', 60));
-                    Console.WriteLine(blockMeshResult.Output);
-                    Console.WriteLine(new string('-', 60));
-
+                    // Log detailed error output to file
+                    _loggingService.LogError($"blockMesh failed with exit code {blockMeshResult.ExitCode}");
+                    _loggingService.LogError($"blockMesh stdout:\n{blockMeshResult.Output}");
                     if (!string.IsNullOrEmpty(blockMeshResult.Error))
                     {
-                        Console.WriteLine();
-                        Console.WriteLine("blockMesh stderr:");
-                        Console.WriteLine(new string('-', 60));
-                        Console.WriteLine(blockMeshResult.Error);
-                        Console.WriteLine(new string('-', 60));
+                        _loggingService.LogError($"blockMesh stderr:\n{blockMeshResult.Error}");
                     }
+
+                    // Display short error message and direct user to log file
+                    Console.WriteLine();
+                    Console.WriteLine($"✗ blockMesh failed with exit code {blockMeshResult.ExitCode}");
+                    Console.WriteLine($"  See log file for details: {_loggingService.GetLogFilePath()}");
 
                     return result;
                 }
@@ -88,20 +87,18 @@ namespace foamscript.Services
                         result.IsSuccess = false;
                         result.ErrorMessage = $"decomposePar failed with exit code {decomposeResult.ExitCode}";
 
-                        Console.WriteLine();
-                        Console.WriteLine("decomposePar stdout:");
-                        Console.WriteLine(new string('-', 60));
-                        Console.WriteLine(decomposeResult.Output);
-                        Console.WriteLine(new string('-', 60));
-
+                        // Log detailed error output to file
+                        _loggingService.LogError($"decomposePar failed with exit code {decomposeResult.ExitCode}");
+                        _loggingService.LogError($"decomposePar stdout:\n{decomposeResult.Output}");
                         if (!string.IsNullOrEmpty(decomposeResult.Error))
                         {
-                            Console.WriteLine();
-                            Console.WriteLine("decomposePar stderr:");
-                            Console.WriteLine(new string('-', 60));
-                            Console.WriteLine(decomposeResult.Error);
-                            Console.WriteLine(new string('-', 60));
+                            _loggingService.LogError($"decomposePar stderr:\n{decomposeResult.Error}");
                         }
+
+                        // Display short error message and direct user to log file
+                        Console.WriteLine();
+                        Console.WriteLine($"✗ decomposePar failed with exit code {decomposeResult.ExitCode}");
+                        Console.WriteLine($"  See log file for details: {_loggingService.GetLogFilePath()}");
 
                         return result;
                     }
@@ -120,20 +117,18 @@ namespace foamscript.Services
                         result.IsSuccess = false;
                         result.ErrorMessage = $"snappyHexMesh (parallel) failed with exit code {snappyResult.ExitCode}";
 
-                        Console.WriteLine();
-                        Console.WriteLine("snappyHexMesh stdout:");
-                        Console.WriteLine(new string('-', 60));
-                        Console.WriteLine(snappyResult.Output);
-                        Console.WriteLine(new string('-', 60));
-
+                        // Log detailed error output to file
+                        _loggingService.LogError($"snappyHexMesh (parallel) failed with exit code {snappyResult.ExitCode}");
+                        _loggingService.LogError($"snappyHexMesh stdout:\n{snappyResult.Output}");
                         if (!string.IsNullOrEmpty(snappyResult.Error))
                         {
-                            Console.WriteLine();
-                            Console.WriteLine("snappyHexMesh stderr:");
-                            Console.WriteLine(new string('-', 60));
-                            Console.WriteLine(snappyResult.Error);
-                            Console.WriteLine(new string('-', 60));
+                            _loggingService.LogError($"snappyHexMesh stderr:\n{snappyResult.Error}");
                         }
+
+                        // Display short error message and direct user to log file
+                        Console.WriteLine();
+                        Console.WriteLine($"✗ snappyHexMesh failed with exit code {snappyResult.ExitCode}");
+                        Console.WriteLine($"  See log file for details: {_loggingService.GetLogFilePath()}");
 
                         return result;
                     }
@@ -167,20 +162,18 @@ namespace foamscript.Services
                         result.IsSuccess = false;
                         result.ErrorMessage = $"snappyHexMesh failed with exit code {snappyResult.ExitCode}";
 
-                        Console.WriteLine();
-                        Console.WriteLine("snappyHexMesh stdout:");
-                        Console.WriteLine(new string('-', 60));
-                        Console.WriteLine(snappyResult.Output);
-                        Console.WriteLine(new string('-', 60));
-
+                        // Log detailed error output to file
+                        _loggingService.LogError($"snappyHexMesh failed with exit code {snappyResult.ExitCode}");
+                        _loggingService.LogError($"snappyHexMesh stdout:\n{snappyResult.Output}");
                         if (!string.IsNullOrEmpty(snappyResult.Error))
                         {
-                            Console.WriteLine();
-                            Console.WriteLine("snappyHexMesh stderr:");
-                            Console.WriteLine(new string('-', 60));
-                            Console.WriteLine(snappyResult.Error);
-                            Console.WriteLine(new string('-', 60));
+                            _loggingService.LogError($"snappyHexMesh stderr:\n{snappyResult.Error}");
                         }
+
+                        // Display short error message and direct user to log file
+                        Console.WriteLine();
+                        Console.WriteLine($"✗ snappyHexMesh failed with exit code {snappyResult.ExitCode}");
+                        Console.WriteLine($"  See log file for details: {_loggingService.GetLogFilePath()}");
 
                         return result;
                     }

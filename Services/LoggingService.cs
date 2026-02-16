@@ -19,5 +19,17 @@ namespace foamscript.Services
         {
             _logger.LogError(ex, message);
         }
-    }       
+
+        public void LogError(string message)
+        {
+            _logger.LogError(message);
+        }
+
+        public string GetLogFilePath()
+        {
+            var timestamp = Environment.GetEnvironmentVariable("FOAMSCRIPT_TIMESTAMP") ?? DateTime.Now.ToString("yyyyMMdd_HHmmss");
+            var logDir = Path.Combine(Directory.GetCurrentDirectory(), "Logs");
+            return Path.Combine(logDir, $"foamscript-{timestamp}.txt");
+        }
+    }
 }
