@@ -54,6 +54,14 @@ namespace foamscript.Services
                 {
                     result.IsSuccess = false;
                     result.ErrorMessage = $"blockMesh failed with exit code {blockMeshResult.ExitCode}";
+
+                    // Display the error output for debugging
+                    Console.WriteLine();
+                    Console.WriteLine("blockMesh output:");
+                    Console.WriteLine(new string('-', 60));
+                    Console.WriteLine(blockMeshResult.Output);
+                    Console.WriteLine(new string('-', 60));
+
                     return result;
                 }
 
@@ -70,6 +78,13 @@ namespace foamscript.Services
                     {
                         result.IsSuccess = false;
                         result.ErrorMessage = $"decomposePar failed with exit code {decomposeResult.ExitCode}";
+
+                        Console.WriteLine();
+                        Console.WriteLine("decomposePar output:");
+                        Console.WriteLine(new string('-', 60));
+                        Console.WriteLine(decomposeResult.Output);
+                        Console.WriteLine(new string('-', 60));
+
                         return result;
                     }
 
@@ -86,6 +101,13 @@ namespace foamscript.Services
                     {
                         result.IsSuccess = false;
                         result.ErrorMessage = $"snappyHexMesh (parallel) failed with exit code {snappyResult.ExitCode}";
+
+                        Console.WriteLine();
+                        Console.WriteLine("snappyHexMesh output:");
+                        Console.WriteLine(new string('-', 60));
+                        Console.WriteLine(snappyResult.Output);
+                        Console.WriteLine(new string('-', 60));
+
                         return result;
                     }
 
@@ -117,6 +139,13 @@ namespace foamscript.Services
                     {
                         result.IsSuccess = false;
                         result.ErrorMessage = $"snappyHexMesh failed with exit code {snappyResult.ExitCode}";
+
+                        Console.WriteLine();
+                        Console.WriteLine("snappyHexMesh output:");
+                        Console.WriteLine(new string('-', 60));
+                        Console.WriteLine(snappyResult.Output);
+                        Console.WriteLine(new string('-', 60));
+
                         return result;
                     }
 
