@@ -40,6 +40,9 @@ namespace foamscript.Services
             // Calculate scale factor for unit conversion to meters
             var scaleFactor = GetUnitScaleFactor(inputUnits);
 
+            // Determine output file (temp if scaling is needed)
+            var tempOutput = scaleFactor != 1.0 ? $"{outputFile}.temp" : outputFile;
+
             // Build gmsh command
             // -3: 3D meshing
             // -format stl: output format
@@ -53,7 +56,7 @@ namespace foamscript.Services
                 gmshArgs += $" -angle {featureAngle.Value}";
             }
 
-            gmshArgs += $" -o {outputFile} {inputFile}";
+            gmshArgs += $" -o {tempOutput} {inputFile}";
 
             // Execute gmsh
             var gmshResult = _processExecutor.Execute("gmsh", gmshArgs);
@@ -66,21 +69,38 @@ namespace foamscript.Services
             }
 
             // Verify output file was created
-            var outputCheckResult = _processExecutor.Execute("test", $"-f {outputFile}");
+            var outputCheckResult = _processExecutor.Execute("test", $"-f {tempOutput}");
             if (outputCheckResult.ExitCode != 0)
             {
                 result.IsSuccess = false;
-                result.ErrorMessage = $"Output file was not created: {outputFile}";
+                result.ErrorMessage = $"Output file was not created: {tempOutput}";
                 return result;
             }
 
-            // Post-process: Scale STL vertices if unit conversion is needed
+            // Scale using gmsh Dilate if unit conversion is needed
             if (scaleFactor != 1.0)
             {
-                if (!ScaleStlFile(outputFile, scaleFactor))
+                var dilateScript = $"Merge '{tempOutput}'; Dilate {{{{0,0,0}}, {scaleFactor}}} {{ Surface{{:}}; }} Save '{outputFile}';";
+                var dilateArgs = $"-string \"{dilateScript}\" -0";
+
+                var dilateResult = _processExecutor.Execute("gmsh", dilateArgs);
+
+                // Clean up temp file
+                try { File.Delete(tempOutput); } catch { }
+
+                if (dilateResult.ExitCode != 0)
                 {
                     result.IsSuccess = false;
-                    result.ErrorMessage = $"Failed to scale STL file to meters (scale factor: {scaleFactor})";
+                    result.ErrorMessage = $"gmsh scaling (Dilate) failed: {dilateResult.Error}";
+                    return result;
+                }
+
+                // Verify scaled output was created
+                var scaledCheckResult = _processExecutor.Execute("test", $"-f {outputFile}");
+                if (scaledCheckResult.ExitCode != 0)
+                {
+                    result.IsSuccess = false;
+                    result.ErrorMessage = $"Scaled output file was not created: {outputFile}";
                     return result;
                 }
             }
@@ -244,57 +264,6 @@ namespace foamscript.Services
             {
                 result.IsSelfIntersecting = false;
                 result.SelfIntersectionCount = 0;
-            }
-        }
-
-        /// <summary>
-        /// Scales all vertices in an STL file by a given factor.
-        /// </summary>
-        /// <param name="stlFile">Path to the STL file</param>
-        /// <param name="scaleFactor">Scale factor to apply to all vertices</param>
-        /// <returns>True if successful, false otherwise</returns>
-        private bool ScaleStlFile(string stlFile, double scaleFactor)
-        {
-            try
-            {
-                var lines = File.ReadAllLines(stlFile);
-                var scaledLines = new List<string>();
-
-                foreach (var line in lines)
-                {
-                    var trimmed = line.Trim();
-                    if (trimmed.StartsWith("vertex"))
-                    {
-                        // Parse vertex line: "vertex x y z"
-                        var parts = trimmed.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
-                        if (parts.Length >= 4)
-                        {
-                            if (double.TryParse(parts[1], out double x) &&
-                                double.TryParse(parts[2], out double y) &&
-                                double.TryParse(parts[3], out double z))
-                            {
-                                // Scale the vertex
-                                x *= scaleFactor;
-                                y *= scaleFactor;
-                                z *= scaleFactor;
-
-                                // Reconstruct line with scaled values
-                                scaledLines.Add($"      vertex {x:E} {y:E} {z:E}");
-                                continue;
-                            }
-                        }
-                    }
-                    // Keep non-vertex lines as-is
-                    scaledLines.Add(line);
-                }
-
-                // Write scaled STL back to file
-                File.WriteAllLines(stlFile, scaledLines);
-                return true;
-            }
-            catch
-            {
-                return false;
             }
         }
 

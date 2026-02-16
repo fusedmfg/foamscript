@@ -466,13 +466,17 @@ Number of zones (connected area with consistent normal) : 5
                 .Returns(new ProcessResult { ExitCode = 0, Output = "Info    : Done meshing" });
 
             _mockProcessExecutor
+                .Setup(x => x.Execute("test", "-f /path/to/model.stl.temp"))
+                .Returns(new ProcessResult { ExitCode = 0, Output = "" });
+
+            _mockProcessExecutor
                 .Setup(x => x.Execute("test", "-f /path/to/model.stl"))
                 .Returns(new ProcessResult { ExitCode = 0, Output = "" });
 
             // Act
             var result = _service.ConvertStepToStl(inputFile, outputFile, meshSize: 1.0, featureAngle: null, inputUnits: "mm");
 
-            // Assert - conversion succeeds (scaling happens via post-processing)
+            // Assert - conversion succeeds (scaling happens via gmsh Dilate)
             result.IsSuccess.Should().BeTrue();
         }
 
@@ -492,13 +496,17 @@ Number of zones (connected area with consistent normal) : 5
                 .Returns(new ProcessResult { ExitCode = 0, Output = "Info    : Done meshing" });
 
             _mockProcessExecutor
+                .Setup(x => x.Execute("test", "-f /path/to/model.stl.temp"))
+                .Returns(new ProcessResult { ExitCode = 0, Output = "" });
+
+            _mockProcessExecutor
                 .Setup(x => x.Execute("test", "-f /path/to/model.stl"))
                 .Returns(new ProcessResult { ExitCode = 0, Output = "" });
 
             // Act
             var result = _service.ConvertStepToStl(inputFile, outputFile, meshSize: 1.0, featureAngle: null, inputUnits: "cm");
 
-            // Assert - conversion succeeds (scaling happens via post-processing)
+            // Assert - conversion succeeds (scaling happens via gmsh Dilate)
             result.IsSuccess.Should().BeTrue();
         }
 
@@ -544,13 +552,17 @@ Number of zones (connected area with consistent normal) : 5
                 .Returns(new ProcessResult { ExitCode = 0, Output = "Info    : Done meshing" });
 
             _mockProcessExecutor
+                .Setup(x => x.Execute("test", "-f /path/to/model.stl.temp"))
+                .Returns(new ProcessResult { ExitCode = 0, Output = "" });
+
+            _mockProcessExecutor
                 .Setup(x => x.Execute("test", "-f /path/to/model.stl"))
                 .Returns(new ProcessResult { ExitCode = 0, Output = "" });
 
             // Act
             var result = _service.ConvertStepToStl(inputFile, outputFile, meshSize: 1.0, featureAngle: null, inputUnits: "in");
 
-            // Assert - conversion succeeds (scaling happens via post-processing)
+            // Assert - conversion succeeds (scaling happens via gmsh Dilate)
             result.IsSuccess.Should().BeTrue();
         }
     }
