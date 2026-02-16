@@ -14,6 +14,9 @@ namespace foamscript.Models
         [Option('t', "template", Required = true, HelpText = "Path to template case directory")]
         public string TemplatePath { get; set; } = string.Empty;
 
+        [Option('s', "model-source", Required = true, HelpText = "Path to source geometry file (STEP, IGES, or STL)")]
+        public string ModelSource { get; set; } = string.Empty;
+
         [Option('a', "angles", Required = true, HelpText = "Angles of attack in degrees (comma-separated, e.g., -5,-2.5,0,2.5,5)")]
         public string Angles { get; set; } = string.Empty;
 
@@ -23,8 +26,14 @@ namespace foamscript.Models
         [Option('r', "rpm", Required = false, Default = 1000, HelpText = "Disc rotation speed (RPM)")]
         public double Rpm { get; set; } = 1000.0;
 
-        [Option("stl-dir", Required = false, HelpText = "Directory containing STL files to copy (disc.stl, rotor.stl, tunnel.stl)")]
-        public string? StlDir { get; set; }
+        [Option('u', "input-units", Required = false, Default = "mm", HelpText = "Source file units (mm, cm, m, in, ft). Only used for STEP/IGES conversion.")]
+        public string InputUnits { get; set; } = "mm";
+
+        [Option('m', "mesh-size", Required = false, Default = 0.05, HelpText = "STL mesh size factor for STEP/IGES conversion")]
+        public double MeshSize { get; set; } = 0.05;
+
+        [Option("feature-angle", Required = false, HelpText = "Feature angle for edge preservation in degrees (optional)")]
+        public double? FeatureAngle { get; set; }
 
         [Option("cores", Required = false, Default = 4, HelpText = "Number of CPU cores for parallel execution")]
         public int Cores { get; set; } = 4;

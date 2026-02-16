@@ -336,23 +336,32 @@ namespace foamscript
             Console.WriteLine();
             Console.WriteLine($"Study directory: {model.OutputDir}");
             Console.WriteLine($"Template: {model.TemplatePath}");
+            Console.WriteLine($"Model source: {model.ModelSource}");
             Console.WriteLine($"Angles: {model.Angles}");
             Console.WriteLine($"Velocity: {model.Velocity} m/s");
             Console.WriteLine($"RPM: {model.Rpm}");
             Console.WriteLine($"Cores: {model.Cores}");
-            if (!string.IsNullOrEmpty(model.StlDir))
+            Console.WriteLine();
+            Console.WriteLine("Geometry Parameters:");
+            Console.WriteLine($"  Input units: {model.InputUnits} (output will be in meters)");
+            Console.WriteLine($"  Mesh size: {model.MeshSize}");
+            if (model.FeatureAngle.HasValue)
             {
-                Console.WriteLine($"STL directory: {model.StlDir}");
+                Console.WriteLine($"  Feature angle: {model.FeatureAngle.Value}°");
             }
             Console.WriteLine();
+            Console.WriteLine("Processing geometry...");
 
             var result = _caseService.CreateStudy(
                 model.OutputDir,
                 model.TemplatePath,
+                model.ModelSource,
                 model.Angles,
                 model.Velocity,
                 model.Rpm,
-                model.StlDir,
+                model.InputUnits,
+                model.MeshSize,
+                model.FeatureAngle,
                 model.Cores);
 
             if (result.IsSuccess)
@@ -361,6 +370,7 @@ namespace foamscript
                 Console.WriteLine();
                 Console.WriteLine($"Study name: {result.StudyName}");
                 Console.WriteLine($"Study directory: {result.StudyDir}");
+                Console.WriteLine($"Geometry directory: {Path.Combine(result.StudyDir!, "geometry")}");
                 Console.WriteLine();
                 Console.WriteLine($"Created {result.Cases.Count} case(s):");
 

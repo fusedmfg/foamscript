@@ -9,17 +9,20 @@ namespace foamscript.Services
     public class CaseService
     {
         private readonly IProcessExecutor _processExecutor;
+        private readonly GeometryService _geometryService;
 
-        public CaseService(IProcessExecutor processExecutor)
+        public CaseService(IProcessExecutor processExecutor, GeometryService geometryService)
         {
             _processExecutor = processExecutor;
+            _geometryService = geometryService;
         }
 
         /// <summary>
         /// Creates a new study with multiple cases for angle of attack sweep.
         /// </summary>
-        public StudyResult CreateStudy(string outputDir, string templatePath, string anglesString,
-            double velocity, double rpm, string? stlDir, int cores)
+        public StudyResult CreateStudy(string outputDir, string templatePath, string modelSource,
+            string anglesString, double velocity, double rpm, string inputUnits, double meshSize,
+            double? featureAngle, int cores)
         {
             var result = new StudyResult();
 
@@ -50,13 +53,26 @@ namespace foamscript.Services
                 // Create study directory
                 Directory.CreateDirectory(result.StudyDir);
 
+                // Create geometry directory for master geometry files
+                var geometryDir = Path.Combine(result.StudyDir, "geometry");
+                Directory.CreateDirectory(geometryDir);
+
+                // Process geometry (convert and generate domain)
+                var geometryResult = ProcessGeometry(geometryDir, modelSource, inputUnits, meshSize, featureAngle);
+                if (!geometryResult.Success)
+                {
+                    result.IsSuccess = false;
+                    result.ErrorMessage = geometryResult.ErrorMessage;
+                    return result;
+                }
+
                 // Convert RPM to rad/s
                 var omega = RpmToRadPerSec(rpm);
 
                 // Create case for each angle
                 foreach (var angle in angles)
                 {
-                    var caseInfo = CreateCase(result.StudyDir, studyName, templatePath, angle, velocity, omega, cores, stlDir);
+                    var caseInfo = CreateCase(result.StudyDir, studyName, templatePath, angle, velocity, omega, cores, geometryDir);
                     result.Cases.Add(caseInfo);
                 }
 
@@ -72,10 +88,89 @@ namespace foamscript.Services
         }
 
         /// <summary>
+        /// Processes geometry: copies source file, converts if needed, generates domain.
+        /// </summary>
+        private (bool Success, string? ErrorMessage) ProcessGeometry(string geometryDir, string modelSource,
+            string inputUnits, double meshSize, double? featureAngle)
+        {
+            try
+            {
+                // Validate source file exists
+                if (!File.Exists(modelSource))
+                {
+                    return (false, $"Model source file not found: {modelSource}");
+                }
+
+                var sourceExt = Path.GetExtension(modelSource).ToLowerInvariant();
+                var sourceFileName = Path.GetFileName(modelSource);
+                var sourceCopyPath = Path.Combine(geometryDir, sourceFileName);
+
+                // Copy source file to geometry directory
+                File.Copy(modelSource, sourceCopyPath, overwrite: true);
+
+                string discStlPath;
+
+                // If STEP or IGES, convert to STL
+                if (sourceExt == ".step" || sourceExt == ".stp" || sourceExt == ".iges" || sourceExt == ".igs")
+                {
+                    discStlPath = Path.Combine(geometryDir, "disc.stl");
+
+                    var conversionResult = _geometryService.ConvertStepToStl(
+                        sourceCopyPath,
+                        discStlPath,
+                        meshSize,
+                        featureAngle,
+                        inputUnits
+                    );
+
+                    if (!conversionResult.IsSuccess)
+                    {
+                        return (false, $"Failed to convert geometry: {conversionResult.ErrorMessage}");
+                    }
+                }
+                else if (sourceExt == ".stl")
+                {
+                    // If already STL, just rename/copy to disc.stl
+                    discStlPath = Path.Combine(geometryDir, "disc.stl");
+                    if (sourceCopyPath != discStlPath)
+                    {
+                        File.Copy(sourceCopyPath, discStlPath, overwrite: true);
+                    }
+                }
+                else
+                {
+                    return (false, $"Unsupported file format: {sourceExt}. Supported formats: .step, .stp, .iges, .igs, .stl");
+                }
+
+                // Generate rotor and tunnel STL files from disc using default parameters
+                var domainResult = _geometryService.GenerateDomain(
+                    discStlPath,
+                    geometryDir,
+                    rotorRadiusScale: 1.2,
+                    rotorHeightScale: 1.5,
+                    tunnelUpstream: 3.0,
+                    tunnelDownstream: 7.0,
+                    tunnelRadial: 4.0,
+                    meshResolution: 32
+                );
+                if (!domainResult.IsSuccess)
+                {
+                    return (false, $"Failed to generate domain: {domainResult.ErrorMessage}");
+                }
+
+                return (true, null);
+            }
+            catch (Exception ex)
+            {
+                return (false, $"Geometry processing failed: {ex.Message}");
+            }
+        }
+
+        /// <summary>
         /// Creates a single case directory for a specific angle of attack.
         /// </summary>
         private CaseInfo CreateCase(string studyDir, string studyName, string templatePath,
-            double angle, double velocity, double omega, int cores, string? stlDir)
+            double angle, double velocity, double omega, int cores, string geometryDir)
         {
             var caseInfo = new CaseInfo
             {
@@ -99,11 +194,8 @@ namespace foamscript.Services
             // Update caseSettings file
             UpdateCaseSettings(caseDir, caseInfo.Ux, caseInfo.Uy, omega, cores);
 
-            // Copy STL files if directory provided
-            if (!string.IsNullOrEmpty(stlDir))
-            {
-                CopyStlFiles(stlDir, caseDir);
-            }
+            // Copy STL files from geometry directory
+            CopyStlFiles(geometryDir, caseDir);
 
             return caseInfo;
         }
