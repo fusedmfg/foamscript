@@ -292,6 +292,49 @@ namespace foamscript.Services
                 return result;
             }
 
+            // Auto-detect units based on PDGA disc diameter rules (21-30cm)
+            var discDiameter = Math.Max(boundingBox.Width, boundingBox.Depth);
+            double unitScale = 1.0;
+            string detectedUnits = "meters";
+
+            if (discDiameter >= 210 && discDiameter <= 300)
+            {
+                // Diameter in millimeters (210-300mm)
+                unitScale = 0.001;
+                detectedUnits = "millimeters";
+            }
+            else if (discDiameter >= 21 && discDiameter <= 30)
+            {
+                // Diameter in centimeters (21-30cm)
+                unitScale = 0.01;
+                detectedUnits = "centimeters";
+            }
+            else if (discDiameter >= 0.21 && discDiameter <= 0.30)
+            {
+                // Diameter in meters (0.21-0.30m) - already correct
+                unitScale = 1.0;
+                detectedUnits = "meters";
+            }
+            else
+            {
+                // Out of expected range - warn but continue
+                Console.WriteLine($"⚠ Warning: Disc diameter {discDiameter:F4} is outside expected PDGA range (21-30cm).");
+                Console.WriteLine($"  Assuming units are meters. Use correct units in convert command if needed.");
+            }
+
+            // Apply scaling if needed
+            if (unitScale != 1.0)
+            {
+                Console.WriteLine($"✓ Auto-detected units: {detectedUnits} (diameter = {discDiameter:F2} {detectedUnits})");
+                Console.WriteLine($"  Scaling to meters (factor: {unitScale})");
+                boundingBox.MinX *= unitScale;
+                boundingBox.MaxX *= unitScale;
+                boundingBox.MinY *= unitScale;
+                boundingBox.MaxY *= unitScale;
+                boundingBox.MinZ *= unitScale;
+                boundingBox.MaxZ *= unitScale;
+            }
+
             result.DiscBoundingBox = boundingBox;
 
             // Calculate rotor dimensions (cylinder around disc)
@@ -312,15 +355,16 @@ namespace foamscript.Services
             result.RotorDimensions = rotorDimensions;
 
             // Calculate tunnel dimensions (box around everything)
-            var discDiameter = 2.0 * discRadius;
+            // Use scaled diameter (discRadius is already from scaled bounding box)
+            var scaledDiscDiameter = 2.0 * discRadius;
             var tunnelDimensions = new BoxDimensions
             {
-                MinX = discCenterX - (tunnelUpstream * discDiameter),
-                MaxX = discCenterX + (tunnelDownstream * discDiameter),
-                MinY = discCenterY - (tunnelRadial * discDiameter),
-                MaxY = discCenterY + (tunnelRadial * discDiameter),
-                MinZ = discCenterZ - (tunnelRadial * discDiameter),
-                MaxZ = discCenterZ + (tunnelRadial * discDiameter)
+                MinX = discCenterX - (tunnelUpstream * scaledDiscDiameter),
+                MaxX = discCenterX + (tunnelDownstream * scaledDiscDiameter),
+                MinY = discCenterY - (tunnelRadial * scaledDiscDiameter),
+                MaxY = discCenterY + (tunnelRadial * scaledDiscDiameter),
+                MinZ = discCenterZ - (tunnelRadial * scaledDiscDiameter),
+                MaxZ = discCenterZ + (tunnelRadial * scaledDiscDiameter)
             };
             result.TunnelDimensions = tunnelDimensions;
 
@@ -422,7 +466,7 @@ namespace foamscript.Services
                 var yTop = dims.CenterY + halfHeight;
                 var yBottom = dims.CenterY - halfHeight;
 
-                // Two triangles for each side face
+                // Two triangles for each side face (outward-facing normals)
                 triangles.Add(new Triangle(
                     new Vector3(x1, yBottom, z1),
                     new Vector3(x2, yBottom, z2),
@@ -434,18 +478,20 @@ namespace foamscript.Services
                     new Vector3(x1, yTop, z1)
                 ));
 
-                // Top cap triangle
+                // Top cap triangle (normal points up: +Y)
+                // Counter-clockwise when viewed from above
                 triangles.Add(new Triangle(
                     new Vector3(dims.CenterX, yTop, dims.CenterZ),
-                    new Vector3(x2, yTop, z2),
-                    new Vector3(x1, yTop, z1)
+                    new Vector3(x1, yTop, z1),
+                    new Vector3(x2, yTop, z2)
                 ));
 
-                // Bottom cap triangle
+                // Bottom cap triangle (normal points down: -Y)
+                // Clockwise when viewed from below (counter-clockwise from above)
                 triangles.Add(new Triangle(
                     new Vector3(dims.CenterX, yBottom, dims.CenterZ),
-                    new Vector3(x1, yBottom, z1),
-                    new Vector3(x2, yBottom, z2)
+                    new Vector3(x2, yBottom, z2),
+                    new Vector3(x1, yBottom, z1)
                 ));
             }
 
