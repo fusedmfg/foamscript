@@ -10,7 +10,8 @@ foamscript validate
 
 # Create parametric study with angle of attack sweep
 foamscript new-study \
-  --output-dir ~/disc_analysis \
+  --project-name MyProject \
+  --output-dir ~/studies \
   --template ~/disc_template \
   --model-source ~/my_disc.step \
   --angles -5,-2.5,0,2.5,5 \
@@ -84,7 +85,8 @@ foamscript convert \
 
 ```bash
 foamscript new-study \
-  --output-dir ~/studies/disc_analysis \
+  --project-name DiscAnalysis \
+  --output-dir ~/studies \
   --template ~/disc_template \
   --model-source ~/my_disc.step \
   --angles -10,-5,-2.5,0,2.5,5,10 \

@@ -329,12 +329,14 @@ namespace foamscript
 
         private int HandleNewStudy(NewStudyModel model)
         {
-            _loggingService.LogInformation($"Creating study at {model.OutputDir}");
+            _loggingService.LogInformation($"Creating project '{model.ProjectName}' in {model.OutputDir}");
 
             Console.WriteLine();
             Console.WriteLine("=== New Study Creation ===");
             Console.WriteLine();
-            Console.WriteLine($"Study directory: {model.OutputDir}");
+            Console.WriteLine($"Project name: {model.ProjectName}");
+            Console.WriteLine($"Output directory: {model.OutputDir}");
+            Console.WriteLine($"Study directory: {Path.Combine(model.OutputDir, model.ProjectName)}");
             Console.WriteLine($"Template: {model.TemplatePath}");
             Console.WriteLine($"Model source: {model.ModelSource}");
             Console.WriteLine($"Angles: {model.Angles}");
@@ -353,6 +355,7 @@ namespace foamscript
             Console.WriteLine("Processing geometry...");
 
             var result = _caseService.CreateStudy(
+                model.ProjectName,
                 model.OutputDir,
                 model.TemplatePath,
                 model.ModelSource,

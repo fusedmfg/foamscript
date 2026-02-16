@@ -8,7 +8,10 @@ namespace foamscript.Models
     [Verb("new-study", HelpText = "Create OpenFOAM study from template with angle of attack cases.")]
     public class NewStudyModel : VerbModel
     {
-        [Option('o', "output-dir", Required = true, HelpText = "Study directory path (e.g., ~/disc_analysis). Study name derived from this.")]
+        [Option('n', "project-name", Required = true, HelpText = "Project name (used for study folder and case naming, e.g., 'MyProject')")]
+        public string ProjectName { get; set; } = string.Empty;
+
+        [Option('o', "output-dir", Required = true, HelpText = "Parent directory where project folder will be created (e.g., ~/studies)")]
         public string OutputDir { get; set; } = string.Empty;
 
         [Option('t', "template", Required = true, HelpText = "Path to template case directory")]

@@ -14,7 +14,8 @@ foamscript validate
 
 # Create a parametric study with angle of attack sweep
 foamscript new-study \
-  --output-dir ~/disc_analysis \
+  --project-name MyProject \
+  --output-dir ~/studies \
   --template ~/disc_template \
   --model-source ~/my_disc.step \
   --angles -5,-2.5,0,2.5,5 \

@@ -230,7 +230,8 @@ foamscript new-study [OPTIONS]
 
 | Option | Short | Description | Default |
 |--------|-------|-------------|---------|
-| `--output-dir` | `-o` | Study directory path (required) | - |
+| `--project-name` | `-n` | Project name (used for study folder and case naming) (required) | - |
+| `--output-dir` | `-o` | Parent directory where project folder will be created (required) | - |
 | `--template` | `-t` | Path to template case directory (required) | - |
 | `--model-source` | `-s` | Path to source geometry file: STEP, IGES, or STL (required) | - |
 | `--angles` | `-a` | Angles of attack in degrees, comma-separated (required) | - |
@@ -264,23 +265,24 @@ This command performs an **integrated workflow**:
 ### Directory Structure
 
 ```
-~/disc_analysis/                    # Study directory (from --output-dir)
-├── geometry/                       # Master geometry files
-│   ├── my_disc.step               # Original source file
-│   ├── disc.stl                   # Converted disc (meters)
-│   ├── rotor.stl                  # Generated rotor
-│   └── tunnel.stl                 # Generated tunnel
-├── disc_analysis_-5.0/            # Case for AoA = -5°
-│   ├── 0/                         # Initial conditions
-│   ├── constant/
-│   │   ├── caseSettings           # Updated parameters
-│   │   └── triSurface/
-│   │       ├── disc.stl          # Copied from geometry/
-│   │       ├── rotor.stl         # Copied from geometry/
-│   │       └── tunnel.stl        # Copied from geometry/
-│   └── system/                    # Solver settings
-├── disc_analysis_0.0/             # Case for AoA = 0°
-└── disc_analysis_5.0/             # Case for AoA = 5°
+~/studies/                          # Parent directory (from --output-dir)
+└── MyProject/                      # Project folder (from --project-name)
+    ├── geometry/                   # Master geometry files
+    │   ├── my_disc.step           # Original source file
+    │   ├── disc.stl               # Converted disc (meters)
+    │   ├── rotor.stl              # Generated rotor
+    │   └── tunnel.stl             # Generated tunnel
+    ├── MyProject_-5.0/            # Case for AoA = -5°
+    │   ├── 0/                     # Initial conditions
+    │   ├── constant/
+    │   │   ├── caseSettings       # Updated parameters
+    │   │   └── triSurface/
+    │   │       ├── disc.stl      # Copied from geometry/
+    │   │       ├── rotor.stl     # Copied from geometry/
+    │   │       └── tunnel.stl    # Copied from geometry/
+    │   └── system/                # Solver settings
+    ├── MyProject_0.0/             # Case for AoA = 0°
+    └── MyProject_5.0/             # Case for AoA = 5°
 ```
 
 ### Examples
@@ -288,7 +290,8 @@ This command performs an **integrated workflow**:
 **Single angle (baseline case):**
 ```bash
 foamscript new-study \
-  --output-dir ~/disc_analysis \
+  --project-name MyProject \
+  --output-dir ~/studies \
   --template ~/disc_template \
   --model-source ~/my_disc.step \
   --angles 0 \
@@ -301,7 +304,8 @@ foamscript new-study \
 **Angle of attack sweep:**
 ```bash
 foamscript new-study \
-  --output-dir ~/disc_analysis \
+  --project-name DiscAnalysis \
+  --output-dir ~/studies \
   --template ~/disc_template \
   --model-source ~/my_disc.step \
   --angles -10,-5,-2.5,0,2.5,5,10 \
@@ -315,7 +319,8 @@ foamscript new-study \
 **Using pre-converted STL:**
 ```bash
 foamscript new-study \
-  --output-dir ~/disc_analysis \
+  --project-name QuickTest \
+  --output-dir ~/studies \
   --template ~/disc_template \
   --model-source ~/disc.stl \
   --angles -5,0,5 \
@@ -326,7 +331,8 @@ foamscript new-study \
 **High-precision geometry conversion:**
 ```bash
 foamscript new-study \
-  --output-dir ~/disc_analysis \
+  --project-name HighPrecision \
+  --output-dir ~/studies \
   --template ~/disc_template \
   --model-source ~/my_disc.step \
   --angles 0 \
@@ -358,7 +364,8 @@ The command displays:
 
 ### Notes
 
-- **Study name is derived from output directory** - `~/disc_analysis` creates cases named `disc_analysis_{angle}`
+- **Project name is used for folder and case naming** - `--project-name MyProject` creates `~/studies/MyProject/` with cases named `MyProject_{angle}`
+- **Output directory is the parent folder** - `--output-dir ~/studies` means the project folder will be created inside `~/studies`
 - **Template must have `constant/caseSettings` file** - This is the central configuration hub
 - **Geometry is processed once** and copied to all cases (efficient for multi-case studies)
 - **All geometry files are in meters** (OpenFOAM standard)
@@ -377,7 +384,7 @@ After creating a study, typical workflow:
 
 1. **Navigate to a case:**
    ```bash
-   cd ~/disc_analysis/disc_analysis_0.0
+   cd ~/studies/MyProject/MyProject_0.0
    ```
 
 2. **Run blockMesh:**
@@ -418,7 +425,8 @@ foamscript validate
 
 # 2. Create parametric study with AoA sweep
 foamscript new-study \
-  --output-dir ~/disc_analysis \
+  --project-name DiscAnalysis \
+  --output-dir ~/studies \
   --template ~/disc_template \
   --model-source ~/my_disc.step \
   --angles -10,-5,-2.5,0,2.5,5,10 \
@@ -429,7 +437,7 @@ foamscript new-study \
   --cores 8
 
 # 3. Navigate to first case and run simulation
-cd ~/disc_analysis/disc_analysis_-10.0
+cd ~/studies/DiscAnalysis/DiscAnalysis_-10.0
 blockMesh
 snappyHexMesh -overwrite
 decomposePar

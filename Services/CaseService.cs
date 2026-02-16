@@ -20,7 +20,7 @@ namespace foamscript.Services
         /// <summary>
         /// Creates a new study with multiple cases for angle of attack sweep.
         /// </summary>
-        public StudyResult CreateStudy(string outputDir, string templatePath, string modelSource,
+        public StudyResult CreateStudy(string projectName, string outputDir, string templatePath, string modelSource,
             string anglesString, double velocity, double rpm, string inputUnits, double meshSize,
             double? featureAngle, int cores)
         {
@@ -28,10 +28,9 @@ namespace foamscript.Services
 
             try
             {
-                // Extract study name from output directory
-                var studyName = Path.GetFileName(outputDir.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
-                result.StudyName = studyName;
-                result.StudyDir = Path.GetFullPath(outputDir);
+                // Use project name for study name and create study directory in output dir
+                result.StudyName = projectName;
+                result.StudyDir = Path.GetFullPath(Path.Combine(outputDir, projectName));
 
                 // Validate template exists
                 if (!Directory.Exists(templatePath))
@@ -72,7 +71,7 @@ namespace foamscript.Services
                 // Create case for each angle
                 foreach (var angle in angles)
                 {
-                    var caseInfo = CreateCase(result.StudyDir, studyName, templatePath, angle, velocity, omega, cores, geometryDir);
+                    var caseInfo = CreateCase(result.StudyDir, projectName, templatePath, angle, velocity, omega, cores, geometryDir);
                     result.Cases.Add(caseInfo);
                 }
 
