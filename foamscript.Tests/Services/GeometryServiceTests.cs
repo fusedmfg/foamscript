@@ -102,7 +102,7 @@ namespace foamscript.Tests.Services
             // Assert
             result.IsSuccess.Should().BeFalse();
             result.ErrorMessage.Should().Contain("gmsh conversion failed");
-            result.ErrorMessage.Should().Contain("Could not parse file");
+            result.ErrorMessage.Should().Contain("exit code 1");
         }
 
         [Fact]
