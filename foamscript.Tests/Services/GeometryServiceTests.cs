@@ -9,12 +9,14 @@ namespace foamscript.Tests.Services
     public class GeometryServiceTests
     {
         private readonly Mock<IProcessExecutor> _mockProcessExecutor;
+        private readonly Mock<LoggingService> _mockLoggingService;
         private readonly GeometryService _service;
 
         public GeometryServiceTests()
         {
             _mockProcessExecutor = new Mock<IProcessExecutor>();
-            _service = new GeometryService(_mockProcessExecutor.Object);
+            _mockLoggingService = new Mock<LoggingService>(Mock.Of<Microsoft.Extensions.Logging.ILogger<LoggingService>>());
+            _service = new GeometryService(_mockProcessExecutor.Object, _mockLoggingService.Object);
         }
 
         [Fact]

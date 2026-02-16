@@ -9,10 +9,12 @@ namespace foamscript.Services
     public class GeometryService
     {
         private readonly IProcessExecutor _processExecutor;
+        private readonly LoggingService _loggingService;
 
-        public GeometryService(IProcessExecutor processExecutor)
+        public GeometryService(IProcessExecutor processExecutor, LoggingService loggingService)
         {
             _processExecutor = processExecutor;
+            _loggingService = loggingService;
         }
 
         /// <summary>
@@ -61,7 +63,21 @@ namespace foamscript.Services
             if (gmshResult.ExitCode != 0)
             {
                 result.IsSuccess = false;
-                result.ErrorMessage = $"gmsh conversion failed: {gmshResult.Error}";
+                result.ErrorMessage = $"gmsh conversion failed with exit code {gmshResult.ExitCode}";
+
+                // Log detailed error output to file
+                _loggingService.LogError($"gmsh conversion failed with exit code {gmshResult.ExitCode}");
+                _loggingService.LogError($"gmsh command: gmsh {gmshArgs}");
+                _loggingService.LogError($"gmsh stdout:\n{gmshResult.Output}");
+                if (!string.IsNullOrEmpty(gmshResult.Error))
+                {
+                    _loggingService.LogError($"gmsh stderr:\n{gmshResult.Error}");
+                }
+
+                // Display short error message and direct user to log file
+                Console.WriteLine($"✗ gmsh conversion failed with exit code {gmshResult.ExitCode}");
+                Console.WriteLine($"  See log file for details: {_loggingService.GetLogFilePath()}");
+
                 return result;
             }
 
@@ -137,7 +153,21 @@ namespace foamscript.Services
             if (surfaceCheckResult.ExitCode != 0)
             {
                 result.IsValid = false;
-                result.ErrorMessage = $"surfaceCheck failed: {surfaceCheckResult.Error}";
+                result.ErrorMessage = $"surfaceCheck failed with exit code {surfaceCheckResult.ExitCode}";
+
+                // Log detailed error output to file
+                _loggingService.LogError($"surfaceCheck failed with exit code {surfaceCheckResult.ExitCode}");
+                _loggingService.LogError($"surfaceCheck command: surfaceCheck -checkSelfIntersection {stlFile}");
+                _loggingService.LogError($"surfaceCheck stdout:\n{surfaceCheckResult.Output}");
+                if (!string.IsNullOrEmpty(surfaceCheckResult.Error))
+                {
+                    _loggingService.LogError($"surfaceCheck stderr:\n{surfaceCheckResult.Error}");
+                }
+
+                // Display short error message and direct user to log file
+                Console.WriteLine($"✗ surfaceCheck failed with exit code {surfaceCheckResult.ExitCode}");
+                Console.WriteLine($"  See log file for details: {_loggingService.GetLogFilePath()}");
+
                 return result;
             }
 

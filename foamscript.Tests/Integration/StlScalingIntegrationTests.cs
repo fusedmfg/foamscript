@@ -2,6 +2,8 @@ using Xunit;
 using FluentAssertions;
 using foamscript.Services;
 using System.IO;
+using Microsoft.Extensions.Logging;
+using Moq;
 
 namespace foamscript.Tests.Integration
 {
@@ -19,9 +21,11 @@ namespace foamscript.Tests.Integration
             _testDirectory = Path.Combine(Path.GetTempPath(), $"foamscript_test_{Guid.NewGuid()}");
             Directory.CreateDirectory(_testDirectory);
 
-            // Create a real process executor for integration tests
+            // Create a real process executor and logging service for integration tests
             var processExecutor = new ProcessExecutor();
-            _geometryService = new GeometryService(processExecutor);
+            var mockLogger = new Mock<ILogger<LoggingService>>();
+            var loggingService = new LoggingService(mockLogger.Object);
+            _geometryService = new GeometryService(processExecutor, loggingService);
         }
 
         public void Dispose()
