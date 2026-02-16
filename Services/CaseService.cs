@@ -233,9 +233,9 @@ namespace foamscript.Services
                     updatedLines.Add($"Uy {uy:F6};");
                 }
                 // Update velocity vector for boundary field (OpenFOAM list format)
-                else if (trimmed.StartsWith("_U_boundaryField_inlet_value "))
+                else if (trimmed.StartsWith("U_boundaryField_inlet_value "))
                 {
-                    updatedLines.Add($"_U_boundaryField_inlet_value ({ux:F6} {uy:F6} 0);");
+                    updatedLines.Add($"U_boundaryField_inlet_value ({ux:F6} {uy:F6} 0);");
                 }
                 // Update rotation speed (rad/s)
                 else if (trimmed.StartsWith("constant_dynamicMeshDict_omega "))
