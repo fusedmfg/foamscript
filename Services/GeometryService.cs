@@ -74,10 +74,6 @@ namespace foamscript.Services
                     _loggingService.LogError($"gmsh stderr:\n{gmshResult.Error}");
                 }
 
-                // Display short error message and direct user to log file
-                Console.WriteLine($"✗ gmsh conversion failed with exit code {gmshResult.ExitCode}");
-                Console.WriteLine($"  See log file for details: {_loggingService.GetLogFilePath()}");
-
                 return result;
             }
 
@@ -163,10 +159,6 @@ namespace foamscript.Services
                 {
                     _loggingService.LogError($"surfaceCheck stderr:\n{surfaceCheckResult.Error}");
                 }
-
-                // Display short error message and direct user to log file
-                Console.WriteLine($"✗ surfaceCheck failed with exit code {surfaceCheckResult.ExitCode}");
-                Console.WriteLine($"  See log file for details: {_loggingService.GetLogFilePath()}");
 
                 return result;
             }

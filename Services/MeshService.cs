@@ -65,11 +65,6 @@ namespace foamscript.Services
                         _loggingService.LogError($"blockMesh stderr:\n{blockMeshResult.Error}");
                     }
 
-                    // Display short error message and direct user to log file
-                    Console.WriteLine();
-                    Console.WriteLine($"✗ blockMesh failed with exit code {blockMeshResult.ExitCode}");
-                    Console.WriteLine($"  See log file for details: {_loggingService.GetLogFilePath()}");
-
                     return result;
                 }
 
@@ -95,11 +90,6 @@ namespace foamscript.Services
                             _loggingService.LogError($"decomposePar stderr:\n{decomposeResult.Error}");
                         }
 
-                        // Display short error message and direct user to log file
-                        Console.WriteLine();
-                        Console.WriteLine($"✗ decomposePar failed with exit code {decomposeResult.ExitCode}");
-                        Console.WriteLine($"  See log file for details: {_loggingService.GetLogFilePath()}");
-
                         return result;
                     }
 
@@ -124,11 +114,6 @@ namespace foamscript.Services
                         {
                             _loggingService.LogError($"snappyHexMesh stderr:\n{snappyResult.Error}");
                         }
-
-                        // Display short error message and direct user to log file
-                        Console.WriteLine();
-                        Console.WriteLine($"✗ snappyHexMesh failed with exit code {snappyResult.ExitCode}");
-                        Console.WriteLine($"  See log file for details: {_loggingService.GetLogFilePath()}");
 
                         return result;
                     }
@@ -169,11 +154,6 @@ namespace foamscript.Services
                         {
                             _loggingService.LogError($"snappyHexMesh stderr:\n{snappyResult.Error}");
                         }
-
-                        // Display short error message and direct user to log file
-                        Console.WriteLine();
-                        Console.WriteLine($"✗ snappyHexMesh failed with exit code {snappyResult.ExitCode}");
-                        Console.WriteLine($"  See log file for details: {_loggingService.GetLogFilePath()}");
 
                         return result;
                     }

@@ -460,6 +460,7 @@ namespace foamscript
             else
             {
                 Console.WriteLine($"✗ Mesh generation failed: {result.ErrorMessage}");
+                Console.WriteLine($"  See log file for details: {_loggingService.GetLogFilePath()}");
                 _loggingService.LogError("Mesh generation failed.", null!);
                 Console.WriteLine();
                 return -1;
@@ -528,6 +529,7 @@ namespace foamscript
                 else
                 {
                     Console.WriteLine($"⚠ Study meshing completed with errors: {result.ErrorMessage}");
+                    Console.WriteLine($"  See log file for details: {_loggingService.GetLogFilePath()}");
                     _loggingService.LogInformation($"Study meshing completed with errors: {result.ErrorMessage}");
                     return -1;
                 }
@@ -535,6 +537,7 @@ namespace foamscript
             else
             {
                 Console.WriteLine($"✗ Study mesh generation failed: {result.ErrorMessage}");
+                Console.WriteLine($"  See log file for details: {_loggingService.GetLogFilePath()}");
                 _loggingService.LogError("Study mesh generation failed.", null!);
                 Console.WriteLine();
                 return -1;
