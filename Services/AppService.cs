@@ -148,6 +148,7 @@ namespace foamscript
             Console.WriteLine();
             Console.WriteLine($"Input:  {model.InputFile}");
             Console.WriteLine($"Output: {model.OutputFile}");
+            Console.WriteLine($"Input units: {model.InputUnits} (output will be in meters)");
             Console.WriteLine($"Mesh size scaling: {model.MeshSize}");
             if (model.FeatureAngle.HasValue)
             {
@@ -156,7 +157,7 @@ namespace foamscript
             Console.WriteLine();
             Console.WriteLine("Running gmsh...");
 
-            var result = _geometryService.ConvertStepToStl(model.InputFile, model.OutputFile, model.MeshSize, model.FeatureAngle);
+            var result = _geometryService.ConvertStepToStl(model.InputFile, model.OutputFile, model.MeshSize, model.FeatureAngle, model.InputUnits);
 
             Console.WriteLine();
 

@@ -449,5 +449,121 @@ Number of zones (connected area with consistent normal) : 5
             result.NormalZones.Should().Be(5);
             result.ErrorMessage.Should().Contain("normal zones");
         }
+
+        [Fact]
+        public void ConvertStepToStl_WithMillimeterUnits_AppliesCorrectScale()
+        {
+            // Arrange
+            var inputFile = "/path/to/model.step";
+            var outputFile = "/path/to/model.stl";
+
+            _mockProcessExecutor
+                .Setup(x => x.Execute("test", "-f /path/to/model.step"))
+                .Returns(new ProcessResult { ExitCode = 0, Output = "" });
+
+            _mockProcessExecutor
+                .Setup(x => x.Execute("gmsh", It.Is<string>(args =>
+                    args.Contains("-scale 0.001"))))
+                .Returns(new ProcessResult { ExitCode = 0, Output = "Info    : Done meshing" });
+
+            _mockProcessExecutor
+                .Setup(x => x.Execute("test", "-f /path/to/model.stl"))
+                .Returns(new ProcessResult { ExitCode = 0, Output = "" });
+
+            // Act
+            var result = _service.ConvertStepToStl(inputFile, outputFile, meshSize: 1.0, featureAngle: null, inputUnits: "mm");
+
+            // Assert
+            result.IsSuccess.Should().BeTrue();
+            _mockProcessExecutor.Verify(x => x.Execute("gmsh", It.Is<string>(args =>
+                args.Contains("-scale 0.001"))), Times.Once);
+        }
+
+        [Fact]
+        public void ConvertStepToStl_WithCentimeterUnits_AppliesCorrectScale()
+        {
+            // Arrange
+            var inputFile = "/path/to/model.step";
+            var outputFile = "/path/to/model.stl";
+
+            _mockProcessExecutor
+                .Setup(x => x.Execute("test", "-f /path/to/model.step"))
+                .Returns(new ProcessResult { ExitCode = 0, Output = "" });
+
+            _mockProcessExecutor
+                .Setup(x => x.Execute("gmsh", It.Is<string>(args =>
+                    args.Contains("-scale 0.01"))))
+                .Returns(new ProcessResult { ExitCode = 0, Output = "Info    : Done meshing" });
+
+            _mockProcessExecutor
+                .Setup(x => x.Execute("test", "-f /path/to/model.stl"))
+                .Returns(new ProcessResult { ExitCode = 0, Output = "" });
+
+            // Act
+            var result = _service.ConvertStepToStl(inputFile, outputFile, meshSize: 1.0, featureAngle: null, inputUnits: "cm");
+
+            // Assert
+            result.IsSuccess.Should().BeTrue();
+            _mockProcessExecutor.Verify(x => x.Execute("gmsh", It.Is<string>(args =>
+                args.Contains("-scale 0.01"))), Times.Once);
+        }
+
+        [Fact]
+        public void ConvertStepToStl_WithMeterUnits_DoesNotApplyScale()
+        {
+            // Arrange
+            var inputFile = "/path/to/model.step";
+            var outputFile = "/path/to/model.stl";
+
+            _mockProcessExecutor
+                .Setup(x => x.Execute("test", "-f /path/to/model.step"))
+                .Returns(new ProcessResult { ExitCode = 0, Output = "" });
+
+            _mockProcessExecutor
+                .Setup(x => x.Execute("gmsh", It.Is<string>(args =>
+                    !args.Contains("-scale"))))
+                .Returns(new ProcessResult { ExitCode = 0, Output = "Info    : Done meshing" });
+
+            _mockProcessExecutor
+                .Setup(x => x.Execute("test", "-f /path/to/model.stl"))
+                .Returns(new ProcessResult { ExitCode = 0, Output = "" });
+
+            // Act
+            var result = _service.ConvertStepToStl(inputFile, outputFile, meshSize: 1.0, featureAngle: null, inputUnits: "m");
+
+            // Assert
+            result.IsSuccess.Should().BeTrue();
+            _mockProcessExecutor.Verify(x => x.Execute("gmsh", It.Is<string>(args =>
+                !args.Contains("-scale"))), Times.Once);
+        }
+
+        [Fact]
+        public void ConvertStepToStl_WithInchUnits_AppliesCorrectScale()
+        {
+            // Arrange
+            var inputFile = "/path/to/model.step";
+            var outputFile = "/path/to/model.stl";
+
+            _mockProcessExecutor
+                .Setup(x => x.Execute("test", "-f /path/to/model.step"))
+                .Returns(new ProcessResult { ExitCode = 0, Output = "" });
+
+            _mockProcessExecutor
+                .Setup(x => x.Execute("gmsh", It.Is<string>(args =>
+                    args.Contains("-scale 0.0254"))))
+                .Returns(new ProcessResult { ExitCode = 0, Output = "Info    : Done meshing" });
+
+            _mockProcessExecutor
+                .Setup(x => x.Execute("test", "-f /path/to/model.stl"))
+                .Returns(new ProcessResult { ExitCode = 0, Output = "" });
+
+            // Act
+            var result = _service.ConvertStepToStl(inputFile, outputFile, meshSize: 1.0, featureAngle: null, inputUnits: "in");
+
+            // Assert
+            result.IsSuccess.Should().BeTrue();
+            _mockProcessExecutor.Verify(x => x.Execute("gmsh", It.Is<string>(args =>
+                args.Contains("-scale 0.0254"))), Times.Once);
+        }
     }
 }

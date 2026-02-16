@@ -20,6 +20,9 @@ namespace foamscript.Models
         [Option('a', "feature-angle", Required = false, HelpText = "Feature angle in degrees (default: none). Preserves sharp edges above this angle threshold.")]
         public double? FeatureAngle { get; set; }
 
+        [Option('u', "input-units", Required = false, HelpText = "Input file units (mm, cm, m, in, ft). Output will be scaled to meters for OpenFOAM. Default: m (no conversion).")]
+        public string InputUnits { get; set; } = "m";
+
         [Option("validate", Required = false, HelpText = "Validate the output STL file for quality and suitability for snappyHexMesh")]
         public bool Validate { get; set; }
 

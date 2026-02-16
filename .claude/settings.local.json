@@ -21,7 +21,9 @@
       "WebFetch(domain:www.openfoam.com)",
       "WebFetch(domain:www.cfd-online.com)",
       "WebFetch(domain:www.wolfdynamics.com)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)"
     ]
   }
 }

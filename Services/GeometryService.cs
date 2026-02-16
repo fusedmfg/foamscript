@@ -22,8 +22,9 @@ namespace foamscript.Services
         /// <param name="outputFile">Path to output STL file</param>
         /// <param name="meshSize">Mesh size scaling factor (default 1.0)</param>
         /// <param name="featureAngle">Feature angle in degrees (null = no angle constraint)</param>
+        /// <param name="inputUnits">Input file units (mm, cm, m, in, ft) - output will be scaled to meters</param>
         /// <returns>Conversion result with success status and details</returns>
-        public GeometryConversionResult ConvertStepToStl(string inputFile, string outputFile, double meshSize = 1.0, double? featureAngle = null)
+        public GeometryConversionResult ConvertStepToStl(string inputFile, string outputFile, double meshSize = 1.0, double? featureAngle = null, string inputUnits = "m")
         {
             var result = new GeometryConversionResult();
 
@@ -36,13 +37,23 @@ namespace foamscript.Services
                 return result;
             }
 
+            // Calculate scale factor for unit conversion to meters
+            var scaleFactor = GetUnitScaleFactor(inputUnits);
+
             // Build gmsh command
             // -3: 3D meshing
             // -format stl: output format
             // -clscale: mesh size scaling factor
+            // -scale: geometry scaling factor (for unit conversion)
             // -angle: feature angle threshold (preserves sharp edges)
             // -o: output file
             var gmshArgs = $"-3 -format stl -clscale {meshSize}";
+
+            // Apply unit conversion scale if needed
+            if (scaleFactor != 1.0)
+            {
+                gmshArgs += $" -scale {scaleFactor}";
+            }
 
             if (featureAngle.HasValue)
             {
@@ -230,6 +241,22 @@ namespace foamscript.Services
                 result.IsSelfIntersecting = false;
                 result.SelfIntersectionCount = 0;
             }
+        }
+
+        /// <summary>
+        /// Gets the scale factor to convert from input units to meters (OpenFOAM standard).
+        /// </summary>
+        private double GetUnitScaleFactor(string inputUnits)
+        {
+            return inputUnits.ToLower() switch
+            {
+                "mm" => 0.001,      // millimeters to meters
+                "cm" => 0.01,       // centimeters to meters
+                "m" => 1.0,         // meters to meters (no conversion)
+                "in" => 0.0254,     // inches to meters
+                "ft" => 0.3048,     // feet to meters
+                _ => 1.0            // default: no conversion
+            };
         }
     }
 }
