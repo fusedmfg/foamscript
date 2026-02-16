@@ -44,16 +44,9 @@ namespace foamscript.Services
             // -3: 3D meshing
             // -format stl: output format
             // -clscale: mesh size scaling factor
-            // -scale: geometry scaling factor (for unit conversion)
             // -angle: feature angle threshold (preserves sharp edges)
             // -o: output file
             var gmshArgs = $"-3 -format stl -clscale {meshSize}";
-
-            // Apply unit conversion scale if needed
-            if (scaleFactor != 1.0)
-            {
-                gmshArgs += $" -scale {scaleFactor}";
-            }
 
             if (featureAngle.HasValue)
             {
@@ -79,6 +72,17 @@ namespace foamscript.Services
                 result.IsSuccess = false;
                 result.ErrorMessage = $"Output file was not created: {outputFile}";
                 return result;
+            }
+
+            // Post-process: Scale STL vertices if unit conversion is needed
+            if (scaleFactor != 1.0)
+            {
+                if (!ScaleStlFile(outputFile, scaleFactor))
+                {
+                    result.IsSuccess = false;
+                    result.ErrorMessage = $"Failed to scale STL file to meters (scale factor: {scaleFactor})";
+                    return result;
+                }
             }
 
             // Parse mesh statistics from gmsh output
@@ -244,6 +248,57 @@ namespace foamscript.Services
         }
 
         /// <summary>
+        /// Scales all vertices in an STL file by a given factor.
+        /// </summary>
+        /// <param name="stlFile">Path to the STL file</param>
+        /// <param name="scaleFactor">Scale factor to apply to all vertices</param>
+        /// <returns>True if successful, false otherwise</returns>
+        private bool ScaleStlFile(string stlFile, double scaleFactor)
+        {
+            try
+            {
+                var lines = File.ReadAllLines(stlFile);
+                var scaledLines = new List<string>();
+
+                foreach (var line in lines)
+                {
+                    var trimmed = line.Trim();
+                    if (trimmed.StartsWith("vertex"))
+                    {
+                        // Parse vertex line: "vertex x y z"
+                        var parts = trimmed.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+                        if (parts.Length >= 4)
+                        {
+                            if (double.TryParse(parts[1], out double x) &&
+                                double.TryParse(parts[2], out double y) &&
+                                double.TryParse(parts[3], out double z))
+                            {
+                                // Scale the vertex
+                                x *= scaleFactor;
+                                y *= scaleFactor;
+                                z *= scaleFactor;
+
+                                // Reconstruct line with scaled values
+                                scaledLines.Add($"      vertex {x:E} {y:E} {z:E}");
+                                continue;
+                            }
+                        }
+                    }
+                    // Keep non-vertex lines as-is
+                    scaledLines.Add(line);
+                }
+
+                // Write scaled STL back to file
+                File.WriteAllLines(stlFile, scaledLines);
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        /// <summary>
         /// Gets the scale factor to convert from input units to meters (OpenFOAM standard).
         /// </summary>
         private double GetUnitScaleFactor(string inputUnits)
@@ -284,6 +339,7 @@ namespace foamscript.Services
             }
 
             // Parse disc STL and calculate bounding box
+            // STL file is assumed to be in meters (converted by the convert command with --input-units)
             var boundingBox = CalculateBoundingBox(discStlFile);
             if (boundingBox == null)
             {
@@ -292,47 +348,12 @@ namespace foamscript.Services
                 return result;
             }
 
-            // Auto-detect units based on PDGA disc diameter rules (21-30cm)
+            // Validate disc dimensions are reasonable (PDGA disc: 21-30cm diameter)
             var discDiameter = Math.Max(boundingBox.Width, boundingBox.Depth);
-            double unitScale = 1.0;
-            string detectedUnits = "meters";
-
-            if (discDiameter >= 210 && discDiameter <= 300)
+            if (discDiameter < 0.18 || discDiameter > 0.35)
             {
-                // Diameter in millimeters (210-300mm)
-                unitScale = 0.001;
-                detectedUnits = "millimeters";
-            }
-            else if (discDiameter >= 21 && discDiameter <= 30)
-            {
-                // Diameter in centimeters (21-30cm)
-                unitScale = 0.01;
-                detectedUnits = "centimeters";
-            }
-            else if (discDiameter >= 0.21 && discDiameter <= 0.30)
-            {
-                // Diameter in meters (0.21-0.30m) - already correct
-                unitScale = 1.0;
-                detectedUnits = "meters";
-            }
-            else
-            {
-                // Out of expected range - warn but continue
-                Console.WriteLine($"⚠ Warning: Disc diameter {discDiameter:F4} is outside expected PDGA range (21-30cm).");
-                Console.WriteLine($"  Assuming units are meters. Use correct units in convert command if needed.");
-            }
-
-            // Apply scaling if needed
-            if (unitScale != 1.0)
-            {
-                Console.WriteLine($"✓ Auto-detected units: {detectedUnits} (diameter = {discDiameter:F2} {detectedUnits})");
-                Console.WriteLine($"  Scaling to meters (factor: {unitScale})");
-                boundingBox.MinX *= unitScale;
-                boundingBox.MaxX *= unitScale;
-                boundingBox.MinY *= unitScale;
-                boundingBox.MaxY *= unitScale;
-                boundingBox.MinZ *= unitScale;
-                boundingBox.MaxZ *= unitScale;
+                Console.WriteLine($"⚠ Warning: Disc diameter {discDiameter:F4}m is outside expected PDGA range (0.21-0.30m).");
+                Console.WriteLine($"  Ensure you used correct --input-units during conversion.");
             }
 
             result.DiscBoundingBox = boundingBox;
