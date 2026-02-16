@@ -40,26 +40,61 @@ namespace foamscript.Services
             // Calculate scale factor for unit conversion to meters
             var scaleFactor = GetUnitScaleFactor(inputUnits);
 
-            // Determine output file (temp if scaling is needed)
-            var tempOutput = scaleFactor != 1.0 ? $"{outputFile}.temp" : outputFile;
+            ProcessResult gmshResult;
 
-            // Build gmsh command
-            // -3: 3D meshing
-            // -format stl: output format
-            // -clscale: mesh size scaling factor
-            // -angle: feature angle threshold (preserves sharp edges)
-            // -o: output file
-            var gmshArgs = $"-3 -format stl -clscale {meshSize}";
-
-            if (featureAngle.HasValue)
+            // If scaling is needed, use gmsh script with Dilate to convert and scale in one step
+            if (scaleFactor != 1.0)
             {
-                gmshArgs += $" -angle {featureAngle.Value}";
+                // Convert to absolute paths for gmsh
+                var absInputFile = Path.GetFullPath(inputFile);
+                var absOutputFile = Path.GetFullPath(outputFile);
+
+                // Build gmsh script for STEP conversion with scaling
+                // - Geometry.OCCBoundsUseVisible: needed for OpenCASCADE kernel
+                // - Dilate: scales geometry around origin
+                // - Volume{:}: applies to all volumes (STEP solids)
+                // - Mesh 2: generates 2D surface mesh
+                var scriptParts = new List<string>
+                {
+                    "Geometry.OCCBoundsUseVisible = 1;",
+                    $"Dilate {{{{0,0,0}}, {scaleFactor}}} {{ Volume{{:}}; }}",
+                    $"Mesh.MeshSizeFactor = {meshSize};",
+                };
+
+                if (featureAngle.HasValue)
+                {
+                    scriptParts.Add($"Mesh.AngleToleranceFacetOverlap = {featureAngle.Value};");
+                }
+
+                scriptParts.Add("Mesh 2;");
+                scriptParts.Add($"Save '{absOutputFile}';");
+
+                var script = string.Join(" ", scriptParts);
+                var gmshArgs = $"{absInputFile} -string \"{script}\" -0";
+
+                Console.WriteLine($"DEBUG: Executing gmsh with args: {gmshArgs}");
+
+                gmshResult = _processExecutor.Execute("gmsh", gmshArgs);
             }
+            else
+            {
+                // No scaling needed, use standard gmsh conversion
+                // -3: 3D meshing
+                // -format stl: output format
+                // -clscale: mesh size scaling factor
+                // -angle: feature angle threshold (preserves sharp edges)
+                // -o: output file
+                var gmshArgs = $"-3 -format stl -clscale {meshSize}";
 
-            gmshArgs += $" -o {tempOutput} {inputFile}";
+                if (featureAngle.HasValue)
+                {
+                    gmshArgs += $" -angle {featureAngle.Value}";
+                }
 
-            // Execute gmsh
-            var gmshResult = _processExecutor.Execute("gmsh", gmshArgs);
+                gmshArgs += $" -o {outputFile} {inputFile}";
+
+                gmshResult = _processExecutor.Execute("gmsh", gmshArgs);
+            }
 
             if (gmshResult.ExitCode != 0)
             {
@@ -69,47 +104,12 @@ namespace foamscript.Services
             }
 
             // Verify output file was created
-            var outputCheckResult = _processExecutor.Execute("test", $"-f {tempOutput}");
+            var outputCheckResult = _processExecutor.Execute("test", $"-f {outputFile}");
             if (outputCheckResult.ExitCode != 0)
             {
                 result.IsSuccess = false;
-                result.ErrorMessage = $"Output file was not created: {tempOutput}";
+                result.ErrorMessage = $"Output file was not created: {outputFile}";
                 return result;
-            }
-
-            // Scale using gmsh Dilate if unit conversion is needed
-            if (scaleFactor != 1.0)
-            {
-                // Convert to absolute paths for gmsh
-                var absTempOutput = Path.GetFullPath(tempOutput);
-                var absOutputFile = Path.GetFullPath(outputFile);
-
-                // Load STL as command-line argument, then apply Dilate transformation
-                var dilateScript = $"Dilate {{{{0,0,0}}, {scaleFactor}}} {{ Surface{{:}}; }} Save '{absOutputFile}';";
-                var dilateArgs = $"{absTempOutput} -string \"{dilateScript}\" -0";
-
-                Console.WriteLine($"DEBUG: Executing gmsh with args: {dilateArgs}");
-
-                var dilateResult = _processExecutor.Execute("gmsh", dilateArgs);
-
-                // Clean up temp file
-                try { File.Delete(tempOutput); } catch { }
-
-                if (dilateResult.ExitCode != 0)
-                {
-                    result.IsSuccess = false;
-                    result.ErrorMessage = $"gmsh scaling (Dilate) failed: {dilateResult.Error}";
-                    return result;
-                }
-
-                // Verify scaled output was created
-                var scaledCheckResult = _processExecutor.Execute("test", $"-f {outputFile}");
-                if (scaledCheckResult.ExitCode != 0)
-                {
-                    result.IsSuccess = false;
-                    result.ErrorMessage = $"Scaled output file was not created: {outputFile}";
-                    return result;
-                }
             }
 
             // Parse mesh statistics from gmsh output
