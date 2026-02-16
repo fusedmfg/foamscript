@@ -88,6 +88,8 @@ namespace foamscript.Services
                 var dilateScript = $"Dilate {{{{0,0,0}}, {scaleFactor}}} {{ Surface{{:}}; }} Save '{absOutputFile}';";
                 var dilateArgs = $"{absTempOutput} -string \"{dilateScript}\" -0";
 
+                Console.WriteLine($"DEBUG: Executing gmsh with args: {dilateArgs}");
+
                 var dilateResult = _processExecutor.Execute("gmsh", dilateArgs);
 
                 // Clean up temp file
