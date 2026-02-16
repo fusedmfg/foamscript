@@ -80,12 +80,13 @@ namespace foamscript.Services
             // Scale using gmsh Dilate if unit conversion is needed
             if (scaleFactor != 1.0)
             {
-                // Convert to absolute paths for gmsh Merge command
+                // Convert to absolute paths for gmsh
                 var absTempOutput = Path.GetFullPath(tempOutput);
                 var absOutputFile = Path.GetFullPath(outputFile);
 
-                var dilateScript = $"Merge '{absTempOutput}'; Dilate {{{{0,0,0}}, {scaleFactor}}} {{ Surface{{:}}; }} Save '{absOutputFile}';";
-                var dilateArgs = $"-string \"{dilateScript}\" -0";
+                // Load STL as command-line argument, then apply Dilate transformation
+                var dilateScript = $"Dilate {{{{0,0,0}}, {scaleFactor}}} {{ Surface{{:}}; }} Save '{absOutputFile}';";
+                var dilateArgs = $"{absTempOutput} -string \"{dilateScript}\" -0";
 
                 var dilateResult = _processExecutor.Execute("gmsh", dilateArgs);
 
