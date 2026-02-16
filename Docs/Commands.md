@@ -351,6 +351,7 @@ For each case, the following parameters in `constant/caseSettings` are automatic
 - `Uy` - Y velocity component (m/s)
 - `constant_dynamicMeshDict_omega` - Rotation speed (rad/s)
 - `system_decomposeParDict_numberOfSubdomains` - Number of cores
+- `discDiameter` - Disc diameter in meters (auto-detected from geometry)
 
 ### Output
 

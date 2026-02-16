@@ -65,13 +65,15 @@ namespace foamscript.Services
                     return result;
                 }
 
+                var discDiameter = geometryResult.DiscDiameter;
+
                 // Convert RPM to rad/s
                 var omega = RpmToRadPerSec(rpm);
 
                 // Create case for each angle
                 foreach (var angle in angles)
                 {
-                    var caseInfo = CreateCase(result.StudyDir, projectName, templatePath, angle, velocity, omega, cores, geometryDir);
+                    var caseInfo = CreateCase(result.StudyDir, projectName, templatePath, angle, velocity, omega, cores, geometryDir, discDiameter);
                     result.Cases.Add(caseInfo);
                 }
 
@@ -89,7 +91,7 @@ namespace foamscript.Services
         /// <summary>
         /// Processes geometry: copies source file, converts if needed, generates domain.
         /// </summary>
-        private (bool Success, string? ErrorMessage) ProcessGeometry(string geometryDir, string modelSource,
+        private (bool Success, string? ErrorMessage, double DiscDiameter) ProcessGeometry(string geometryDir, string modelSource,
             string inputUnits, double meshSize, double? featureAngle)
         {
             try
@@ -97,7 +99,7 @@ namespace foamscript.Services
                 // Validate source file exists
                 if (!File.Exists(modelSource))
                 {
-                    return (false, $"Model source file not found: {modelSource}");
+                    return (false, $"Model source file not found: {modelSource}", 0.0);
                 }
 
                 var sourceExt = Path.GetExtension(modelSource).ToLowerInvariant();
@@ -124,7 +126,7 @@ namespace foamscript.Services
 
                     if (!conversionResult.IsSuccess)
                     {
-                        return (false, $"Failed to convert geometry: {conversionResult.ErrorMessage}");
+                        return (false, $"Failed to convert geometry: {conversionResult.ErrorMessage}", 0.0);
                     }
                 }
                 else if (sourceExt == ".stl")
@@ -138,7 +140,7 @@ namespace foamscript.Services
                 }
                 else
                 {
-                    return (false, $"Unsupported file format: {sourceExt}. Supported formats: .step, .stp, .iges, .igs, .stl");
+                    return (false, $"Unsupported file format: {sourceExt}. Supported formats: .step, .stp, .iges, .igs, .stl", 0.0);
                 }
 
                 // Generate rotor and tunnel STL files from disc using default parameters
@@ -154,14 +156,17 @@ namespace foamscript.Services
                 );
                 if (!domainResult.IsSuccess)
                 {
-                    return (false, $"Failed to generate domain: {domainResult.ErrorMessage}");
+                    return (false, $"Failed to generate domain: {domainResult.ErrorMessage}", 0.0);
                 }
 
-                return (true, null);
+                // Extract disc diameter from bounding box
+                var discDiameter = domainResult.DiscBoundingBox?.Diameter ?? 0.0;
+
+                return (true, null, discDiameter);
             }
             catch (Exception ex)
             {
-                return (false, $"Geometry processing failed: {ex.Message}");
+                return (false, $"Geometry processing failed: {ex.Message}", 0.0);
             }
         }
 
@@ -169,7 +174,7 @@ namespace foamscript.Services
         /// Creates a single case directory for a specific angle of attack.
         /// </summary>
         private CaseInfo CreateCase(string studyDir, string studyName, string templatePath,
-            double angle, double velocity, double omega, int cores, string geometryDir)
+            double angle, double velocity, double omega, int cores, string geometryDir, double discDiameter)
         {
             var caseInfo = new CaseInfo
             {
@@ -191,7 +196,7 @@ namespace foamscript.Services
             caseInfo.Uy = velocity * Math.Sin(angleRad);
 
             // Update caseSettings file
-            UpdateCaseSettings(caseDir, caseInfo.Ux, caseInfo.Uy, omega, cores);
+            UpdateCaseSettings(caseDir, caseInfo.Ux, caseInfo.Uy, omega, cores, discDiameter);
 
             // Copy STL files from geometry directory
             CopyStlFiles(geometryDir, caseDir);
@@ -202,7 +207,7 @@ namespace foamscript.Services
         /// <summary>
         /// Updates the constant/caseSettings file with calculated parameters.
         /// </summary>
-        private void UpdateCaseSettings(string caseDir, double ux, double uy, double omega, int cores)
+        private void UpdateCaseSettings(string caseDir, double ux, double uy, double omega, int cores, double discDiameter)
         {
             var caseSettingsPath = Path.Combine(caseDir, "constant", "caseSettings");
 
@@ -236,6 +241,11 @@ namespace foamscript.Services
                 else if (trimmed.StartsWith("system_decomposeParDict_numberOfSubdomains "))
                 {
                     updatedLines.Add($"system_decomposeParDict_numberOfSubdomains {cores};");
+                }
+                // Update disc diameter
+                else if (trimmed.StartsWith("discDiameter "))
+                {
+                    updatedLines.Add($"discDiameter {discDiameter:F6};");
                 }
                 else
                 {
