@@ -34,11 +34,6 @@ namespace foamscript
                     case ConvertModel convertModel:
                         return HandleConvert(convertModel);
 
-                    // Handle mesh verb.
-                    case MeshModel meshModel:
-                        _loggingService.LogInformation("Running mesh model...");
-                        return _meshService.MeshGeometry();
-
                     // Handle generate-domain verb.
                     case GenerateDomainModel generateDomainModel:
                         return HandleGenerateDomain(generateDomainModel);
@@ -46,6 +41,14 @@ namespace foamscript
                     // Handle new-study verb.
                     case NewStudyModel newStudyModel:
                         return HandleNewStudy(newStudyModel);
+
+                    // Handle mesh verb.
+                    case MeshCaseModel meshCaseModel:
+                        return HandleMesh(meshCaseModel);
+
+                    // Handle mesh-study verb.
+                    case MeshStudyModel meshStudyModel:
+                        return HandleMeshStudy(meshStudyModel);
 
                     // Handle unimplemented verb types here.
                     default:
@@ -393,6 +396,146 @@ namespace foamscript
             {
                 Console.WriteLine($"✗ Study creation failed: {result.ErrorMessage}");
                 _loggingService.LogError("Study creation failed.", null!);
+                Console.WriteLine();
+                return -1;
+            }
+        }
+
+        private int HandleMesh(MeshCaseModel model)
+        {
+            _loggingService.LogInformation($"Meshing case at {model.CaseDir}");
+
+            Console.WriteLine();
+            Console.WriteLine("=== Mesh Generation ===");
+            Console.WriteLine();
+            Console.WriteLine($"Case directory: {model.CaseDir}");
+            Console.WriteLine($"Parallel: {(model.Parallel ? $"Yes ({model.Cores} cores)" : "No")}");
+            Console.WriteLine($"Check quality: {(model.CheckQuality ? "Yes" : "No")}");
+            Console.WriteLine($"Overwrite: {(model.Overwrite ? "Yes" : "No")}");
+            Console.WriteLine();
+
+            var result = _meshService.MeshCase(
+                model.CaseDir,
+                model.Parallel,
+                model.Cores,
+                model.CheckQuality,
+                model.Overwrite);
+
+            if (result.IsSuccess)
+            {
+                Console.WriteLine();
+                Console.WriteLine("✓ Mesh generation successful!");
+                Console.WriteLine();
+
+                if (result.CellCount.HasValue)
+                {
+                    Console.WriteLine("Mesh Statistics:");
+                    Console.WriteLine($"  Cells: {result.CellCount:N0}");
+                    if (result.PointCount.HasValue)
+                        Console.WriteLine($"  Points: {result.PointCount:N0}");
+                    if (result.FaceCount.HasValue)
+                        Console.WriteLine($"  Faces: {result.FaceCount:N0}");
+                    Console.WriteLine();
+                }
+
+                if (result.MeshQualityPassed.HasValue)
+                {
+                    Console.WriteLine($"Mesh Quality: {(result.MeshQualityPassed.Value ? "✓ Passed" : "✗ Failed")}");
+                    Console.WriteLine();
+                }
+
+                if (result.Warnings.Count > 0)
+                {
+                    Console.WriteLine("Warnings:");
+                    foreach (var warning in result.Warnings)
+                    {
+                        Console.WriteLine($"  ⚠ {warning}");
+                    }
+                    Console.WriteLine();
+                }
+
+                _loggingService.LogInformation("Mesh generation completed successfully.");
+                return 0;
+            }
+            else
+            {
+                Console.WriteLine($"✗ Mesh generation failed: {result.ErrorMessage}");
+                _loggingService.LogError("Mesh generation failed.", null!);
+                Console.WriteLine();
+                return -1;
+            }
+        }
+
+        private int HandleMeshStudy(MeshStudyModel model)
+        {
+            _loggingService.LogInformation($"Meshing study at {model.StudyDir}");
+
+            Console.WriteLine();
+            Console.WriteLine("=== Study Mesh Generation ===");
+            Console.WriteLine();
+            Console.WriteLine($"Study directory: {model.StudyDir}");
+            Console.WriteLine($"Parallel: {(model.Parallel ? $"Yes ({model.Cores} cores per case)" : "No")}");
+            Console.WriteLine($"Check quality: {(model.CheckQuality ? "Yes" : "No")}");
+            Console.WriteLine($"Overwrite: {(model.Overwrite ? "Yes" : "No")}");
+            Console.WriteLine($"Continue on error: {(model.ContinueOnError ? "Yes" : "No")}");
+            Console.WriteLine();
+
+            var result = _meshService.MeshStudy(
+                model.StudyDir,
+                model.Parallel,
+                model.Cores,
+                model.CheckQuality,
+                model.Overwrite,
+                model.ContinueOnError);
+
+            if (result.IsSuccess || (model.ContinueOnError && result.SuccessfulCases > 0))
+            {
+                Console.WriteLine("=== Study Mesh Summary ===");
+                Console.WriteLine();
+                Console.WriteLine($"Total cases: {result.TotalCases}");
+                Console.WriteLine($"✓ Successful: {result.SuccessfulCases}");
+                if (result.FailedCases > 0)
+                {
+                    Console.WriteLine($"✗ Failed: {result.FailedCases}");
+                }
+                Console.WriteLine();
+
+                // Show summary table
+                Console.WriteLine("Case Details:");
+                Console.WriteLine(new string('-', 80));
+                Console.WriteLine($"{"Case Name",-30} {"Status",-10} {"Cells",-15} {"Quality",-10}");
+                Console.WriteLine(new string('-', 80));
+
+                foreach (var caseSummary in result.CaseSummaries)
+                {
+                    var status = caseSummary.Success ? "✓ OK" : "✗ Failed";
+                    var cells = caseSummary.CellCount.HasValue ? $"{caseSummary.CellCount:N0}" : "N/A";
+                    var quality = caseSummary.MeshQualityPassed.HasValue
+                        ? (caseSummary.MeshQualityPassed.Value ? "✓ Passed" : "✗ Failed")
+                        : "N/A";
+
+                    Console.WriteLine($"{caseSummary.CaseName,-30} {status,-10} {cells,-15} {quality,-10}");
+                }
+
+                Console.WriteLine(new string('-', 80));
+                Console.WriteLine();
+
+                if (result.IsSuccess)
+                {
+                    _loggingService.LogInformation("Study mesh generation completed successfully.");
+                    return 0;
+                }
+                else
+                {
+                    Console.WriteLine($"⚠ Study meshing completed with errors: {result.ErrorMessage}");
+                    _loggingService.LogInformation($"Study meshing completed with errors: {result.ErrorMessage}");
+                    return -1;
+                }
+            }
+            else
+            {
+                Console.WriteLine($"✗ Study mesh generation failed: {result.ErrorMessage}");
+                _loggingService.LogError("Study mesh generation failed.", null!);
                 Console.WriteLine();
                 return -1;
             }
