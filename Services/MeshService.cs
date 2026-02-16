@@ -57,10 +57,19 @@ namespace foamscript.Services
 
                     // Display the error output for debugging
                     Console.WriteLine();
-                    Console.WriteLine("blockMesh output:");
+                    Console.WriteLine("blockMesh stdout:");
                     Console.WriteLine(new string('-', 60));
                     Console.WriteLine(blockMeshResult.Output);
                     Console.WriteLine(new string('-', 60));
+
+                    if (!string.IsNullOrEmpty(blockMeshResult.Error))
+                    {
+                        Console.WriteLine();
+                        Console.WriteLine("blockMesh stderr:");
+                        Console.WriteLine(new string('-', 60));
+                        Console.WriteLine(blockMeshResult.Error);
+                        Console.WriteLine(new string('-', 60));
+                    }
 
                     return result;
                 }
@@ -80,10 +89,19 @@ namespace foamscript.Services
                         result.ErrorMessage = $"decomposePar failed with exit code {decomposeResult.ExitCode}";
 
                         Console.WriteLine();
-                        Console.WriteLine("decomposePar output:");
+                        Console.WriteLine("decomposePar stdout:");
                         Console.WriteLine(new string('-', 60));
                         Console.WriteLine(decomposeResult.Output);
                         Console.WriteLine(new string('-', 60));
+
+                        if (!string.IsNullOrEmpty(decomposeResult.Error))
+                        {
+                            Console.WriteLine();
+                            Console.WriteLine("decomposePar stderr:");
+                            Console.WriteLine(new string('-', 60));
+                            Console.WriteLine(decomposeResult.Error);
+                            Console.WriteLine(new string('-', 60));
+                        }
 
                         return result;
                     }
@@ -103,10 +121,19 @@ namespace foamscript.Services
                         result.ErrorMessage = $"snappyHexMesh (parallel) failed with exit code {snappyResult.ExitCode}";
 
                         Console.WriteLine();
-                        Console.WriteLine("snappyHexMesh output:");
+                        Console.WriteLine("snappyHexMesh stdout:");
                         Console.WriteLine(new string('-', 60));
                         Console.WriteLine(snappyResult.Output);
                         Console.WriteLine(new string('-', 60));
+
+                        if (!string.IsNullOrEmpty(snappyResult.Error))
+                        {
+                            Console.WriteLine();
+                            Console.WriteLine("snappyHexMesh stderr:");
+                            Console.WriteLine(new string('-', 60));
+                            Console.WriteLine(snappyResult.Error);
+                            Console.WriteLine(new string('-', 60));
+                        }
 
                         return result;
                     }
@@ -141,10 +168,19 @@ namespace foamscript.Services
                         result.ErrorMessage = $"snappyHexMesh failed with exit code {snappyResult.ExitCode}";
 
                         Console.WriteLine();
-                        Console.WriteLine("snappyHexMesh output:");
+                        Console.WriteLine("snappyHexMesh stdout:");
                         Console.WriteLine(new string('-', 60));
                         Console.WriteLine(snappyResult.Output);
                         Console.WriteLine(new string('-', 60));
+
+                        if (!string.IsNullOrEmpty(snappyResult.Error))
+                        {
+                            Console.WriteLine();
+                            Console.WriteLine("snappyHexMesh stderr:");
+                            Console.WriteLine(new string('-', 60));
+                            Console.WriteLine(snappyResult.Error);
+                            Console.WriteLine(new string('-', 60));
+                        }
 
                         return result;
                     }
