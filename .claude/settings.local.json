@@ -1,0 +1,27 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(dotnet new:*)",
+      "Bash(dotnet add:*)",
+      "Bash(dotnet test:*)",
+      "Bash(dotnet build:*)",
+      "Bash(dotnet clean:*)",
+      "Bash(powershell.exe -File deploy.ps1 -RunValidation)",
+      "Bash(powershell.exe -ExecutionPolicy Bypass -File deploy.ps1 -RunValidation)",
+      "Bash(cmd.exe /c \"powershell.exe -ExecutionPolicy Bypass -Command \"\"& {Set-Location ''C:\\\\source\\\\foamscript''; .\\\\deploy.ps1 -RunValidation}\"\"\")",
+      "Bash(powershell.exe -Command \"[System.Management.Automation.PSParser]::Tokenize\\(\\(Get-Content -Path ''C:\\\\source\\\\foamscript\\\\deploy.ps1'' -Raw\\), [ref]$null\\) | Select-Object -First 1\")",
+      "Bash(cmd.exe /c \"run-deploy.bat -RunValidation\")",
+      "Bash(rsync:*)",
+      "Bash(tar:*)",
+      "Bash(scp:*)",
+      "Bash(ssh trboyden@fusiondiscgolf \"mkdir -p ~/foamscript && cd ~/foamscript && tar -xzf /tmp/foamscript.tar.gz\")",
+      "Bash(ssh trboyden@fusiondiscgolf \"cd ~/foamscript && dotnet build foamscript.csproj -c Release --verbosity quiet\")",
+      "Bash(ssh:*)",
+      "Bash(dotnet run:*)",
+      "WebFetch(domain:www.openfoam.com)",
+      "WebFetch(domain:www.cfd-online.com)",
+      "WebFetch(domain:www.wolfdynamics.com)",
+      "Bash(git add:*)"
+    ]
+  }
+}

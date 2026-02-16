@@ -1,5 +1,5 @@
 using Microsoft.Extensions.Logging;
-namespace foamscript
+namespace foamscript.Services
 {
     public class LoggingService
     {

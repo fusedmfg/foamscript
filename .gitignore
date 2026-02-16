@@ -416,3 +416,6 @@ FodyWeavers.xsd
 *.msix
 *.msm
 *.msp
+
+# FoamScript deployment configuration (contains credentials)
+deploy.config.ps1
