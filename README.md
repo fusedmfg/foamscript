@@ -32,7 +32,7 @@ foamscript new-study \
 
 ## Documentation
 
-📖 **[Full Documentation](Docs/README.md)**
+📖 **[Full Documentation](Docs/Commands.md)**
 
 ### Commands
 
@@ -126,4 +126,4 @@ foamscript/
 
 ## Contributing
 
-See [Docs/README.md](Docs/README.md) for contribution guidelines.
+When adding new features, update [Docs/Commands.md](Docs/Commands.md) with any new commands or options.
