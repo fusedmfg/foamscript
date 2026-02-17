@@ -27,7 +27,7 @@ foamscript new-study \
 - **Geometry Conversion**: STEP/IGES → STL with automatic unit scaling (mm, cm, in, ft → meters)
 - **Domain Generation**: Automatic rotor and tunnel STL creation
 - **Parametric Studies**: Angle of attack sweeps with automatic parameter calculation
-- **Template-Based**: Centralized configuration with `constant/caseSettings`
+- **Template-Based**: Scriban-rendered OpenFOAM case files with full parameter substitution
 - **Cross-Platform**: Developed on Windows, deployed on Linux
 
 ## Documentation
@@ -60,7 +60,7 @@ dotnet publish -c Release
 
 ### Deploy
 
-See [DEPLOY.md](DEPLOY.md) for deployment to Linux systems.
+Clone the repo on the Linux machine and run `./build.sh` — it pulls latest, builds Release, and runs tests.
 
 ## Usage Examples
 
