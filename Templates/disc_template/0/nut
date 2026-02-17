@@ -1,0 +1,58 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
+|  \\    /   O peration     | Version:  v2512                                 |
+|   \\  /    A nd           | Website:  www.openfoam.com                      |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       volScalarField;
+    object      nut;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+#include "$FOAM_CASE/constant/caseSettings"
+
+// Hard-coded constant
+dimensions      [0 2 -1 0 0 0 0];
+
+// Solver will calculate the real values at the first iteration
+internalField   uniform 0;
+
+boundaryField
+{
+    inlet
+    {
+        // nut is derived from U, k, and omega at the boundary
+        type            calculated;
+        value           uniform 0;
+    }
+
+    outlet
+    {
+        type            zeroGradient;
+    }
+
+    tunnel
+    {
+        type            slip;
+    }
+
+    disc
+    {
+        // Standard wall function for kinematic eddy viscosity
+        type            nutkWallFunction;
+        value           uniform 0;
+    }
+
+    "rotor.*"
+    {
+        type            cyclicAMI;
+        value           uniform 0;
+    }
+}
+
+// ************************************************************************* //

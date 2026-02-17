@@ -10,11 +10,13 @@ namespace foamscript.Services
     {
         private readonly IProcessExecutor _processExecutor;
         private readonly GeometryService _geometryService;
+        private readonly TemplateService _templateService;
 
-        public CaseService(IProcessExecutor processExecutor, GeometryService geometryService)
+        public CaseService(IProcessExecutor processExecutor, GeometryService geometryService, TemplateService templateService)
         {
             _processExecutor = processExecutor;
             _geometryService = geometryService;
+            _templateService = templateService;
         }
 
         /// <summary>
@@ -187,16 +189,16 @@ namespace foamscript.Services
             var caseDir = Path.Combine(studyDir, caseName);
             caseInfo.CaseDir = caseDir;
 
-            // Copy template to case directory
-            CopyDirectory(templatePath, caseDir);
-
             // Calculate velocity components for this angle
             var angleRad = angle * Math.PI / 180.0;
             caseInfo.Ux = velocity * Math.Cos(angleRad);
             caseInfo.Uy = velocity * Math.Sin(angleRad);
 
-            // Update caseSettings file
-            UpdateCaseSettings(caseDir, caseInfo.Ux, caseInfo.Uy, omega, cores, discDiameter);
+            // Calculate all template parameters
+            var context = CalculateTemplateContext(caseInfo.Ux, caseInfo.Uy, omega, cores, discDiameter);
+
+            // Process template with Scriban
+            _templateService.ProcessTemplate(templatePath, caseDir, context);
 
             // Copy STL files from geometry directory
             CopyStlFiles(geometryDir, caseDir);
@@ -205,94 +207,50 @@ namespace foamscript.Services
         }
 
         /// <summary>
-        /// Updates the constant/caseSettings file with calculated parameters.
+        /// Calculates all template context parameters for Scriban rendering.
         /// </summary>
-        private void UpdateCaseSettings(string caseDir, double ux, double uy, double omega, int cores, double discDiameter)
+        private object CalculateTemplateContext(double ux, double uy, double omegaRotation, int cores, double discDiameter)
         {
-            var caseSettingsPath = Path.Combine(caseDir, "constant", "caseSettings");
-
-            if (!File.Exists(caseSettingsPath))
-            {
-                throw new FileNotFoundException($"caseSettings file not found: {caseSettingsPath}");
-            }
-
             // Calculate derived turbulence parameters
             const double turbulenceIntensity = 0.05; // 5% turbulence (standard for clean air flow)
             const double cmu = 0.09; // Standard turbulence constant
+            const double nu = 1.5e-05; // Kinematic viscosity (standard air)
+            const double endTime = 1.0; // Simulation duration (seconds)
+            const int nOuterCorrectors = 3; // PIMPLE solver parameter
+            const int refinementLevelMin = 3; // Mesh refinement min
+            const int refinementLevelMax = 4; // Mesh refinement max
 
             var velocityMagnitude = Math.Sqrt(ux * ux + uy * uy);
             var k = 1.5 * Math.Pow(velocityMagnitude * turbulenceIntensity, 2);
             var mixingLength = 0.07 * discDiameter;
             var omegaTurbulence = Math.Sqrt(k) / (Math.Pow(cmu, 0.25) * mixingLength);
 
-            var lines = File.ReadAllLines(caseSettingsPath);
-            var updatedLines = new List<string>();
+            // Calculate Aref (reference area) = pi * (diameter/2)^2
+            var aref = Math.PI * Math.Pow(discDiameter / 2.0, 2);
 
-            foreach (var line in lines)
+            // Return anonymous object with all template parameters
+            // Use lowercase with underscores for Scriban variable names
+            return new
             {
-                var trimmed = line.Trim();
-
-                // Update velocity components
-                if (trimmed.StartsWith("Ux "))
-                {
-                    updatedLines.Add($"Ux {ux:F6};");
-                }
-                else if (trimmed.StartsWith("Uy "))
-                {
-                    updatedLines.Add($"Uy {uy:F6};");
-                }
-                // Update velocity vector for boundary field (OpenFOAM list format)
-                else if (trimmed.StartsWith("U_boundaryField_inlet_value "))
-                {
-                    updatedLines.Add($"U_boundaryField_inlet_value ({ux:F6} {uy:F6} 0);");
-                }
-                // Update pressure boundary value (typically 0 for outlet)
-                else if (trimmed.StartsWith("p_boundaryField_outlet_value "))
-                {
-                    updatedLines.Add($"p_boundaryField_outlet_value 0;");
-                }
-                // Update velocity magnitude for forceCoeffs
-                else if (trimmed.StartsWith("system_controlDict_magUInf "))
-                {
-                    updatedLines.Add($"system_controlDict_magUInf {velocityMagnitude:F6};");
-                }
-                // Update turbulence kinetic energy
-                else if (trimmed.StartsWith("k_internalField_value "))
-                {
-                    updatedLines.Add($"k_internalField_value {k:E};");
-                }
-                // Update mixing length
-                else if (trimmed.StartsWith("mixingLength "))
-                {
-                    updatedLines.Add($"mixingLength {mixingLength:F6};");
-                }
-                // Update turbulence omega (specific dissipation rate)
-                else if (trimmed.StartsWith("omega_internalField_value "))
-                {
-                    updatedLines.Add($"omega_internalField_value {omegaTurbulence:E};");
-                }
-                // Update rotation speed (rad/s)
-                else if (trimmed.StartsWith("constant_dynamicMeshDict_omega "))
-                {
-                    updatedLines.Add($"constant_dynamicMeshDict_omega {omega:F6};");
-                }
-                // Update number of CPU cores
-                else if (trimmed.StartsWith("system_decomposeParDict_numberOfSubdomains "))
-                {
-                    updatedLines.Add($"system_decomposeParDict_numberOfSubdomains {cores};");
-                }
-                // Update disc diameter
-                else if (trimmed.StartsWith("discDiameter "))
-                {
-                    updatedLines.Add($"discDiameter {discDiameter:F6};");
-                }
-                else
-                {
-                    updatedLines.Add(line);
-                }
-            }
-
-            File.WriteAllLines(caseSettingsPath, updatedLines);
+                ux = ux,
+                uy = uy,
+                p = 0, // Pressure (typically 0)
+                turbulence_intensity = turbulenceIntensity,
+                k = k,
+                cmu = cmu,
+                disc_diameter = discDiameter,
+                mixing_length = mixingLength,
+                omega_turbulence = omegaTurbulence,
+                nu = nu,
+                omega_rotation = omegaRotation,
+                end_time = endTime,
+                mag_u_inf = velocityMagnitude,
+                n_outer_correctors = nOuterCorrectors,
+                refinement_level_min = refinementLevelMin,
+                refinement_level_max = refinementLevelMax,
+                cores = cores,
+                aref = aref
+            };
         }
 
         /// <summary>

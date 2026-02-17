@@ -1,0 +1,57 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
+|  \\    /   O peration     | Version:  v2512                                 |
+|   \\  /    A nd           | Website:  www.openfoam.com                      |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       volVectorField;
+    object      U;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+// Hard-coded constant
+dimensions      [0 1 -1 0 0 0 0];
+
+// Hard-coded constant
+internalField   uniform (0 0 0);
+
+boundaryField
+{
+    inlet
+    {
+        type            fixedValue;
+
+        // constant/caseSettings parameter: Ux, Uy, Uz
+        value           uniform ({{ ux }} {{ uy }} 0);
+    }
+
+    outlet
+    {
+        type            zeroGradient;
+    }
+
+    tunnel
+    {
+        type            slip;
+    }
+
+    disc
+    {
+        type            noSlip;
+    }
+
+    "rotor.*"
+    {
+        type            cyclicAMI;
+
+        // constant/caseSettings parameter: Ux, Uy, Uz
+        value           uniform ({{ ux }} {{ uy }} 0);
+    }
+}
+
+// ************************************************************************* //

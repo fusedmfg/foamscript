@@ -1,0 +1,62 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
+|  \\    /   O peration     | Version:  v2512                                 |
+|   \\  /    A nd           | Website:  www.openfoam.com                      |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      blockMeshDict;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+#include "$FOAM_CASE/constant/caseSettings"
+
+// Constant: Ensure we are working in Meters
+scale   1;
+
+vertices
+(
+    (-5 -5 -5) // 0
+    ( 5 -5 -5) // 1
+    ( 5  5 -5) // 2
+    (-5  5 -5) // 3
+    (-5 -5  5) // 4
+    ( 5 -5  5) // 5
+    ( 5  5  5) // 6
+    (-5  5  5) // 7
+);
+
+blocks
+(
+    // Constant: Initial grid density. SnappyHexMesh will refine this later.
+    hex (0 1 2 3 4 5 6 7) (20 20 20) simpleGrading (1 1 1)
+);
+
+edges
+();
+
+boundary
+(
+    // We define a single generic boundary. 
+    // SnappyHexMesh will overwrite this with your 'inlet', 'outlet', and 'tunnel' patches.
+    baseBox
+    {
+        type patch;
+        faces
+        (
+            (3 7 6 2)
+            (0 4 7 3)
+            (2 6 5 1)
+            (1 5 4 0)
+            (0 3 2 1)
+            (4 5 6 7)
+        );
+    }
+);
+
+// ************************************************************************* //
