@@ -216,6 +216,15 @@ namespace foamscript.Services
                 throw new FileNotFoundException($"caseSettings file not found: {caseSettingsPath}");
             }
 
+            // Calculate derived turbulence parameters
+            const double turbulenceIntensity = 0.05; // 5% turbulence (standard for clean air flow)
+            const double cmu = 0.09; // Standard turbulence constant
+
+            var velocityMagnitude = Math.Sqrt(ux * ux + uy * uy);
+            var k = 1.5 * Math.Pow(velocityMagnitude * turbulenceIntensity, 2);
+            var mixingLength = 0.07 * discDiameter;
+            var omegaTurbulence = Math.Sqrt(k) / (Math.Pow(cmu, 0.25) * mixingLength);
+
             var lines = File.ReadAllLines(caseSettingsPath);
             var updatedLines = new List<string>();
 
@@ -236,6 +245,31 @@ namespace foamscript.Services
                 else if (trimmed.StartsWith("U_boundaryField_inlet_value "))
                 {
                     updatedLines.Add($"U_boundaryField_inlet_value ({ux:F6} {uy:F6} 0);");
+                }
+                // Update pressure boundary value (typically 0 for outlet)
+                else if (trimmed.StartsWith("p_boundaryField_outlet_value "))
+                {
+                    updatedLines.Add($"p_boundaryField_outlet_value 0;");
+                }
+                // Update velocity magnitude for forceCoeffs
+                else if (trimmed.StartsWith("system_controlDict_magUInf "))
+                {
+                    updatedLines.Add($"system_controlDict_magUInf {velocityMagnitude:F6};");
+                }
+                // Update turbulence kinetic energy
+                else if (trimmed.StartsWith("k_internalField_value "))
+                {
+                    updatedLines.Add($"k_internalField_value {k:E};");
+                }
+                // Update mixing length
+                else if (trimmed.StartsWith("mixingLength "))
+                {
+                    updatedLines.Add($"mixingLength {mixingLength:F6};");
+                }
+                // Update turbulence omega (specific dissipation rate)
+                else if (trimmed.StartsWith("omega_internalField_value "))
+                {
+                    updatedLines.Add($"omega_internalField_value {omegaTurbulence:E};");
                 }
                 // Update rotation speed (rad/s)
                 else if (trimmed.StartsWith("constant_dynamicMeshDict_omega "))
