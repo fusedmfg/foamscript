@@ -50,6 +50,10 @@ namespace foamscript
                     case MeshStudyModel meshStudyModel:
                         return HandleMeshStudy(meshStudyModel);
 
+                    // Handle list-templates verb.
+                    case ListTemplatesModel listTemplatesModel:
+                        return HandleListTemplates(listTemplatesModel);
+
                     // Handle unimplemented verb types here.
                     default:
                         throw new NotImplementedException($"The verb of type {model.GetType().Name} is not implemented.");
@@ -332,14 +336,28 @@ namespace foamscript
 
         private int HandleNewStudy(NewStudyModel model)
         {
-            // Resolve template path: use default if not specified
-            var templatePath = model.TemplatePath;
-            if (string.IsNullOrEmpty(templatePath))
+            // Resolve template path: supports both template names and full paths
+            string templatePath;
+            try
             {
-                // Default to the built-in template in the application directory
-                var appDir = AppContext.BaseDirectory;
-                templatePath = Path.Combine(appDir, "..", "..", "..", "Templates", "external_disc_rotating-ami_transient");
-                templatePath = Path.GetFullPath(templatePath); // Normalize the path
+                templatePath = ResolveTemplatePath(model.TemplatePath);
+            }
+            catch (DirectoryNotFoundException ex)
+            {
+                Console.WriteLine($"✗ {ex.Message}");
+                Console.WriteLine();
+                Console.WriteLine("Available templates:");
+                var availableTemplatesDir = GetTemplatesDirectory();
+                if (Directory.Exists(availableTemplatesDir))
+                {
+                    foreach (var dir in Directory.GetDirectories(availableTemplatesDir))
+                    {
+                        Console.WriteLine($"  • {Path.GetFileName(dir)}");
+                    }
+                }
+                Console.WriteLine();
+                Console.WriteLine("Use 'foamscript list-templates' for more information");
+                return -1;
             }
 
             _loggingService.LogInformation($"Creating project '{model.ProjectName}' in {model.OutputDir}");
@@ -552,6 +570,128 @@ namespace foamscript
                 Console.WriteLine();
                 return -1;
             }
+        }
+
+        private int HandleListTemplates(ListTemplatesModel model)
+        {
+            _loggingService.LogInformation("Listing available templates");
+
+            Console.WriteLine();
+            Console.WriteLine("=== Available OpenFOAM Templates ===");
+            Console.WriteLine();
+
+            var templatesDir = GetTemplatesDirectory();
+
+            if (!Directory.Exists(templatesDir))
+            {
+                Console.WriteLine("✗ Templates directory not found");
+                Console.WriteLine($"  Expected location: {templatesDir}");
+                return -1;
+            }
+
+            var templates = Directory.GetDirectories(templatesDir)
+                .Select(d => Path.GetFileName(d))
+                .Where(name => !string.IsNullOrEmpty(name))
+                .OrderBy(name => name)
+                .ToList();
+
+            if (templates.Count == 0)
+            {
+                Console.WriteLine("No templates found");
+                return 0;
+            }
+
+            foreach (var templateName in templates)
+            {
+                var templatePath = Path.Combine(templatesDir, templateName!);
+                var templateMdPath = Path.Combine(templatePath, "TEMPLATE.md");
+
+                Console.WriteLine($"• {templateName}");
+
+                // Try to read the first line of TEMPLATE.md for description
+                if (File.Exists(templateMdPath))
+                {
+                    try
+                    {
+                        var lines = File.ReadLines(templateMdPath).Take(10).ToList();
+                        // Look for classification info
+                        foreach (var line in lines)
+                        {
+                            if (line.StartsWith("- **Domain**:"))
+                            {
+                                Console.WriteLine($"  Domain: {line.Replace("- **Domain**:", "").Trim()}");
+                            }
+                            else if (line.StartsWith("- **Feature**:"))
+                            {
+                                Console.WriteLine($"  Feature: {line.Replace("- **Feature**:", "").Trim()}");
+                            }
+                            else if (line.StartsWith("- **Solver**:"))
+                            {
+                                Console.WriteLine($"  Solver: {line.Replace("- **Solver**:", "").Trim()}");
+                                break; // Stop after solver line
+                            }
+                        }
+                    }
+                    catch
+                    {
+                        // If we can't read the template file, just show the name
+                    }
+                }
+                Console.WriteLine();
+            }
+
+            Console.WriteLine($"Total templates available: {templates.Count}");
+            Console.WriteLine();
+            Console.WriteLine("To use a template:");
+            Console.WriteLine($"  foamscript new-study -t \"{templates[0]}\" ...");
+            Console.WriteLine();
+            Console.WriteLine("For more information:");
+            Console.WriteLine("  See Templates/TEMPLATES.md in the repository");
+            Console.WriteLine();
+
+            return 0;
+        }
+
+        /// <summary>
+        /// Resolves a template path from either a short name or full path.
+        /// </summary>
+        private string ResolveTemplatePath(string? templatePathOrName)
+        {
+            var templatesDir = GetTemplatesDirectory();
+
+            // If null or empty, use default
+            if (string.IsNullOrEmpty(templatePathOrName))
+            {
+                return Path.Combine(templatesDir, "external_disc_rotating-ami_transient");
+            }
+
+            // If it's an absolute path or contains path separators, use as-is
+            if (Path.IsPathRooted(templatePathOrName) ||
+                templatePathOrName.Contains(Path.DirectorySeparatorChar) ||
+                templatePathOrName.Contains(Path.AltDirectorySeparatorChar))
+            {
+                return Path.GetFullPath(templatePathOrName);
+            }
+
+            // Otherwise, treat it as a template name and look in Templates directory
+            var resolvedPath = Path.Combine(templatesDir, templatePathOrName);
+
+            if (!Directory.Exists(resolvedPath))
+            {
+                throw new DirectoryNotFoundException($"Template '{templatePathOrName}' not found in {templatesDir}");
+            }
+
+            return Path.GetFullPath(resolvedPath);
+        }
+
+        /// <summary>
+        /// Gets the templates directory path.
+        /// </summary>
+        private string GetTemplatesDirectory()
+        {
+            var appDir = AppContext.BaseDirectory;
+            var templatesDir = Path.Combine(appDir, "..", "..", "..", "Templates");
+            return Path.GetFullPath(templatesDir);
         }
     }
 }
