@@ -1,0 +1,45 @@
+{
+  // ── Required ────────────────────────────────────────────────────────────────
+  // These four fields must be provided in every config file.
+
+  "projectName": "MyDiscStudy",           // Folder name and prefix for all case directories
+  "outputDir": "/home/user/studies",      // Parent directory where the project folder is created
+  "modelSource": "/home/user/disc.step",  // Path to geometry file: .step, .stp, .iges, .igs, or .stl
+  "angles": "-10,-5,-2.5,0,2.5,5,10",    // Comma-separated angles of attack in degrees
+
+  // ── Study options ────────────────────────────────────────────────────────────
+  // All optional. Values shown below are the defaults.
+
+  "templateName": "external_disc_rotating-ami_transient", // Template name or full path (run 'foamscript list-templates')
+  "velocity": 20.0,        // Freestream velocity magnitude (m/s)
+  "rpm": 1000.0,           // Disc rotation speed (RPM)
+  "inputUnits": "mm",      // Source geometry units: mm | cm | m | in | ft  (STEP/IGES only)
+  "meshSize": 0.05,        // gmsh mesh size factor for STEP/IGES conversion (lower = finer)
+  "featureAngle": null,    // Edge preservation angle in degrees, or null to disable
+  "cores": 4,              // CPU cores for parallel decomposition
+
+  // ── Physics parameters ───────────────────────────────────────────────────────
+  // Fluid properties and solver settings. All optional — defaults shown.
+
+  "physics": {
+    "nu": 1.5e-5,               // Kinematic viscosity (m²/s) — air at ~20°C sea level
+    "turbulenceIntensity": 0.05, // Freestream turbulence intensity (0.05 = 5%)
+    "endTime": 1.0,             // Simulation end time (seconds)
+    "nOuterCorrectors": 3,      // PIMPLE outer corrector iterations
+    "refinementLevelMin": 3,    // snappyHexMesh minimum refinement level around geometry
+    "refinementLevelMax": 4     // snappyHexMesh maximum refinement level around geometry
+  },
+
+  // ── Domain geometry parameters ───────────────────────────────────────────────
+  // Controls the size of the AMI rotating zone and wind tunnel. All optional.
+  // All scales and extents are relative to the detected disc diameter.
+
+  "domain": {
+    "rotorRadiusScale": 1.25,  // AMI cylinder radius = disc_radius × scale (~25% clearance)
+    "rotorHeightScale": 1.5,   // AMI cylinder height = disc_height × scale
+    "tunnelUpstream": 5.0,     // Wind tunnel upstream extent in disc diameters  (-x direction)
+    "tunnelDownstream": 10.0,  // Wind tunnel downstream extent in disc diameters (+x direction)
+    "tunnelRadial": 5.0,       // Wind tunnel radial extent in disc diameters    (+/-y and +/-z)
+    "meshResolution": 32       // Number of vertices around generated cylinder geometries
+  }
+}

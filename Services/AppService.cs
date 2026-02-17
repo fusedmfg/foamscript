@@ -507,7 +507,12 @@ namespace foamscript
             try
             {
                 var json = File.ReadAllText(path);
-                var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+                var options = new JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true,
+                    ReadCommentHandling = JsonCommentHandling.Skip,
+                    AllowTrailingCommas = true
+                };
                 var config = JsonSerializer.Deserialize<StudyConfig>(json, options);
 
                 if (config == null)
