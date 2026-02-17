@@ -14,11 +14,11 @@ namespace foamscript.Models
         [Option('o', "output-dir", Required = false, HelpText = "Output directory for generated STL files (default: current directory)")]
         public string OutputDirectory { get; set; } = ".";
 
-        [Option("rotor-radius-scale", Required = false, HelpText = "Rotor radius scaling factor relative to disc radius (default: 1.5)")]
-        public double RotorRadiusScale { get; set; } = 1.5;
+        [Option("rotor-radius-scale", Required = false, HelpText = "Rotor AMI cylinder radius as a multiple of disc radius (default: 1.25)")]
+        public double RotorRadiusScale { get; set; } = 1.25;
 
-        [Option("rotor-height-scale", Required = false, HelpText = "Rotor height scaling factor relative to disc height (default: 1.2)")]
-        public double RotorHeightScale { get; set; } = 1.2;
+        [Option("rotor-height-scale", Required = false, HelpText = "Rotor AMI cylinder height as a multiple of disc height (default: 1.5)")]
+        public double RotorHeightScale { get; set; } = 1.5;
 
         [Option("tunnel-upstream", Required = false, HelpText = "Tunnel upstream length in disc diameters (default: 5)")]
         public double TunnelUpstream { get; set; } = 5.0;

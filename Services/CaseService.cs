@@ -22,17 +22,14 @@ namespace foamscript.Services
         /// <summary>
         /// Creates a new study with multiple cases for angle of attack sweep.
         /// </summary>
-        public StudyResult CreateStudy(string projectName, string outputDir, string templatePath, string modelSource,
-            string anglesString, double velocity, double rpm, string inputUnits, double meshSize,
-            double? featureAngle, int cores)
+        public StudyResult CreateStudy(StudyConfig config, string templatePath)
         {
             var result = new StudyResult();
 
             try
             {
-                // Use project name for study name and create study directory in output dir
-                result.StudyName = projectName;
-                result.StudyDir = Path.GetFullPath(Path.Combine(outputDir, projectName));
+                result.StudyName = config.ProjectName;
+                result.StudyDir = Path.GetFullPath(Path.Combine(config.OutputDir, config.ProjectName));
 
                 // Validate template exists
                 if (!Directory.Exists(templatePath))
@@ -43,11 +40,11 @@ namespace foamscript.Services
                 }
 
                 // Parse angles
-                var angles = ParseAngles(anglesString);
+                var angles = ParseAngles(config.Angles);
                 if (angles.Length == 0)
                 {
                     result.IsSuccess = false;
-                    result.ErrorMessage = $"Invalid angles format: {anglesString}. Use comma-separated values (e.g., -5,-2.5,0,2.5,5)";
+                    result.ErrorMessage = $"Invalid angles format: {config.Angles}. Use comma-separated values (e.g., -5,-2.5,0,2.5,5)";
                     return result;
                 }
 
@@ -59,7 +56,7 @@ namespace foamscript.Services
                 Directory.CreateDirectory(geometryDir);
 
                 // Process geometry (convert and generate domain)
-                var geometryResult = ProcessGeometry(geometryDir, modelSource, inputUnits, meshSize, featureAngle);
+                var geometryResult = ProcessGeometry(geometryDir, config);
                 if (!geometryResult.Success)
                 {
                     result.IsSuccess = false;
@@ -70,12 +67,13 @@ namespace foamscript.Services
                 var discDiameter = geometryResult.DiscDiameter;
 
                 // Convert RPM to rad/s
-                var omega = RpmToRadPerSec(rpm);
+                var omega = RpmToRadPerSec(config.Rpm);
 
                 // Create case for each angle
                 foreach (var angle in angles)
                 {
-                    var caseInfo = CreateCase(result.StudyDir, projectName, templatePath, angle, velocity, omega, cores, geometryDir, discDiameter);
+                    var caseInfo = CreateCase(result.StudyDir, config.ProjectName, templatePath, angle,
+                        config.Velocity, omega, config.Cores, geometryDir, discDiameter, config.Physics);
                     result.Cases.Add(caseInfo);
                 }
 
@@ -93,23 +91,23 @@ namespace foamscript.Services
         /// <summary>
         /// Processes geometry: copies source file, converts if needed, generates domain.
         /// </summary>
-        private (bool Success, string? ErrorMessage, double DiscDiameter) ProcessGeometry(string geometryDir, string modelSource,
-            string inputUnits, double meshSize, double? featureAngle)
+        private (bool Success, string? ErrorMessage, double DiscDiameter) ProcessGeometry(
+            string geometryDir, StudyConfig config)
         {
             try
             {
                 // Validate source file exists
-                if (!File.Exists(modelSource))
+                if (!File.Exists(config.ModelSource))
                 {
-                    return (false, $"Model source file not found: {modelSource}", 0.0);
+                    return (false, $"Model source file not found: {config.ModelSource}", 0.0);
                 }
 
-                var sourceExt = Path.GetExtension(modelSource).ToLowerInvariant();
-                var sourceFileName = Path.GetFileName(modelSource);
+                var sourceExt = Path.GetExtension(config.ModelSource).ToLowerInvariant();
+                var sourceFileName = Path.GetFileName(config.ModelSource);
                 var sourceCopyPath = Path.Combine(geometryDir, sourceFileName);
 
                 // Copy source file to geometry directory
-                File.Copy(modelSource, sourceCopyPath, overwrite: true);
+                File.Copy(config.ModelSource, sourceCopyPath, overwrite: true);
 
                 string discStlPath;
 
@@ -121,9 +119,9 @@ namespace foamscript.Services
                     var conversionResult = _geometryService.ConvertStepToStl(
                         sourceCopyPath,
                         discStlPath,
-                        meshSize,
-                        featureAngle,
-                        inputUnits
+                        config.MeshSize,
+                        config.FeatureAngle,
+                        config.InputUnits
                     );
 
                     if (!conversionResult.IsSuccess)
@@ -145,16 +143,18 @@ namespace foamscript.Services
                     return (false, $"Unsupported file format: {sourceExt}. Supported formats: .step, .stp, .iges, .igs, .stl", 0.0);
                 }
 
-                // Generate rotor and tunnel STL files from disc using default parameters
+                var domain = config.Domain;
+
+                // Generate rotor and tunnel STL files from disc
                 var domainResult = _geometryService.GenerateDomain(
                     discStlPath,
                     geometryDir,
-                    rotorRadiusScale: 1.2,
-                    rotorHeightScale: 1.5,
-                    tunnelUpstream: 3.0,
-                    tunnelDownstream: 7.0,
-                    tunnelRadial: 4.0,
-                    meshResolution: 32
+                    rotorRadiusScale: domain.RotorRadiusScale,
+                    rotorHeightScale: domain.RotorHeightScale,
+                    tunnelUpstream: domain.TunnelUpstream,
+                    tunnelDownstream: domain.TunnelDownstream,
+                    tunnelRadial: domain.TunnelRadial,
+                    meshResolution: domain.MeshResolution
                 );
                 if (!domainResult.IsSuccess)
                 {
@@ -176,7 +176,8 @@ namespace foamscript.Services
         /// Creates a single case directory for a specific angle of attack.
         /// </summary>
         private CaseInfo CreateCase(string studyDir, string studyName, string templatePath,
-            double angle, double velocity, double omega, int cores, string geometryDir, double discDiameter)
+            double angle, double velocity, double omega, int cores,
+            string geometryDir, double discDiameter, StudyPhysicsConfig physics)
         {
             var caseInfo = new CaseInfo
             {
@@ -195,7 +196,7 @@ namespace foamscript.Services
             caseInfo.Uy = velocity * Math.Sin(angleRad);
 
             // Calculate all template parameters
-            var context = CalculateTemplateContext(caseInfo.Ux, caseInfo.Uy, omega, cores, discDiameter);
+            var context = CalculateTemplateContext(caseInfo.Ux, caseInfo.Uy, omega, cores, discDiameter, physics);
 
             // Process template with Scriban
             _templateService.ProcessTemplate(templatePath, caseDir, context);
@@ -209,45 +210,37 @@ namespace foamscript.Services
         /// <summary>
         /// Calculates all template context parameters for Scriban rendering.
         /// </summary>
-        private object CalculateTemplateContext(double ux, double uy, double omegaRotation, int cores, double discDiameter)
+        private static object CalculateTemplateContext(double ux, double uy, double omegaRotation,
+            int cores, double discDiameter, StudyPhysicsConfig physics)
         {
-            // Calculate derived turbulence parameters
-            const double turbulenceIntensity = 0.05; // 5% turbulence (standard for clean air flow)
-            const double cmu = 0.09; // Standard turbulence constant
-            const double nu = 1.5e-05; // Kinematic viscosity (standard air)
-            const double endTime = 1.0; // Simulation duration (seconds)
-            const int nOuterCorrectors = 3; // PIMPLE solver parameter
-            const int refinementLevelMin = 3; // Mesh refinement min
-            const int refinementLevelMax = 4; // Mesh refinement max
+            const double cmu = 0.09; // Standard k-omega SST turbulence model constant
 
             var velocityMagnitude = Math.Sqrt(ux * ux + uy * uy);
-            var k = 1.5 * Math.Pow(velocityMagnitude * turbulenceIntensity, 2);
+            var k = 1.5 * Math.Pow(velocityMagnitude * physics.TurbulenceIntensity, 2);
             var mixingLength = 0.07 * discDiameter;
             var omegaTurbulence = Math.Sqrt(k) / (Math.Pow(cmu, 0.25) * mixingLength);
 
-            // Calculate Aref (reference area) = pi * (diameter/2)^2
+            // Reference area: pi * (diameter/2)^2
             var aref = Math.PI * Math.Pow(discDiameter / 2.0, 2);
 
-            // Return anonymous object with all template parameters
-            // Use lowercase with underscores for Scriban variable names
             return new
             {
                 ux = ux,
                 uy = uy,
-                p = 0, // Pressure (typically 0)
-                turbulence_intensity = turbulenceIntensity,
+                p = 0,
+                turbulence_intensity = physics.TurbulenceIntensity,
                 k = k,
                 cmu = cmu,
                 disc_diameter = discDiameter,
                 mixing_length = mixingLength,
                 omega_turbulence = omegaTurbulence,
-                nu = nu,
+                nu = physics.Nu,
                 omega_rotation = omegaRotation,
-                end_time = endTime,
+                end_time = physics.EndTime,
                 mag_u_inf = velocityMagnitude,
-                n_outer_correctors = nOuterCorrectors,
-                refinement_level_min = refinementLevelMin,
-                refinement_level_max = refinementLevelMax,
+                n_outer_correctors = physics.NOuterCorrectors,
+                refinement_level_min = physics.RefinementLevelMin,
+                refinement_level_max = physics.RefinementLevelMax,
                 cores = cores,
                 aref = aref
             };
@@ -256,7 +249,7 @@ namespace foamscript.Services
         /// <summary>
         /// Copies STL files to case constant/triSurface directory.
         /// </summary>
-        private void CopyStlFiles(string stlDir, string caseDir)
+        private static void CopyStlFiles(string stlDir, string caseDir)
         {
             var triSurfaceDir = Path.Combine(caseDir, "constant", "triSurface");
             Directory.CreateDirectory(triSurfaceDir);
@@ -275,34 +268,9 @@ namespace foamscript.Services
         }
 
         /// <summary>
-        /// Recursively copies a directory.
-        /// </summary>
-        private void CopyDirectory(string sourceDir, string destDir)
-        {
-            // Create destination directory
-            Directory.CreateDirectory(destDir);
-
-            // Copy all files
-            foreach (var file in Directory.GetFiles(sourceDir))
-            {
-                var fileName = Path.GetFileName(file);
-                var destFile = Path.Combine(destDir, fileName);
-                File.Copy(file, destFile, overwrite: true);
-            }
-
-            // Recursively copy subdirectories
-            foreach (var subDir in Directory.GetDirectories(sourceDir))
-            {
-                var dirName = Path.GetFileName(subDir);
-                var destSubDir = Path.Combine(destDir, dirName);
-                CopyDirectory(subDir, destSubDir);
-            }
-        }
-
-        /// <summary>
         /// Parses comma-separated angles string into array of doubles.
         /// </summary>
-        private double[] ParseAngles(string anglesString)
+        private static double[] ParseAngles(string anglesString)
         {
             try
             {
@@ -320,7 +288,7 @@ namespace foamscript.Services
         /// <summary>
         /// Converts RPM to radians per second.
         /// </summary>
-        private double RpmToRadPerSec(double rpm)
+        private static double RpmToRadPerSec(double rpm)
         {
             return rpm * 2.0 * Math.PI / 60.0;
         }

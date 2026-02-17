@@ -150,44 +150,41 @@ foamscript generate-domain [OPTIONS]
 | Option | Short | Description | Default |
 |--------|-------|-------------|---------|
 | `--disc` | `-d` | Input disc STL file (required) | - |
-| `--output-dir` | `-o` | Output directory for rotor.stl and tunnel.stl (required) | - |
-| `--rotor-radius` | | Rotor radius scale factor | `1.2` |
-| `--rotor-height` | | Rotor height scale factor | `1.5` |
-| `--tunnel-upstream` | | Tunnel upstream length (disc diameters) | `3.0` |
-| `--tunnel-downstream` | | Tunnel downstream length (disc diameters) | `7.0` |
-| `--tunnel-radial` | | Tunnel radial extent (disc diameters) | `4.0` |
-| `--mesh-resolution` | | Mesh resolution (segments per cylinder) | `32` |
+| `--output-dir` | `-o` | Output directory for rotor.stl and tunnel.stl | `.` |
+| `--rotor-radius-scale` | | Rotor AMI cylinder radius as multiple of disc radius | `1.25` |
+| `--rotor-height-scale` | | Rotor AMI cylinder height as multiple of disc height | `1.5` |
+| `--tunnel-upstream` | | Tunnel upstream extent (disc diameters) | `5.0` |
+| `--tunnel-downstream` | | Tunnel downstream extent (disc diameters) | `10.0` |
+| `--tunnel-radial` | | Tunnel radial extent (disc diameters) | `5.0` |
+| `--mesh-resolution` | | Segments around generated cylinders | `32` |
 | `--validate` | | Run surfaceCheck validation on generated files | `false` |
 
 ### How It Works
 
 1. **Analyzes disc geometry** to determine bounding box and center
-2. **Generates rotor cylinder** around the disc (rotating region for MRF)
+2. **Generates rotor cylinder** around the disc (AMI rotating region)
 3. **Generates tunnel box** around the rotor (stationary far-field)
+
+Defaults follow standard CFD conventions: 5D upstream, 10D downstream, 5D radial. The rotor cylinder provides ~25% clearance around the disc.
 
 ### Examples
 
 **Generate with defaults:**
 ```bash
-foamscript generate-domain \
-  --disc disc.stl \
-  --output-dir ./
+foamscript generate-domain disc.stl --output-dir ./
 ```
 
-**Custom tunnel dimensions (longer wake region):**
+**Extended wake for wake analysis:**
 ```bash
-foamscript generate-domain \
-  --disc disc.stl \
+foamscript generate-domain disc.stl \
   --output-dir ./ \
-  --tunnel-upstream 5 \
-  --tunnel-downstream 10 \
-  --tunnel-radial 6
+  --tunnel-downstream 15 \
+  --validate
 ```
 
-**High-resolution mesh with validation:**
+**High-resolution mesh:**
 ```bash
-foamscript generate-domain \
-  --disc disc.stl \
+foamscript generate-domain disc.stl \
   --output-dir ./ \
   --mesh-resolution 64 \
   --validate
@@ -199,20 +196,13 @@ The command creates:
 - `rotor.stl` - Cylindrical rotating region
 - `tunnel.stl` - Box-shaped stationary region
 
-And displays:
-- Disc bounding box dimensions
-- Rotor dimensions (radius, height)
-- Tunnel extents
-- Validation results (if `--validate` used)
+And displays disc bounding box, rotor dimensions, tunnel extents, and optional validation results.
 
 ### Notes
 
 - **Rotor must enclose disc completely** (use scales > 1.0)
-- **Tunnel must enclose rotor completely** (minimum 2-3 disc diameters)
-- Typical CFD best practices:
-  - Upstream: 3-5 disc diameters
-  - Downstream: 7-10 disc diameters (longer for wake analysis)
-  - Radial: 4-6 disc diameters
+- **Tunnel must enclose rotor completely**
+- Standard CFD convention: 5D upstream, 10D downstream, 5D radial
 
 ---
 
@@ -220,21 +210,33 @@ And displays:
 
 Creates a complete OpenFOAM study with multiple cases for angle of attack sweep. This is the main command for setting up parametric studies.
 
+Parameters can be supplied via CLI options or a JSON config file (see [JSON Config File](#json-config-file)).
+
 ### Usage
 
 ```bash
-foamscript new-study [OPTIONS]
+# CLI options
+foamscript new-study -n <name> -o <dir> -s <model> -a <angles> [OPTIONS]
+
+# JSON config file
+foamscript new-study --config study.json
 ```
 
-### Options
+### Required Options (when not using --config)
+
+| Option | Short | Description |
+|--------|-------|-------------|
+| `--project-name` | `-n` | Project name (folder and case naming) |
+| `--output-dir` | `-o` | Parent directory for the project folder |
+| `--model-source` | `-s` | Source geometry file: STEP, IGES, or STL |
+| `--angles` | `-a` | Angles of attack in degrees, comma-separated |
+
+### Study Options
 
 | Option | Short | Description | Default |
 |--------|-------|-------------|---------|
-| `--project-name` | `-n` | Project name (used for study folder and case naming) (required) | - |
-| `--output-dir` | `-o` | Parent directory where project folder will be created (required) | - |
-| `--template` | `-t` | Path to template case directory (required) | - |
-| `--model-source` | `-s` | Path to source geometry file: STEP, IGES, or STL (required) | - |
-| `--angles` | `-a` | Angles of attack in degrees, comma-separated (required) | - |
+| `--config` | `-c` | Path to JSON config file (replaces all CLI options) | - |
+| `--template` | `-t` | Template name or path | `external_disc_rotating-ami_transient` |
 | `--velocity` | `-v` | Free stream velocity magnitude (m/s) | `20.0` |
 | `--rpm` | `-r` | Disc rotation speed (RPM) | `1000` |
 | `--input-units` | `-u` | Source file units: mm, cm, m, in, ft | `mm` |
@@ -242,183 +244,194 @@ foamscript new-study [OPTIONS]
 | `--feature-angle` | | Feature angle for edge preservation (degrees) | - |
 | `--cores` | | Number of CPU cores for parallel execution | `4` |
 
+### Physics Parameters
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `--nu` | Kinematic viscosity (m²/s) — air at ~20°C sea level | `1.5e-5` |
+| `--turbulence-intensity` | Freestream turbulence intensity (fraction, e.g. 0.05 = 5%) | `0.05` |
+| `--end-time` | Simulation end time (seconds) | `1.0` |
+| `--outer-correctors` | PIMPLE outer corrector iterations | `3` |
+| `--refinement-min` | snappyHexMesh minimum refinement level | `3` |
+| `--refinement-max` | snappyHexMesh maximum refinement level | `4` |
+
+### Domain Geometry Parameters
+
+All scales are relative to the detected disc diameter.
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `--rotor-radius-scale` | Rotor AMI cylinder radius (multiple of disc radius) | `1.25` |
+| `--rotor-height-scale` | Rotor AMI cylinder height (multiple of disc height) | `1.5` |
+| `--tunnel-upstream` | Wind tunnel upstream extent (disc diameters) | `5.0` |
+| `--tunnel-downstream` | Wind tunnel downstream extent (disc diameters) | `10.0` |
+| `--tunnel-radial` | Wind tunnel radial extent (disc diameters) | `5.0` |
+| `--mesh-resolution` | Segments around generated cylinder geometries | `32` |
+
 ### How It Works
 
-This command performs an **integrated workflow**:
-
 1. **Creates study directory structure**
-2. **Creates `geometry/` subdirectory** for master geometry files
-3. **Copies model source file** to geometry directory
-4. **Converts geometry** (if STEP/IGES):
-   - Converts to STL with unit scaling
-   - Applies feature angle preservation if specified
-5. **Generates domain**:
-   - Creates `rotor.stl` (rotating region)
-   - Creates `tunnel.stl` (stationary region)
-6. **Creates case for each angle**:
-   - Copies template to `{studyName}_{angle}/`
-   - Calculates velocity components: `Ux = V*cos(α)`, `Uy = V*sin(α)`
-   - Converts RPM to rad/s: `ω = RPM * 2π / 60`
-   - Updates `constant/caseSettings` with parameters
-   - Copies STL files from `geometry/` to `constant/triSurface/`
+2. **Processes geometry** (convert STEP/IGES → STL, scale to meters, validate)
+3. **Generates domain** (`rotor.stl` AMI rotating region, `tunnel.stl` stationary far-field)
+4. **For each angle of attack:**
+   - Calculates `Ux = V·cos(α)`, `Uy = V·sin(α)`, `ω = RPM × 2π/60`
+   - Derives turbulence parameters (`k`, `ω_turb`) from physics config
+   - Renders Scriban template files with all parameters
+   - Copies geometry STL files to `constant/triSurface/`
 
 ### Directory Structure
 
 ```
-~/studies/                          # Parent directory (from --output-dir)
-└── MyProject/                      # Project folder (from --project-name)
-    ├── geometry/                   # Master geometry files
-    │   ├── my_disc.step           # Original source file
+{outputDir}/
+└── {projectName}/
+    ├── geometry/                   # Master geometry (processed once)
+    │   ├── disc.step              # Original source file
     │   ├── disc.stl               # Converted disc (meters)
-    │   ├── rotor.stl              # Generated rotor
-    │   └── tunnel.stl             # Generated tunnel
-    ├── MyProject_-5.0/            # Case for AoA = -5°
-    │   ├── 0/                     # Initial conditions
+    │   ├── rotor.stl              # Generated AMI cylinder
+    │   └── tunnel.stl             # Generated wind tunnel box
+    ├── {projectName}_-5.0/        # Case for AoA = -5°
+    │   ├── 0/                     # Initial conditions (U, p, k, omega, nut)
     │   ├── constant/
-    │   │   ├── caseSettings       # Updated parameters
-    │   │   └── triSurface/
-    │   │       ├── disc.stl      # Copied from geometry/
-    │   │       ├── rotor.stl     # Copied from geometry/
-    │   │       └── tunnel.stl    # Copied from geometry/
-    │   └── system/                # Solver settings
-    ├── MyProject_0.0/             # Case for AoA = 0°
-    └── MyProject_5.0/             # Case for AoA = 5°
+    │   │   ├── triSurface/
+    │   │   │   ├── disc.stl
+    │   │   │   ├── rotor.stl
+    │   │   │   └── tunnel.stl
+    │   │   ├── dynamicMeshDict
+    │   │   └── transportProperties
+    │   └── system/                # blockMeshDict, snappyHexMeshDict, etc.
+    ├── {projectName}_0.0/
+    └── {projectName}_5.0/
 ```
 
 ### Examples
 
-**Single angle (baseline case):**
+**Minimal — single angle with defaults:**
 ```bash
 foamscript new-study \
-  --project-name MyProject \
-  --output-dir ~/studies \
-  --template ~/disc_template \
-  --model-source ~/my_disc.step \
-  --angles 0 \
-  --velocity 20 \
-  --rpm 1000 \
+  -n MyDisc \
+  -o ~/studies \
+  -s ~/my_disc.step \
+  -a 0
+```
+
+**AoA sweep with custom velocity and RPM:**
+```bash
+foamscript new-study \
+  -n DiscAnalysis \
+  -o ~/studies \
+  -s ~/my_disc.step \
+  -a -10,-5,-2.5,0,2.5,5,10 \
+  --velocity 15 \
+  --rpm 1200 \
   --input-units mm \
   --cores 8
 ```
 
-**Angle of attack sweep:**
+**Custom physics — high-altitude, lower viscosity simulation:**
 ```bash
 foamscript new-study \
-  --project-name DiscAnalysis \
-  --output-dir ~/studies \
-  --template ~/disc_template \
-  --model-source ~/my_disc.step \
-  --angles -10,-5,-2.5,0,2.5,5,10 \
-  --velocity 20 \
-  --rpm 1000 \
-  --input-units mm \
-  --mesh-size 0.05 \
-  --cores 8
+  -n HighAlt \
+  -o ~/studies \
+  -s ~/disc.stl \
+  -a 0,5,10 \
+  --nu 1.8e-5 \
+  --turbulence-intensity 0.03
 ```
 
-**Using pre-converted STL:**
+**Custom mesh refinement for high-fidelity study:**
 ```bash
 foamscript new-study \
-  --project-name QuickTest \
-  --output-dir ~/studies \
-  --template ~/disc_template \
-  --model-source ~/disc.stl \
-  --angles -5,0,5 \
-  --velocity 20 \
-  --rpm 1000
+  -n HiFi \
+  -o ~/studies \
+  -s ~/disc.step \
+  -a 0,5 \
+  --refinement-min 4 \
+  --refinement-max 6 \
+  --end-time 2.0
 ```
 
-**High-precision geometry conversion:**
+**Using a JSON config file:**
 ```bash
-foamscript new-study \
-  --project-name HighPrecision \
-  --output-dir ~/studies \
-  --template ~/disc_template \
-  --model-source ~/my_disc.step \
-  --angles 0 \
-  --velocity 20 \
-  --rpm 1000 \
-  --input-units mm \
-  --mesh-size 0.02 \
-  --feature-angle 30
+foamscript new-study --config ~/studies/my_study.json
 ```
 
-### Parameters Updated in caseSettings
+---
 
-For each case, the following parameters in `constant/caseSettings` are automatically updated:
+## JSON Config File
 
-- `Ux` - X velocity component (m/s)
-- `Uy` - Y velocity component (m/s)
-- `constant_dynamicMeshDict_omega` - Rotation speed (rad/s)
-- `system_decomposeParDict_numberOfSubdomains` - Number of cores
-- `discDiameter` - Disc diameter in meters (auto-detected from geometry)
+An alternative to specifying all CLI options is to provide a JSON config file with `--config`. This is useful for saving and repeating study setups.
 
-### Output
+### Format
 
-The command displays:
-- Study parameters (directory, template, geometry)
-- Geometry processing progress
-- List of created cases with:
-  - Angle of attack
-  - Velocity components (Ux, Uy)
-  - Rotation speed (omega in rad/s)
+```json
+{
+  "projectName": "MyStudy",
+  "outputDir": "~/studies",
+  "templateName": "external_disc_rotating-ami_transient",
+  "modelSource": "~/my_disc.step",
+  "angles": "-5,0,5,10",
+  "velocity": 20.0,
+  "rpm": 1000.0,
+  "inputUnits": "mm",
+  "meshSize": 0.05,
+  "featureAngle": null,
+  "cores": 4,
+  "physics": {
+    "nu": 1.5e-5,
+    "turbulenceIntensity": 0.05,
+    "endTime": 1.0,
+    "nOuterCorrectors": 3,
+    "refinementLevelMin": 3,
+    "refinementLevelMax": 4
+  },
+  "domain": {
+    "rotorRadiusScale": 1.25,
+    "rotorHeightScale": 1.5,
+    "tunnelUpstream": 5.0,
+    "tunnelDownstream": 10.0,
+    "tunnelRadial": 5.0,
+    "meshResolution": 32
+  }
+}
+```
 
 ### Notes
 
-- **Project name is used for folder and case naming** - `--project-name MyProject` creates `~/studies/MyProject/` with cases named `MyProject_{angle}`
-- **Output directory is the parent folder** - `--output-dir ~/studies` means the project folder will be created inside `~/studies`
-- **Template must have `constant/caseSettings` file** - This is the central configuration hub
-- **Geometry is processed once** and copied to all cases (efficient for multi-case studies)
-- **All geometry files are in meters** (OpenFOAM standard)
-- For STEP/IGES files, conversion uses the same logic as the `convert` command
+- **Required fields**: `projectName`, `outputDir`, `modelSource`, `angles`
+- **All other fields are optional** — omitted physics/domain fields use the same defaults as the CLI options
+- **JSON keys are case-insensitive** — `projectName`, `ProjectName`, and `project_name` are all accepted
+- The `physics` and `domain` sections can be omitted entirely if defaults are acceptable
+- `featureAngle` accepts `null` or a numeric value in degrees
 
-### Template Requirements
+### Usage
 
-Your template case must have:
-- `constant/caseSettings` - Central configuration file
-- Standard OpenFOAM directory structure (`0/`, `constant/`, `system/`)
-- `constant/triSurface/` directory (will be populated automatically)
+```bash
+foamscript new-study --config ~/studies/my_study.json
+```
 
-### Next Steps After Creation
+### Next Steps After Study Creation
 
-After creating a study, typical workflow:
+```bash
+# Mesh a single case
+foamscript mesh -d ~/studies/MyStudy/MyStudy_0.0
 
-1. **Navigate to a case:**
-   ```bash
-   cd ~/studies/MyProject/MyProject_0.0
-   ```
+# Mesh all cases in the study (parallel, 8 cores)
+foamscript mesh-study -d ~/studies/MyStudy --parallel --cores 8
 
-2. **Run blockMesh:**
-   ```bash
-   blockMesh
-   ```
-
-3. **Run snappyHexMesh:**
-   ```bash
-   snappyHexMesh -overwrite
-   ```
-
-4. **Decompose for parallel:**
-   ```bash
-   decomposePar
-   ```
-
-5. **Run solver:**
-   ```bash
-   mpirun -np 8 simpleFoam -parallel
-   ```
-
-6. **Reconstruct and post-process:**
-   ```bash
-   reconstructPar
-   paraFoam
-   ```
+# Or mesh manually
+cd ~/studies/MyStudy/MyStudy_0.0
+blockMesh
+snappyHexMesh -overwrite
+decomposePar
+mpirun -np 8 pimpleFoam -parallel
+reconstructPar
+```
 
 ---
 
 ## Common Workflows
 
-### Complete Study Setup (STEP → Cases)
+### Complete Study Setup (STEP → Meshed Cases)
 
 ```bash
 # 1. Validate environment
@@ -426,24 +439,45 @@ foamscript validate
 
 # 2. Create parametric study with AoA sweep
 foamscript new-study \
-  --project-name DiscAnalysis \
-  --output-dir ~/studies \
-  --template ~/disc_template \
-  --model-source ~/my_disc.step \
-  --angles -10,-5,-2.5,0,2.5,5,10 \
+  -n DiscAnalysis \
+  -o ~/studies \
+  -s ~/my_disc.step \
+  -a -10,-5,-2.5,0,2.5,5,10 \
   --velocity 20 \
   --rpm 1000 \
   --input-units mm \
-  --mesh-size 0.05 \
   --cores 8
 
-# 3. Navigate to first case and run simulation
-cd ~/studies/DiscAnalysis/DiscAnalysis_-10.0
-blockMesh
-snappyHexMesh -overwrite
-decomposePar
-mpirun -np 8 simpleFoam -parallel
-reconstructPar
+# 3. Mesh all cases in parallel
+foamscript mesh-study \
+  -d ~/studies/DiscAnalysis \
+  --parallel \
+  --cores 8 \
+  --check-quality
+```
+
+### Using a Config File for Repeatable Studies
+
+```bash
+# Save study config as JSON
+cat > ~/studies/disc_study.json << 'EOF'
+{
+  "projectName": "DiscAnalysis",
+  "outputDir": "~/studies",
+  "modelSource": "~/my_disc.step",
+  "angles": "-10,-5,-2.5,0,2.5,5,10",
+  "velocity": 20.0,
+  "rpm": 1000.0,
+  "inputUnits": "mm",
+  "cores": 8
+}
+EOF
+
+# Run study from config
+foamscript new-study --config ~/studies/disc_study.json
+
+# Mesh study
+foamscript mesh-study -d ~/studies/DiscAnalysis --parallel --cores 8
 ```
 
 ### Standalone Geometry Processing
@@ -457,11 +491,8 @@ foamscript convert \
   --mesh-size 0.05 \
   --validate
 
-# 2. Generate domain
-foamscript generate-domain \
-  --disc disc.stl \
-  --output-dir ./ \
-  --validate
+# 2. Generate domain STL files
+foamscript generate-domain disc.stl --output-dir ./ --validate
 ```
 
 ---
@@ -516,9 +547,9 @@ This warning appears if converted geometry is not 0.21-0.30m:
 
 ### "Template directory not found"
 
-Ensure template path exists and has proper structure:
+Ensure the template name is correct:
 ```bash
-ls -la ~/disc_template/constant/caseSettings
+foamscript list-templates
 ```
 
 ### Conversion takes too long
@@ -532,4 +563,4 @@ ls -la ~/disc_template/constant/caseSettings
 Check that:
 - `--velocity` is in m/s (not mph or other units)
 - Angles are in degrees (not radians)
-- Template's `caseSettings` has correct variable names
+- Template's Scriban variables match what `CaseService` provides (see `TEMPLATE.md` in the template directory)

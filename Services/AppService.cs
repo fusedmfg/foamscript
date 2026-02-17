@@ -1,3 +1,4 @@
+using System.Text.Json;
 using foamscript.Services;
 using foamscript.Models;
 
@@ -336,11 +337,77 @@ namespace foamscript
 
         private int HandleNewStudy(NewStudyModel model)
         {
-            // Resolve template path: supports both template names and full paths
+            // Build config from JSON file or CLI args
+            StudyConfig config;
+            if (model.ConfigFile != null)
+            {
+                var loadResult = LoadStudyConfig(model.ConfigFile);
+                if (loadResult.Error != null)
+                {
+                    Console.WriteLine($"✗ {loadResult.Error}");
+                    Console.WriteLine();
+                    return -1;
+                }
+                config = loadResult.Config!;
+            }
+            else
+            {
+                // Validate required CLI args
+                var missing = new List<string>();
+                if (string.IsNullOrEmpty(model.ProjectName)) missing.Add("--project-name (-n)");
+                if (string.IsNullOrEmpty(model.OutputDir)) missing.Add("--output-dir (-o)");
+                if (string.IsNullOrEmpty(model.ModelSource)) missing.Add("--model-source (-s)");
+                if (string.IsNullOrEmpty(model.Angles)) missing.Add("--angles (-a)");
+
+                if (missing.Count > 0)
+                {
+                    Console.WriteLine("✗ Missing required arguments (or provide --config <file.json>):");
+                    foreach (var arg in missing)
+                        Console.WriteLine($"    {arg}");
+                    Console.WriteLine();
+                    Console.WriteLine("Run 'foamscript new-study --help' for usage.");
+                    return -1;
+                }
+
+                config = new StudyConfig
+                {
+                    ProjectName = model.ProjectName,
+                    OutputDir = model.OutputDir,
+                    TemplateName = model.TemplatePath,
+                    ModelSource = model.ModelSource,
+                    Angles = model.Angles,
+                    Velocity = model.Velocity,
+                    Rpm = model.Rpm,
+                    InputUnits = model.InputUnits,
+                    MeshSize = model.MeshSize,
+                    FeatureAngle = model.FeatureAngle,
+                    Cores = model.Cores,
+                    Physics = new StudyPhysicsConfig
+                    {
+                        Nu = model.Nu,
+                        TurbulenceIntensity = model.TurbulenceIntensity,
+                        EndTime = model.EndTime,
+                        NOuterCorrectors = model.NOuterCorrectors,
+                        RefinementLevelMin = model.RefinementLevelMin,
+                        RefinementLevelMax = model.RefinementLevelMax
+                    },
+                    Domain = new StudyDomainConfig
+                    {
+                        RotorRadiusScale = model.RotorRadiusScale,
+                        RotorHeightScale = model.RotorHeightScale,
+                        TunnelUpstream = model.TunnelUpstream,
+                        TunnelDownstream = model.TunnelDownstream,
+                        TunnelRadial = model.TunnelRadial,
+                        MeshResolution = model.MeshResolution
+                    }
+                };
+            }
+
+            // Resolve template path
             string templatePath;
             try
             {
-                templatePath = ResolveTemplatePath(model.TemplatePath);
+                templatePath = ResolveTemplatePath(config.TemplateName);
             }
             catch (DirectoryNotFoundException ex)
             {
@@ -360,51 +427,51 @@ namespace foamscript
                 return -1;
             }
 
-            _loggingService.LogInformation($"Creating project '{model.ProjectName}' in {model.OutputDir}");
+            _loggingService.LogInformation($"Creating project '{config.ProjectName}' in {config.OutputDir}");
 
             Console.WriteLine();
             Console.WriteLine("=== New Study Creation ===");
             Console.WriteLine();
-            Console.WriteLine($"Project name: {model.ProjectName}");
-            Console.WriteLine($"Output directory: {model.OutputDir}");
-            Console.WriteLine($"Study directory: {Path.Combine(model.OutputDir, model.ProjectName)}");
-            Console.WriteLine($"Template: {templatePath}");
-            Console.WriteLine($"Model source: {model.ModelSource}");
-            Console.WriteLine($"Angles: {model.Angles}");
-            Console.WriteLine($"Velocity: {model.Velocity} m/s");
-            Console.WriteLine($"RPM: {model.Rpm}");
-            Console.WriteLine($"Cores: {model.Cores}");
+            Console.WriteLine($"Project name:     {config.ProjectName}");
+            Console.WriteLine($"Output directory: {config.OutputDir}");
+            Console.WriteLine($"Study directory:  {Path.Combine(config.OutputDir, config.ProjectName)}");
+            Console.WriteLine($"Template:         {templatePath}");
+            Console.WriteLine($"Model source:     {config.ModelSource}");
+            Console.WriteLine($"Angles:           {config.Angles}");
+            Console.WriteLine($"Velocity:         {config.Velocity} m/s");
+            Console.WriteLine($"RPM:              {config.Rpm}");
+            Console.WriteLine($"Cores:            {config.Cores}");
             Console.WriteLine();
-            Console.WriteLine("Geometry Parameters:");
-            Console.WriteLine($"  Input units: {model.InputUnits} (output will be in meters)");
-            Console.WriteLine($"  Mesh size: {model.MeshSize}");
-            if (model.FeatureAngle.HasValue)
-            {
-                Console.WriteLine($"  Feature angle: {model.FeatureAngle.Value}°");
-            }
+            Console.WriteLine("Geometry / Domain Parameters:");
+            Console.WriteLine($"  Input units:        {config.InputUnits} (output in meters)");
+            Console.WriteLine($"  Mesh size:          {config.MeshSize}");
+            if (config.FeatureAngle.HasValue)
+                Console.WriteLine($"  Feature angle:      {config.FeatureAngle.Value}°");
+            Console.WriteLine($"  Rotor radius scale: {config.Domain.RotorRadiusScale}x");
+            Console.WriteLine($"  Rotor height scale: {config.Domain.RotorHeightScale}x");
+            Console.WriteLine($"  Tunnel upstream:    {config.Domain.TunnelUpstream} D");
+            Console.WriteLine($"  Tunnel downstream:  {config.Domain.TunnelDownstream} D");
+            Console.WriteLine($"  Tunnel radial:      {config.Domain.TunnelRadial} D");
+            Console.WriteLine($"  Mesh resolution:    {config.Domain.MeshResolution} segments");
+            Console.WriteLine();
+            Console.WriteLine("Physics Parameters:");
+            Console.WriteLine($"  nu:                   {config.Physics.Nu:E2} m²/s");
+            Console.WriteLine($"  Turbulence intensity: {config.Physics.TurbulenceIntensity * 100:F0}%");
+            Console.WriteLine($"  End time:             {config.Physics.EndTime} s");
+            Console.WriteLine($"  Outer correctors:     {config.Physics.NOuterCorrectors}");
+            Console.WriteLine($"  Refinement levels:    {config.Physics.RefinementLevelMin}–{config.Physics.RefinementLevelMax}");
             Console.WriteLine();
             Console.WriteLine("Processing geometry...");
 
-            var result = _caseService.CreateStudy(
-                model.ProjectName,
-                model.OutputDir,
-                templatePath,
-                model.ModelSource,
-                model.Angles,
-                model.Velocity,
-                model.Rpm,
-                model.InputUnits,
-                model.MeshSize,
-                model.FeatureAngle,
-                model.Cores);
+            var result = _caseService.CreateStudy(config, templatePath);
 
             if (result.IsSuccess)
             {
                 Console.WriteLine("✓ Study creation successful!");
                 Console.WriteLine();
-                Console.WriteLine($"Study name: {result.StudyName}");
-                Console.WriteLine($"Study directory: {result.StudyDir}");
-                Console.WriteLine($"Geometry directory: {Path.Combine(result.StudyDir!, "geometry")}");
+                Console.WriteLine($"Study name:        {result.StudyName}");
+                Console.WriteLine($"Study directory:   {result.StudyDir}");
+                Console.WriteLine($"Geometry directory:{Path.Combine(result.StudyDir!, "geometry")}");
                 Console.WriteLine();
                 Console.WriteLine($"Created {result.Cases.Count} case(s):");
 
@@ -413,7 +480,7 @@ namespace foamscript
                     Console.WriteLine($"  • {Path.GetFileName(caseInfo.CaseDir)}");
                     Console.WriteLine($"      AoA: {caseInfo.AngleOfAttack}°");
                     Console.WriteLine($"      Velocity: Ux={caseInfo.Ux:F3} m/s, Uy={caseInfo.Uy:F3} m/s");
-                    Console.WriteLine($"      Omega: {caseInfo.Omega:F3} rad/s ({model.Rpm} RPM)");
+                    Console.WriteLine($"      Omega: {caseInfo.Omega:F3} rad/s ({config.Rpm} RPM)");
                 }
 
                 _loggingService.LogInformation("Study creation completed successfully.");
@@ -426,6 +493,45 @@ namespace foamscript
                 _loggingService.LogError("Study creation failed.", null!);
                 Console.WriteLine();
                 return -1;
+            }
+        }
+
+        /// <summary>
+        /// Loads and validates a StudyConfig from a JSON file.
+        /// </summary>
+        private static (StudyConfig? Config, string? Error) LoadStudyConfig(string path)
+        {
+            if (!File.Exists(path))
+                return (null, $"Config file not found: {path}");
+
+            try
+            {
+                var json = File.ReadAllText(path);
+                var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+                var config = JsonSerializer.Deserialize<StudyConfig>(json, options);
+
+                if (config == null)
+                    return (null, $"Failed to parse config file: {path}");
+
+                // Validate required fields
+                var missing = new List<string>();
+                if (string.IsNullOrWhiteSpace(config.ProjectName)) missing.Add("projectName");
+                if (string.IsNullOrWhiteSpace(config.OutputDir)) missing.Add("outputDir");
+                if (string.IsNullOrWhiteSpace(config.ModelSource)) missing.Add("modelSource");
+                if (string.IsNullOrWhiteSpace(config.Angles)) missing.Add("angles");
+
+                if (missing.Count > 0)
+                    return (null, $"Config file is missing required fields: {string.Join(", ", missing)}");
+
+                // Ensure nested config objects exist (they may be null if omitted from JSON)
+                config.Physics ??= new StudyPhysicsConfig();
+                config.Domain ??= new StudyDomainConfig();
+
+                return (config, null);
+            }
+            catch (JsonException ex)
+            {
+                return (null, $"Invalid JSON in config file '{path}': {ex.Message}");
             }
         }
 
