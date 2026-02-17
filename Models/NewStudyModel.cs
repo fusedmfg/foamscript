@@ -14,8 +14,8 @@ namespace foamscript.Models
         [Option('o', "output-dir", Required = true, HelpText = "Parent directory where project folder will be created (e.g., ~/studies)")]
         public string OutputDir { get; set; } = string.Empty;
 
-        [Option('t', "template", Required = true, HelpText = "Path to template case directory")]
-        public string TemplatePath { get; set; } = string.Empty;
+        [Option('t', "template", Required = false, HelpText = "Path to template case directory (defaults to external_disc_rotating-ami_transient)")]
+        public string? TemplatePath { get; set; }
 
         [Option('s', "model-source", Required = true, HelpText = "Path to source geometry file (STEP, IGES, or STL)")]
         public string ModelSource { get; set; } = string.Empty;

@@ -332,6 +332,16 @@ namespace foamscript
 
         private int HandleNewStudy(NewStudyModel model)
         {
+            // Resolve template path: use default if not specified
+            var templatePath = model.TemplatePath;
+            if (string.IsNullOrEmpty(templatePath))
+            {
+                // Default to the built-in template in the application directory
+                var appDir = AppContext.BaseDirectory;
+                templatePath = Path.Combine(appDir, "..", "..", "..", "Templates", "external_disc_rotating-ami_transient");
+                templatePath = Path.GetFullPath(templatePath); // Normalize the path
+            }
+
             _loggingService.LogInformation($"Creating project '{model.ProjectName}' in {model.OutputDir}");
 
             Console.WriteLine();
@@ -340,7 +350,7 @@ namespace foamscript
             Console.WriteLine($"Project name: {model.ProjectName}");
             Console.WriteLine($"Output directory: {model.OutputDir}");
             Console.WriteLine($"Study directory: {Path.Combine(model.OutputDir, model.ProjectName)}");
-            Console.WriteLine($"Template: {model.TemplatePath}");
+            Console.WriteLine($"Template: {templatePath}");
             Console.WriteLine($"Model source: {model.ModelSource}");
             Console.WriteLine($"Angles: {model.Angles}");
             Console.WriteLine($"Velocity: {model.Velocity} m/s");
@@ -360,7 +370,7 @@ namespace foamscript
             var result = _caseService.CreateStudy(
                 model.ProjectName,
                 model.OutputDir,
-                model.TemplatePath,
+                templatePath,
                 model.ModelSource,
                 model.Angles,
                 model.Velocity,

@@ -1,6 +1,14 @@
-# OpenFOAM Disc Template Documentation
+# External Rotating Disc Template (AMI, Transient)
 
-This directory contains an OpenFOAM case template for rotating disc simulations with angle of attack (AoA) sweeps. The template uses [Scriban](https://github.com/scriban/scriban) templating to dynamically generate case files with calculated parameters.
+**Template Name**: `external_disc_rotating-ami_transient`
+
+**Classification**:
+- **Domain**: External aerodynamics
+- **Feature**: Rotating disc (frisbee, propeller blade element, etc.)
+- **Motion**: AMI (Arbitrary Mesh Interface) - full mesh rotation
+- **Solver**: Transient (pimpleFoam)
+
+This template is designed for rotating disc simulations with angle of attack (AoA) sweeps in external flow. It uses [Scriban](https://github.com/scriban/scriban) templating to dynamically generate case files with calculated parameters.
 
 ## Template System
 
