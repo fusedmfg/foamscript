@@ -1,6 +1,6 @@
 # FoamScript
 
-C# CLI utility for OpenFOAM case management and automated CFD workflows for disc golf disc analysis.
+.NET 10 CLI tool for automating OpenFOAM CFD case setup and meshing for disc golf disc aerodynamic analysis.
 
 ## Quick Start
 
@@ -10,36 +10,41 @@ foamscript validate
 
 # Create parametric study with angle of attack sweep
 foamscript new-study \
-  --project-name MyProject \
-  --output-dir ~/studies \
-  --template ~/disc_template \
-  --model-source ~/my_disc.step \
-  --angles -5,-2.5,0,2.5,5 \
-  --velocity 20 \
-  --rpm 1000 \
-  --input-units mm \
-  --cores 8
+  -n DiscAnalysis \
+  -o ~/OpenFOAM/$USER-v2512/run \
+  -s ~/models/disc.step \
+  -a -5,0,5,10 \
+  --velocity 20 --rpm 1000 --input-units mm --cores 4
+
+# Mesh all cases in parallel
+foamscript mesh-study -d ~/OpenFOAM/$USER-v2512/run/DiscAnalysis --parallel --cores 4
+
+# Or use a JSON config file
+foamscript new-study --config study.json
 ```
 
 ## Features
 
-- **Integrated Workflow**: Single command creates complete study with geometry processing and multiple cases
-- **Geometry Conversion**: STEP/IGES → STL with automatic unit scaling (mm, cm, in, ft → meters)
-- **Domain Generation**: Automatic rotor and tunnel STL creation
-- **Parametric Studies**: Angle of attack sweeps with automatic parameter calculation
-- **Template-Based**: Scriban-rendered OpenFOAM case files with full parameter substitution
-- **Cross-Platform**: Developed on Windows, deployed on Linux
+- **Full Pipeline**: STEP/IGES → STL → domain generation → Scriban-templated case creation → meshing
+- **Configurable Physics**: Turbulence intensity, viscosity, end time, refinement levels — all via CLI or JSON
+- **Configurable Domain**: Tunnel sizing, rotor scaling, mesh resolution — defaults follow CFD convention (5D upstream, 10D downstream, 5D radial)
+- **Parallel Meshing**: blockMesh → surfaceFeatureExtract → decomposePar → snappyHexMesh (MPI) → reconstructParMesh
+- **Parametric Studies**: Angle of attack sweeps with automatic velocity decomposition and turbulence parameter calculation
+- **Template System**: Scriban-rendered OpenFOAM case files; template naming: `{domain}_{feature}_{motion}_{solver-type}`
 
-## Documentation
+## Commands
 
-📖 **[Full Documentation](Docs/Commands.md)**
+| Command | Description |
+|---------|-------------|
+| `validate` | Validate OpenFOAM environment (tools, env vars) |
+| `convert` | Convert STEP/IGES → STL via gmsh with unit scaling |
+| `generate-domain` | Generate rotor cylinder + tunnel box STL from disc geometry |
+| `new-study` | Full pipeline: geometry → domain → templated cases for AoA sweep |
+| `mesh` | Run blockMesh + snappyHexMesh on a single case (serial or parallel) |
+| `mesh-study` | Batch mesh all cases in a study directory |
+| `list-templates` | List available OpenFOAM case templates |
 
-### Commands
-
-- [validate](Docs/Commands.md#validate) - Validate OpenFOAM environment
-- [convert](Docs/Commands.md#convert) - Convert STEP/IGES geometry to STL
-- [generate-domain](Docs/Commands.md#generate-domain) - Generate rotor and tunnel domains
-- [new-study](Docs/Commands.md#new-study) - Create OpenFOAM study with AoA sweep
+See **[Commands.md](Docs/Commands.md)** for full reference with all options, JSON config format, and examples.
 
 ## Installation
 
@@ -47,82 +52,53 @@ foamscript new-study \
 
 - OpenFOAM v2312+ (tested with v2512)
 - .NET 10.0 SDK
-- gmsh (for geometry conversion)
+- gmsh (for STEP/IGES → STL conversion)
 
-### Build
+### Build & Test
 
 ```bash
-git clone <repository>
-cd foamscript
 dotnet build
-dotnet publish -c Release
+dotnet test    # 86 tests
 ```
 
-### Deploy
-
-Clone the repo on the Linux machine and run `./build.sh` — it pulls latest, builds Release, and runs tests.
-
-## Usage Examples
-
-### Validate Environment
+### Deploy to Linux
 
 ```bash
-foamscript validate --verbose
+dotnet publish -c Release -r linux-x64 --self-contained
+# Copy to Linux machine, or clone and build directly:
+dotnet build -c Release
 ```
 
-### Convert Geometry
-
-```bash
-foamscript convert \
-  --input disc.step \
-  --output disc.stl \
-  --input-units mm \
-  --mesh-size 0.05 \
-  --validate
-```
-
-### Create Complete Study
-
-```bash
-foamscript new-study \
-  --project-name DiscAnalysis \
-  --output-dir ~/studies \
-  --template ~/disc_template \
-  --model-source ~/my_disc.step \
-  --angles -10,-5,-2.5,0,2.5,5,10 \
-  --velocity 20 \
-  --rpm 1000 \
-  --input-units mm \
-  --mesh-size 0.05 \
-  --cores 8
-```
-
-## Development
-
-### Run Tests
-
-```bash
-dotnet test
-```
-
-### Project Structure
+## Project Structure
 
 ```
 foamscript/
-├── Models/          # Command-line models
-├── Services/        # Business logic
-│   ├── AppService.cs
-│   ├── CaseService.cs
-│   ├── GeometryService.cs
-│   ├── EnvironmentService.cs
-│   └── MeshService.cs
-├── Docs/            # Documentation
-└── foamscript.Tests/
+├── Models/              # CLI models (CommandLineParser) + result/config POCOs
+├── Services/            # Business logic
+│   ├── AppService.cs    # CLI routing, JSON config loading, validation
+│   ├── CaseService.cs   # Study creation, template context calculation
+│   ├── GeometryService.cs  # STEP→STL, bounding box, domain generation
+│   ├── MeshService.cs   # blockMesh, snappyHexMesh, parallel workflow
+│   ├── EnvironmentService.cs  # OpenFOAM environment validation
+│   └── TemplateService.cs  # Scriban template rendering
+├── Templates/           # OpenFOAM case templates (Scriban)
+│   └── external_disc_rotating-ami_transient/
+├── Docs/Commands.md     # Full command reference
+├── foamscript.Tests/    # xUnit + Moq + FluentAssertions (86 tests)
+└── study.example.jsonc  # Example JSON config file
 ```
+
+## Architecture
+
+- **CommandLineParser** for declarative CLI verb/option parsing
+- **Dependency injection** via `Microsoft.Extensions.Hosting`
+- **`IProcessExecutor` abstraction** wraps all external process calls — enables full unit test mocking without OpenFOAM installed
+- **Result object pattern** — all service calls return typed results (`IsSuccess`, `ErrorMessage`)
+- **Scriban templating** — OpenFOAM files rendered at case creation with pre-calculated physics context
 
 ## License
 
-[Add your license here]
+MIT
 
 ## Contributing
 
