@@ -75,7 +75,7 @@ namespace foamscript.Services
                 {
                     // Decompose domain for parallel processing
                     Console.WriteLine($"Decomposing domain for {cores} processors...");
-                    var decomposeResult = _processExecutor.Execute("decomposePar", $"-case {caseDir}");
+                    var decomposeResult = _processExecutor.Execute("decomposePar", $"-case {caseDir} -no-fields");
 
                     if (decomposeResult.ExitCode != 0)
                     {

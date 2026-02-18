@@ -60,7 +60,7 @@ namespace foamscript.Tests.Services
         private void SetupParallelWorkflowSuccess(string caseDir, int cores = 4)
         {
             _mockProcessExecutor
-                .Setup(x => x.Execute("decomposePar", $"-case {caseDir}"))
+                .Setup(x => x.Execute("decomposePar", $"-case {caseDir} -no-fields"))
                 .Returns(new ProcessResult { ExitCode = 0 });
             _mockProcessExecutor
                 .Setup(x => x.Execute("mpirun", It.IsAny<string>()))
@@ -199,7 +199,7 @@ namespace foamscript.Tests.Services
 
             _service.MeshCase(caseDir, parallel: true, cores: 4, checkQuality: false, overwrite: false);
 
-            _mockProcessExecutor.Verify(x => x.Execute("decomposePar", $"-case {caseDir}"), Times.Once);
+            _mockProcessExecutor.Verify(x => x.Execute("decomposePar", $"-case {caseDir} -no-fields"), Times.Once);
         }
 
         [Fact]
