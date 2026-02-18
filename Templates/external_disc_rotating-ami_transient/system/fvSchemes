@@ -14,8 +14,6 @@ FoamFile
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-#include "$FOAM_CASE/constant/caseSettings"
-
 ddtSchemes
 {
     // Constant: First-order implicit (Stable for transient disc sweeps)

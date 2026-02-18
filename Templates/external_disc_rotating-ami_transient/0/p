@@ -32,7 +32,7 @@ boundaryField
     {
         type            fixedValue;
 
-        // constant/caseSettings parameter: p
+        // Scriban parameter: p
         value           uniform {{ p }};
     }
 

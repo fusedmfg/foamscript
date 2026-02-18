@@ -26,7 +26,7 @@ boundaryField
     {
         type            fixedValue;
 
-        // constant/caseSettings parameter: Ux, Uy, Uz
+        // Scriban parameters: ux, uy
         value           uniform ({{ ux }} {{ uy }} 0);
     }
 
@@ -49,7 +49,7 @@ boundaryField
     {
         type            cyclicAMI;
 
-        // constant/caseSettings parameter: Ux, Uy, Uz
+        // Scriban parameters: ux, uy
         value           uniform ({{ ux }} {{ uy }} 0);
     }
 }

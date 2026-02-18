@@ -14,8 +14,6 @@ FoamFile
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-#include "$FOAM_CASE/constant/caseSettings"
-
 // Constant: Ensure we are working in Meters
 scale   1;
 
