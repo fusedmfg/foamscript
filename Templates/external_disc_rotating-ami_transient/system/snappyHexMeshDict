@@ -99,6 +99,8 @@ meshQualityControls
     minFaceWeight 0.05;
     minVolRatio 0.01;
     minTriangleTwist -1;
+    nSmoothScale 4;
+    errorReduction 0.75;
     relaxed { maxNonOrtho 75; }
 }
 
