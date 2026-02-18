@@ -35,7 +35,7 @@ castellatedMeshControls
     features
     (
         // Refine edges of the disc specifically
-        { file "disc.eMesh"; level 4; }
+        { file "disc.eMesh"; level {{ feature_level }}; }
     );
 
     refinementSurfaces
@@ -67,9 +67,8 @@ castellatedMeshControls
 
     resolveFeatureAngle 30;
 
-    // Location must be in the "Air" - assuming tunnel is large and disc is at 0,0,0
-    // (X Y Z) - Adjust this if your tunnel box is smaller than 5 meters
-    locationInMesh (2.0 2.0 2.0); 
+    // Point inside the tunnel domain, downstream of the disc (away from geometry)
+    locationInMesh ({{ domain_downstream * 0.5 }} {{ domain_radial * 0.5 }} {{ domain_radial * 0.5 }});
     
     allowFreeStandingZoneFaces false;
 }

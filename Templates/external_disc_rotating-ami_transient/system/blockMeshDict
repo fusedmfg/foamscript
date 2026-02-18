@@ -14,25 +14,31 @@ FoamFile
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-// Constant: Ensure we are working in Meters
 scale   1;
+
+// Domain sized to tunnel extents (with 10% margin)
+// X: -upstream to +downstream, Y/Z: -radial to +radial
 
 vertices
 (
-    (-5 -5 -5) // 0
-    ( 5 -5 -5) // 1
-    ( 5  5 -5) // 2
-    (-5  5 -5) // 3
-    (-5 -5  5) // 4
-    ( 5 -5  5) // 5
-    ( 5  5  5) // 6
-    (-5  5  5) // 7
+    (-{{ domain_upstream }}  -{{ domain_radial }}  -{{ domain_radial }}) // 0
+    ( {{ domain_downstream }} -{{ domain_radial }}  -{{ domain_radial }}) // 1
+    ( {{ domain_downstream }}  {{ domain_radial }}  -{{ domain_radial }}) // 2
+    (-{{ domain_upstream }}   {{ domain_radial }}  -{{ domain_radial }}) // 3
+    (-{{ domain_upstream }}  -{{ domain_radial }}   {{ domain_radial }}) // 4
+    ( {{ domain_downstream }} -{{ domain_radial }}   {{ domain_radial }}) // 5
+    ( {{ domain_downstream }}  {{ domain_radial }}   {{ domain_radial }}) // 6
+    (-{{ domain_upstream }}   {{ domain_radial }}   {{ domain_radial }}) // 7
 );
+
+{{- # Calculate cell counts: ~20 cells per disc diameter in each direction }}
+{{- nx = math.ceil((domain_upstream + domain_downstream) / disc_diameter * 4) }}
+{{- ny = math.ceil(2 * domain_radial / disc_diameter * 4) }}
+{{- nz = ny }}
 
 blocks
 (
-    // Constant: Initial grid density. SnappyHexMesh will refine this later.
-    hex (0 1 2 3 4 5 6 7) (20 20 20) simpleGrading (1 1 1)
+    hex (0 1 2 3 4 5 6 7) ({{ nx }} {{ ny }} {{ nz }}) simpleGrading (1 1 1)
 );
 
 edges
@@ -40,8 +46,6 @@ edges
 
 boundary
 (
-    // We define a single generic boundary. 
-    // SnappyHexMesh will overwrite this with your 'inlet', 'outlet', and 'tunnel' patches.
     baseBox
     {
         type patch;

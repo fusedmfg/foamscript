@@ -73,7 +73,7 @@ namespace foamscript.Services
                 foreach (var angle in angles)
                 {
                     var caseInfo = CreateCase(result.StudyDir, config.ProjectName, templatePath, angle,
-                        config.Velocity, omega, config.Cores, geometryDir, discDiameter, config.Physics);
+                        config.Velocity, omega, config.Cores, geometryDir, discDiameter, config.Physics, config.Domain);
                     result.Cases.Add(caseInfo);
                 }
 
@@ -177,7 +177,7 @@ namespace foamscript.Services
         /// </summary>
         private CaseInfo CreateCase(string studyDir, string studyName, string templatePath,
             double angle, double velocity, double omega, int cores,
-            string geometryDir, double discDiameter, StudyPhysicsConfig physics)
+            string geometryDir, double discDiameter, StudyPhysicsConfig physics, StudyDomainConfig domain)
         {
             var caseInfo = new CaseInfo
             {
@@ -196,7 +196,7 @@ namespace foamscript.Services
             caseInfo.Uy = velocity * Math.Sin(angleRad);
 
             // Calculate all template parameters
-            var context = CalculateTemplateContext(caseInfo.Ux, caseInfo.Uy, omega, cores, discDiameter, physics);
+            var context = CalculateTemplateContext(caseInfo.Ux, caseInfo.Uy, omega, cores, discDiameter, physics, domain);
 
             // Process template with Scriban
             _templateService.ProcessTemplate(templatePath, caseDir, context);
@@ -211,7 +211,7 @@ namespace foamscript.Services
         /// Calculates all template context parameters for Scriban rendering.
         /// </summary>
         private static object CalculateTemplateContext(double ux, double uy, double omegaRotation,
-            int cores, double discDiameter, StudyPhysicsConfig physics)
+            int cores, double discDiameter, StudyPhysicsConfig physics, StudyDomainConfig domain)
         {
             const double cmu = 0.09; // Standard k-omega SST turbulence model constant
 
@@ -222,6 +222,12 @@ namespace foamscript.Services
 
             // Reference area: pi * (diameter/2)^2
             var aref = Math.PI * Math.Pow(discDiameter / 2.0, 2);
+
+            // Domain extents in meters (with 10% margin beyond tunnel STL)
+            const double margin = 1.1;
+            var domainUpstream = domain.TunnelUpstream * discDiameter * margin;
+            var domainDownstream = domain.TunnelDownstream * discDiameter * margin;
+            var domainRadial = domain.TunnelRadial * discDiameter * margin;
 
             return new
             {
@@ -241,8 +247,12 @@ namespace foamscript.Services
                 n_outer_correctors = physics.NOuterCorrectors,
                 refinement_level_min = physics.RefinementLevelMin,
                 refinement_level_max = physics.RefinementLevelMax,
+                feature_level = physics.RefinementLevelMax,
                 cores = cores,
-                aref = aref
+                aref = aref,
+                domain_upstream = domainUpstream,
+                domain_downstream = domainDownstream,
+                domain_radial = domainRadial
             };
         }
 
