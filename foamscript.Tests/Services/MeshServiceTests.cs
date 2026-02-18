@@ -48,6 +48,11 @@ namespace foamscript.Tests.Services
                 .Setup(x => x.Execute("blockMesh", $"-case {caseDir}"))
                 .Returns(new ProcessResult { ExitCode = 0, Output = "" });
 
+        private void SetupFeatureExtractSuccess(string caseDir) =>
+            _mockProcessExecutor
+                .Setup(x => x.Execute("surfaceFeatureExtract", $"-case {caseDir}"))
+                .Returns(new ProcessResult { ExitCode = 0, Output = "" });
+
         private void SetupSerialSnappySuccess(string caseDir, bool overwrite = false)
         {
             var args = $"-case {caseDir}";
@@ -114,6 +119,7 @@ namespace foamscript.Tests.Services
         {
             var caseDir = CreateValidCaseDir();
             SetupBlockMeshSuccess(caseDir);
+            SetupFeatureExtractSuccess(caseDir);
             SetupSerialSnappySuccess(caseDir);
 
             _service.MeshCase(caseDir, parallel: false, cores: 1, checkQuality: false, overwrite: false);
@@ -140,6 +146,7 @@ namespace foamscript.Tests.Services
         {
             var caseDir = CreateValidCaseDir();
             SetupBlockMeshSuccess(caseDir);
+            SetupFeatureExtractSuccess(caseDir);
             SetupSerialSnappySuccess(caseDir);
 
             _service.MeshCase(caseDir, parallel: false, cores: 1, checkQuality: false, overwrite: false);
@@ -152,6 +159,7 @@ namespace foamscript.Tests.Services
         {
             var caseDir = CreateValidCaseDir();
             SetupBlockMeshSuccess(caseDir);
+            SetupFeatureExtractSuccess(caseDir);
             SetupSerialSnappySuccess(caseDir, overwrite: true);
 
             _service.MeshCase(caseDir, parallel: false, cores: 1, checkQuality: false, overwrite: true);
@@ -165,6 +173,7 @@ namespace foamscript.Tests.Services
         {
             var caseDir = CreateValidCaseDir();
             SetupBlockMeshSuccess(caseDir);
+            SetupFeatureExtractSuccess(caseDir);
             _mockProcessExecutor
                 .Setup(x => x.Execute("snappyHexMesh", It.IsAny<string>()))
                 .Returns(new ProcessResult { ExitCode = 1, Output = "FOAM FATAL ERROR" });
@@ -180,6 +189,7 @@ namespace foamscript.Tests.Services
         {
             var caseDir = CreateValidCaseDir();
             SetupBlockMeshSuccess(caseDir);
+            SetupFeatureExtractSuccess(caseDir);
             SetupSerialSnappySuccess(caseDir);
 
             var result = _service.MeshCase(caseDir, parallel: false, cores: 1, checkQuality: false, overwrite: false);
@@ -195,6 +205,7 @@ namespace foamscript.Tests.Services
         {
             var caseDir = CreateValidCaseDir();
             SetupBlockMeshSuccess(caseDir);
+            SetupFeatureExtractSuccess(caseDir);
             SetupParallelWorkflowSuccess(caseDir);
 
             _service.MeshCase(caseDir, parallel: true, cores: 4, checkQuality: false, overwrite: false);
@@ -207,6 +218,7 @@ namespace foamscript.Tests.Services
         {
             var caseDir = CreateValidCaseDir();
             SetupBlockMeshSuccess(caseDir);
+            SetupFeatureExtractSuccess(caseDir);
             _mockProcessExecutor
                 .Setup(x => x.Execute("decomposePar", It.IsAny<string>()))
                 .Returns(new ProcessResult { ExitCode = 1, Output = "Error" });
@@ -223,6 +235,7 @@ namespace foamscript.Tests.Services
             var caseDir = CreateValidCaseDir();
             int cores = 4;
             SetupBlockMeshSuccess(caseDir);
+            SetupFeatureExtractSuccess(caseDir);
             SetupParallelWorkflowSuccess(caseDir, cores);
 
             _service.MeshCase(caseDir, parallel: true, cores: cores, checkQuality: false, overwrite: false);
@@ -239,6 +252,7 @@ namespace foamscript.Tests.Services
         {
             var caseDir = CreateValidCaseDir();
             SetupBlockMeshSuccess(caseDir);
+            SetupFeatureExtractSuccess(caseDir);
             _mockProcessExecutor
                 .Setup(x => x.Execute("decomposePar", It.IsAny<string>()))
                 .Returns(new ProcessResult { ExitCode = 0 });
@@ -260,6 +274,7 @@ namespace foamscript.Tests.Services
         {
             var caseDir = CreateValidCaseDir();
             SetupBlockMeshSuccess(caseDir);
+            SetupFeatureExtractSuccess(caseDir);
             _mockProcessExecutor
                 .Setup(x => x.Execute("decomposePar", It.IsAny<string>()))
                 .Returns(new ProcessResult { ExitCode = 0 });
@@ -278,6 +293,7 @@ namespace foamscript.Tests.Services
         {
             var caseDir = CreateValidCaseDir();
             SetupBlockMeshSuccess(caseDir);
+            SetupFeatureExtractSuccess(caseDir);
             SetupParallelWorkflowSuccess(caseDir);
 
             _service.MeshCase(caseDir, parallel: true, cores: 4, checkQuality: false, overwrite: false);
@@ -290,6 +306,7 @@ namespace foamscript.Tests.Services
         {
             var caseDir = CreateValidCaseDir();
             SetupBlockMeshSuccess(caseDir);
+            SetupFeatureExtractSuccess(caseDir);
             _mockProcessExecutor
                 .Setup(x => x.Execute("decomposePar", It.IsAny<string>()))
                 .Returns(new ProcessResult { ExitCode = 0 });
@@ -312,6 +329,7 @@ namespace foamscript.Tests.Services
         {
             var caseDir = CreateValidCaseDir();
             SetupBlockMeshSuccess(caseDir);
+            SetupFeatureExtractSuccess(caseDir);
             SetupParallelWorkflowSuccess(caseDir);
 
             var result = _service.MeshCase(caseDir, parallel: true, cores: 4, checkQuality: false, overwrite: false);
@@ -326,6 +344,7 @@ namespace foamscript.Tests.Services
         {
             var caseDir = CreateValidCaseDir();
             SetupBlockMeshSuccess(caseDir);
+            SetupFeatureExtractSuccess(caseDir);
             SetupSerialSnappySuccess(caseDir);
             _mockProcessExecutor
                 .Setup(x => x.Execute("checkMesh", $"-case {caseDir}"))
@@ -341,6 +360,7 @@ namespace foamscript.Tests.Services
         {
             var caseDir = CreateValidCaseDir();
             SetupBlockMeshSuccess(caseDir);
+            SetupFeatureExtractSuccess(caseDir);
             SetupSerialSnappySuccess(caseDir);
 
             _service.MeshCase(caseDir, parallel: false, cores: 1, checkQuality: false, overwrite: false);
@@ -353,6 +373,7 @@ namespace foamscript.Tests.Services
         {
             var caseDir = CreateValidCaseDir();
             SetupBlockMeshSuccess(caseDir);
+            SetupFeatureExtractSuccess(caseDir);
             SetupSerialSnappySuccess(caseDir);
             _mockProcessExecutor
                 .Setup(x => x.Execute("checkMesh", It.IsAny<string>()))
@@ -368,6 +389,7 @@ namespace foamscript.Tests.Services
         {
             var caseDir = CreateValidCaseDir();
             SetupBlockMeshSuccess(caseDir);
+            SetupFeatureExtractSuccess(caseDir);
             SetupSerialSnappySuccess(caseDir);
             _mockProcessExecutor
                 .Setup(x => x.Execute("checkMesh", It.IsAny<string>()))
@@ -390,6 +412,7 @@ namespace foamscript.Tests.Services
         {
             var caseDir = CreateValidCaseDir();
             SetupBlockMeshSuccess(caseDir);
+            SetupFeatureExtractSuccess(caseDir);
             SetupSerialSnappySuccess(caseDir);
             _mockProcessExecutor
                 .Setup(x => x.Execute("checkMesh", It.IsAny<string>()))
@@ -405,6 +428,7 @@ namespace foamscript.Tests.Services
         {
             var caseDir = CreateValidCaseDir();
             SetupBlockMeshSuccess(caseDir);
+            SetupFeatureExtractSuccess(caseDir);
             SetupSerialSnappySuccess(caseDir);
             _mockProcessExecutor
                 .Setup(x => x.Execute("checkMesh", It.IsAny<string>()))
@@ -420,6 +444,7 @@ namespace foamscript.Tests.Services
         {
             var caseDir = CreateValidCaseDir();
             SetupBlockMeshSuccess(caseDir);
+            SetupFeatureExtractSuccess(caseDir);
             SetupSerialSnappySuccess(caseDir);
             _mockProcessExecutor
                 .Setup(x => x.Execute("checkMesh", It.IsAny<string>()))
@@ -435,6 +460,7 @@ namespace foamscript.Tests.Services
         {
             var caseDir = CreateValidCaseDir();
             SetupBlockMeshSuccess(caseDir);
+            SetupFeatureExtractSuccess(caseDir);
             SetupSerialSnappySuccess(caseDir);
             _mockProcessExecutor
                 .Setup(x => x.Execute("checkMesh", It.IsAny<string>()))
@@ -538,6 +564,9 @@ namespace foamscript.Tests.Services
                 .Setup(x => x.Execute("blockMesh", It.IsAny<string>()))
                 .Returns(new ProcessResult { ExitCode = 0 });
             _mockProcessExecutor
+                .Setup(x => x.Execute("surfaceFeatureExtract", It.IsAny<string>()))
+                .Returns(new ProcessResult { ExitCode = 0 });
+            _mockProcessExecutor
                 .Setup(x => x.Execute("snappyHexMesh", It.IsAny<string>()))
                 .Returns(new ProcessResult { ExitCode = 0 });
 
@@ -563,6 +592,9 @@ namespace foamscript.Tests.Services
 
             _mockProcessExecutor
                 .Setup(x => x.Execute("blockMesh", It.IsAny<string>()))
+                .Returns(new ProcessResult { ExitCode = 0 });
+            _mockProcessExecutor
+                .Setup(x => x.Execute("surfaceFeatureExtract", It.IsAny<string>()))
                 .Returns(new ProcessResult { ExitCode = 0 });
             _mockProcessExecutor
                 .Setup(x => x.Execute("snappyHexMesh", It.IsAny<string>()))

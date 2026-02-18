@@ -70,7 +70,28 @@ namespace foamscript.Services
 
                 Console.WriteLine("✓ blockMesh completed successfully");
 
-                // Step 2: Run snappyHexMesh
+                // Step 2: Extract surface features (generates .eMesh files for snappyHexMesh)
+                Console.WriteLine("Extracting surface features...");
+                var featureResult = _processExecutor.Execute("surfaceFeatureExtract", $"-case {caseDir}");
+
+                if (featureResult.ExitCode != 0)
+                {
+                    result.IsSuccess = false;
+                    result.ErrorMessage = $"surfaceFeatureExtract failed with exit code {featureResult.ExitCode}";
+
+                    _loggingService.LogError($"surfaceFeatureExtract failed with exit code {featureResult.ExitCode}");
+                    _loggingService.LogError($"surfaceFeatureExtract stdout:\n{featureResult.Output}");
+                    if (!string.IsNullOrEmpty(featureResult.Error))
+                    {
+                        _loggingService.LogError($"surfaceFeatureExtract stderr:\n{featureResult.Error}");
+                    }
+
+                    return result;
+                }
+
+                Console.WriteLine("✓ Surface features extracted successfully");
+
+                // Step 3: Run snappyHexMesh
                 if (parallel)
                 {
                     // Decompose domain for parallel processing
@@ -94,6 +115,9 @@ namespace foamscript.Services
                     }
 
                     Console.WriteLine("✓ Domain decomposed successfully");
+
+                    // Copy triSurface files to each processor directory
+                    DistributeTriSurface(caseDir, cores);
 
                     // Run snappyHexMesh in parallel
                     Console.WriteLine($"Running snappyHexMesh in parallel ({cores} cores)...");
@@ -319,6 +343,31 @@ namespace foamscript.Services
             caseDirs.Sort();
 
             return caseDirs;
+        }
+
+        /// <summary>
+        /// Copies constant/triSurface files (STL + eMesh) to each processor directory.
+        /// Required for parallel snappyHexMesh which reads geometry from processor dirs.
+        /// </summary>
+        private static void DistributeTriSurface(string caseDir, int cores)
+        {
+            var triSurfaceDir = Path.Combine(caseDir, "constant", "triSurface");
+            if (!Directory.Exists(triSurfaceDir))
+                return;
+
+            var files = Directory.GetFiles(triSurfaceDir);
+
+            for (int i = 0; i < cores; i++)
+            {
+                var procTriDir = Path.Combine(caseDir, $"processor{i}", "constant", "triSurface");
+                Directory.CreateDirectory(procTriDir);
+
+                foreach (var file in files)
+                {
+                    var dest = Path.Combine(procTriDir, Path.GetFileName(file));
+                    File.Copy(file, dest, overwrite: true);
+                }
+            }
         }
 
         /// <summary>
