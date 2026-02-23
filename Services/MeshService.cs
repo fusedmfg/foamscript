@@ -186,22 +186,8 @@ namespace foamscript.Services
                 }
 
                 // Step: Convert rotor wall patches to cyclicAMI (required for AMI rotation)
-                var createPatchDictPath = Path.Combine(caseDir, "system", "createPatchDict");
-                if (File.Exists(createPatchDictPath))
-                {
-                    Console.WriteLine("Creating AMI patches (createPatch)...");
-                    var createPatchResult = _processExecutor.Execute("createPatch", $"-case {caseDir} -overwrite");
+                PatchBoundaryForAMI(caseDir);
 
-                    if (createPatchResult.ExitCode != 0)
-                    {
-                        result.IsSuccess = false;
-                        result.ErrorMessage = $"createPatch failed with exit code {createPatchResult.ExitCode}";
-                        LogToolError("createPatch", createPatchResult);
-                        return result;
-                    }
-
-                    Console.WriteLine("✓ AMI patches created successfully");
-                }
 
                 // Step 3: Check mesh quality (optional)
                 if (checkQuality)
@@ -328,6 +314,73 @@ namespace foamscript.Services
                 result.ErrorMessage = $"Study meshing failed: {ex.Message}";
                 return result;
             }
+        }
+
+        /// <summary>
+        /// Patches the constant/polyMesh/boundary file to convert rotor/rotor_slave
+        /// from wall type to cyclicAMI. Required for AMI mesh interface rotation.
+        /// createPatch utility doesn't reliably work in all OpenFOAM versions.
+        /// </summary>
+        private static void PatchBoundaryForAMI(string caseDir)
+        {
+            var boundaryPath = Path.Combine(caseDir, "constant", "polyMesh", "boundary");
+            if (!File.Exists(boundaryPath))
+                return;
+
+            var content = File.ReadAllText(boundaryPath);
+
+            // Only patch if rotor patches exist as wall type
+            if (!content.Contains("rotor") || !content.Contains("rotor_slave"))
+                return;
+
+            var lines = File.ReadAllLines(boundaryPath).ToList();
+            var output = new List<string>();
+
+            for (int i = 0; i < lines.Count; i++)
+            {
+                var trimmed = lines[i].Trim();
+
+                // Detect rotor or rotor_slave patch block
+                if ((trimmed == "rotor" || trimmed == "rotor_slave") && i + 1 < lines.Count && lines[i + 1].Trim() == "{")
+                {
+                    var patchName = trimmed;
+                    var neighbourPatch = patchName == "rotor" ? "rotor_slave" : "rotor";
+
+                    output.Add(lines[i]); // patch name
+                    output.Add(lines[i + 1]); // {
+                    i += 2;
+
+                    // Write cyclicAMI entries
+                    output.Add("        type            cyclicAMI;");
+                    output.Add($"        neighbourPatch  {neighbourPatch};");
+                    output.Add("        transform       noOrdering;");
+                    output.Add("        matchTolerance  0.0001;");
+
+                    // Skip old type and inGroups lines, keep nFaces and startFace
+                    while (i < lines.Count)
+                    {
+                        var innerTrimmed = lines[i].Trim();
+                        if (innerTrimmed.StartsWith("nFaces") || innerTrimmed.StartsWith("startFace"))
+                        {
+                            output.Add(lines[i]);
+                        }
+                        else if (innerTrimmed == "}")
+                        {
+                            output.Add(lines[i]);
+                            break;
+                        }
+                        // Skip type, inGroups lines
+                        i++;
+                    }
+                }
+                else
+                {
+                    output.Add(lines[i]);
+                }
+            }
+
+            File.WriteAllLines(boundaryPath, output);
+            Console.WriteLine("✓ Rotor patches converted to cyclicAMI");
         }
 
         private void LogToolError(string toolName, ProcessResult result)
