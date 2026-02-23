@@ -58,7 +58,7 @@ functions
         dragDir         (1 0 0);
         liftDir         (0 1 0);
         pitchAxis       (0 0 1);
-        cofR            (0 0 0); // Center of Rotation at CAD origin
+        CofR            (0 0 0); // Center of Rotation at CAD origin
     }
 }
 

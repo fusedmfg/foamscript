@@ -22,7 +22,6 @@ geometry
 {
     disc.stl   { type triSurfaceMesh; name disc; }
     rotor.stl  { type triSurfaceMesh; name rotor; }
-    tunnel.stl { type triSurfaceMesh; name tunnel; }
 }
 
 castellatedMeshControls
@@ -53,11 +52,7 @@ castellatedMeshControls
             faceZone rotatingZone;
             cellZoneInside inside;
         }
-        tunnel
-        {
-            level (0 0);
-            patchInfo { type wall; }
-        }
+        // tunnel boundary defined by blockMesh (inlet/outlet/walls)
     }
 
     refinementRegions

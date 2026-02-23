@@ -46,17 +46,31 @@ edges
 
 boundary
 (
-    baseBox
+    inlet
     {
         type patch;
         faces
         (
-            (3 7 6 2)
-            (0 4 7 3)
-            (2 6 5 1)
-            (1 5 4 0)
-            (0 3 2 1)
-            (4 5 6 7)
+            (0 4 7 3) // upstream face (x = -upstream)
+        );
+    }
+    outlet
+    {
+        type patch;
+        faces
+        (
+            (2 6 5 1) // downstream face (x = +downstream)
+        );
+    }
+    tunnel
+    {
+        type wall;
+        faces
+        (
+            (3 7 6 2) // top
+            (1 5 4 0) // bottom
+            (0 3 2 1) // front (z = -radial)
+            (4 5 6 7) // back (z = +radial)
         );
     }
 );
