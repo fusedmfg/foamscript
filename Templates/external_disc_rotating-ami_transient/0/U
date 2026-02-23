@@ -17,8 +17,8 @@ FoamFile
 // Hard-coded constant
 dimensions      [0 1 -1 0 0 0 0];
 
-// Hard-coded constant
-internalField   uniform (0 0 0);
+// Parameterized: Initialize to freestream velocity (prevents adaptive timestep FPE)
+internalField   uniform ({{ ux }} {{ uy }} 0);
 
 boundaryField
 {
