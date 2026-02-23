@@ -185,6 +185,24 @@ namespace foamscript.Services
                     Console.WriteLine("✓ snappyHexMesh completed successfully");
                 }
 
+                // Step: Convert rotor wall patches to cyclicAMI (required for AMI rotation)
+                var createPatchDictPath = Path.Combine(caseDir, "system", "createPatchDict");
+                if (File.Exists(createPatchDictPath))
+                {
+                    Console.WriteLine("Creating AMI patches (createPatch)...");
+                    var createPatchResult = _processExecutor.Execute("createPatch", $"-case {caseDir} -overwrite");
+
+                    if (createPatchResult.ExitCode != 0)
+                    {
+                        result.IsSuccess = false;
+                        result.ErrorMessage = $"createPatch failed with exit code {createPatchResult.ExitCode}";
+                        LogToolError("createPatch", createPatchResult);
+                        return result;
+                    }
+
+                    Console.WriteLine("✓ AMI patches created successfully");
+                }
+
                 // Step 3: Check mesh quality (optional)
                 if (checkQuality)
                 {
@@ -309,6 +327,16 @@ namespace foamscript.Services
                 result.IsSuccess = false;
                 result.ErrorMessage = $"Study meshing failed: {ex.Message}";
                 return result;
+            }
+        }
+
+        private void LogToolError(string toolName, ProcessResult result)
+        {
+            _loggingService.LogError($"{toolName} failed with exit code {result.ExitCode}");
+            _loggingService.LogError($"{toolName} stdout:\n{result.Output}");
+            if (!string.IsNullOrEmpty(result.Error))
+            {
+                _loggingService.LogError($"{toolName} stderr:\n{result.Error}");
             }
         }
 
