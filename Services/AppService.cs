@@ -11,14 +11,18 @@ namespace foamscript
         private readonly EnvironmentService _environmentService;
         private readonly GeometryService _geometryService;
         private readonly CaseService _caseService;
+        private readonly SolverService _solverService;
+        private readonly ResultsService _resultsService;
 
-        public AppService(LoggingService loggingService, MeshService meshService, EnvironmentService environmentService, GeometryService geometryService, CaseService caseService)
+        public AppService(LoggingService loggingService, MeshService meshService, EnvironmentService environmentService, GeometryService geometryService, CaseService caseService, SolverService solverService, ResultsService resultsService)
         {
             _loggingService = loggingService;
             _meshService = meshService;
             _environmentService = environmentService;
             _geometryService = geometryService;
             _caseService = caseService;
+            _solverService = solverService;
+            _resultsService = resultsService;
         }
 
         public int Run(VerbModel model)
@@ -50,6 +54,18 @@ namespace foamscript
                     // Handle mesh-study verb.
                     case MeshStudyModel meshStudyModel:
                         return HandleMeshStudy(meshStudyModel);
+
+                    // Handle solve verb.
+                    case SolveCaseModel solveCaseModel:
+                        return HandleSolve(solveCaseModel);
+
+                    // Handle solve-study verb.
+                    case SolveStudyModel solveStudyModel:
+                        return HandleSolveStudy(solveStudyModel);
+
+                    // Handle results verb.
+                    case ResultsModel resultsModel:
+                        return HandleResults(resultsModel);
 
                     // Handle list-templates verb.
                     case ListTemplatesModel listTemplatesModel:
@@ -761,6 +777,130 @@ namespace foamscript
             Console.WriteLine();
 
             return 0;
+        }
+
+        private int HandleSolve(SolveCaseModel model)
+        {
+            _loggingService.LogInformation($"Solving case at {model.CaseDir}");
+
+            Console.WriteLine();
+            Console.WriteLine("=== Solver Execution ===");
+            Console.WriteLine();
+            Console.WriteLine($"Case directory: {model.CaseDir}");
+            Console.WriteLine($"Parallel: {(model.Parallel ? $"Yes ({model.Cores} cores)" : "No")}");
+            Console.WriteLine();
+
+            var result = _solverService.SolveCase(model.CaseDir, model.Parallel, model.Cores);
+
+            if (result.IsSuccess)
+            {
+                Console.WriteLine();
+                Console.WriteLine("=== Solve Summary ===");
+                Console.WriteLine();
+
+                if (result.SimulationTime.HasValue)
+                    Console.WriteLine($"Simulation time: {result.SimulationTime.Value:F4} s");
+
+                if (result.Cd.HasValue)
+                {
+                    Console.WriteLine($"Force Coefficients (time-averaged):");
+                    Console.WriteLine($"  Cd: {result.Cd.Value:F6}");
+                    Console.WriteLine($"  Cl: {result.Cl?.ToString("F6") ?? "N/A"}");
+                    Console.WriteLine($"  Cm: {result.CmPitch?.ToString("F6") ?? "N/A"}");
+                }
+
+                if (result.Warnings.Count > 0)
+                {
+                    Console.WriteLine();
+                    Console.WriteLine("Warnings:");
+                    foreach (var warning in result.Warnings)
+                        Console.WriteLine($"  ⚠ {warning}");
+                }
+
+                Console.WriteLine();
+                _loggingService.LogInformation("Solver execution completed successfully.");
+                return 0;
+            }
+            else
+            {
+                Console.WriteLine($"✗ Solver execution failed: {result.ErrorMessage}");
+                Console.WriteLine($"  See log file for details: {_loggingService.GetLogFilePath()}");
+                _loggingService.LogError("Solver execution failed.", null!);
+                Console.WriteLine();
+                return -1;
+            }
+        }
+
+        private int HandleSolveStudy(SolveStudyModel model)
+        {
+            _loggingService.LogInformation($"Solving study at {model.StudyDir}");
+
+            Console.WriteLine();
+            Console.WriteLine("=== Study Solver Execution ===");
+            Console.WriteLine();
+            Console.WriteLine($"Study directory: {model.StudyDir}");
+            Console.WriteLine($"Parallel: {(model.Parallel ? $"Yes ({model.Cores} cores per case)" : "No")}");
+            Console.WriteLine($"Continue on error: {(model.ContinueOnError ? "Yes" : "No")}");
+            Console.WriteLine();
+
+            var result = _solverService.SolveStudy(model.StudyDir, model.Parallel, model.Cores, model.ContinueOnError);
+
+            Console.WriteLine();
+            Console.WriteLine("=== Study Solve Summary ===");
+            Console.WriteLine();
+            Console.WriteLine($"Total cases: {result.TotalCases}");
+            Console.WriteLine($"✓ Successful: {result.SuccessfulCases}");
+            if (result.FailedCases > 0)
+                Console.WriteLine($"✗ Failed: {result.FailedCases}");
+            Console.WriteLine();
+
+            Console.WriteLine($"{"Case Name",-30} {"Status",-10} {"Cd",10} {"Cl",10} {"Cm",10}");
+            Console.WriteLine(new string('-', 75));
+
+            foreach (var cs in result.CaseSummaries)
+            {
+                var status = cs.Success ? "✓ OK" : "✗ Failed";
+                var cd = cs.Cd.HasValue ? $"{cs.Cd.Value:F6}" : "N/A";
+                var cl = cs.Cl.HasValue ? $"{cs.Cl.Value:F6}" : "N/A";
+                var cm = cs.CmPitch.HasValue ? $"{cs.CmPitch.Value:F6}" : "N/A";
+                Console.WriteLine($"{cs.CaseName,-30} {status,-10} {cd,10} {cl,10} {cm,10}");
+            }
+
+            Console.WriteLine(new string('-', 75));
+            Console.WriteLine();
+
+            if (result.IsSuccess)
+            {
+                _loggingService.LogInformation("Study solver execution completed successfully.");
+                return 0;
+            }
+            else
+            {
+                Console.WriteLine($"⚠ {result.ErrorMessage}");
+                Console.WriteLine($"  See log file for details: {_loggingService.GetLogFilePath()}");
+                return -1;
+            }
+        }
+
+        private int HandleResults(ResultsModel model)
+        {
+            _loggingService.LogInformation($"Extracting results from {model.StudyDir}");
+
+            var summary = _resultsService.ExtractResults(model.StudyDir, model.Format, model.AverageWindow);
+
+            if (summary.IsSuccess)
+            {
+                var output = ResultsService.FormatResults(summary, model.Format);
+                Console.Write(output);
+                _loggingService.LogInformation("Results extraction completed successfully.");
+                return 0;
+            }
+            else
+            {
+                Console.WriteLine($"✗ Results extraction failed: {summary.ErrorMessage}");
+                _loggingService.LogError("Results extraction failed.", null!);
+                return -1;
+            }
         }
 
         /// <summary>

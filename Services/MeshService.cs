@@ -238,7 +238,7 @@ namespace foamscript.Services
                 }
 
                 // Discover case directories (directories that contain constant/ and system/)
-                var caseDirs = DiscoverCases(studyDir);
+                var caseDirs = CaseDiscovery.DiscoverCases(studyDir);
 
                 if (caseDirs.Count == 0)
                 {
@@ -310,39 +310,6 @@ namespace foamscript.Services
                 result.ErrorMessage = $"Study meshing failed: {ex.Message}";
                 return result;
             }
-        }
-
-        /// <summary>
-        /// Discovers all valid OpenFOAM case directories within a study directory.
-        /// </summary>
-        private List<string> DiscoverCases(string studyDir)
-        {
-            var caseDirs = new List<string>();
-
-            // Get all subdirectories
-            var subdirs = Directory.GetDirectories(studyDir);
-
-            foreach (var subdir in subdirs)
-            {
-                // Skip geometry directory and other non-case directories
-                var dirName = Path.GetFileName(subdir);
-                if (dirName == "geometry" || dirName.StartsWith("."))
-                    continue;
-
-                // Check if it's a valid OpenFOAM case (has constant/ and system/)
-                var constantDir = Path.Combine(subdir, "constant");
-                var systemDir = Path.Combine(subdir, "system");
-
-                if (Directory.Exists(constantDir) && Directory.Exists(systemDir))
-                {
-                    caseDirs.Add(subdir);
-                }
-            }
-
-            // Sort case directories alphabetically for consistent ordering
-            caseDirs.Sort();
-
-            return caseDirs;
         }
 
         /// <summary>

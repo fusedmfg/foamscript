@@ -8,6 +8,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <InternalsVisibleTo Include="foamscript.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
     <Compile Remove="foamscript.Tests/**" />
     <EmbeddedResource Remove="foamscript.Tests/**" />
     <None Remove="foamscript.Tests/**" />

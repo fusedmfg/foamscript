@@ -67,6 +67,8 @@ namespace foamscript
                 builder.Services.AddTransient<CaseService>();
                 builder.Services.AddTransient<AppService>();
                 builder.Services.AddTransient<MeshService>();
+                builder.Services.AddTransient<SolverService>();
+                builder.Services.AddTransient<ResultsService>();
 
                 // Build the host and initialize the main application class.
                 using IHost host = builder.Build();
