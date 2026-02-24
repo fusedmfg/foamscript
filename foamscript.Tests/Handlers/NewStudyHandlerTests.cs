@@ -23,7 +23,9 @@ namespace foamscript.Tests.Handlers
             _mockProcessExecutor = new Mock<IProcessExecutor>();
 
             // CaseService requires (IProcessExecutor, GeometryService, TemplateService) — build the chain
-            var geometryService = new GeometryService(_mockProcessExecutor.Object, _mockLoggingService.Object);
+            var geometryService = new GeometryService(
+                new StlConversionService(_mockProcessExecutor.Object, _mockLoggingService.Object),
+                new DomainService(_mockProcessExecutor.Object, _mockLoggingService.Object));
             var templateService = new TemplateService(_mockLoggingService.Object);
             _mockCaseService = new Mock<CaseService>(
                 _mockProcessExecutor.Object,
