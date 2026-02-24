@@ -22,7 +22,7 @@ namespace foamscript.Services
         /// <summary>
         /// Creates a new study with multiple cases for angle of attack sweep.
         /// </summary>
-        public StudyResult CreateStudy(StudyConfig config, string templatePath)
+        public virtual StudyResult CreateStudy(StudyConfig config, string templatePath)
         {
             var result = new StudyResult();
 
