@@ -36,7 +36,32 @@
       "Bash(\"/c/Program Files/GitHub CLI/gh.exe\" auth status)",
       "Bash(\"/c/Program Files/GitHub:*)",
       "Bash(\"/c/Program Files/GitHub CLI/gh.exe\" issue create:*)",
-      "Bash(\"/c/Program Files/GitHub CLI/gh.exe\" issue close 6 --comment \"✅ Implemented in commit 2d134cb - template selection CLI is working.\n\nFeatures:\n- \\\\`foamscript list-templates\\\\` command\n- Smart template name resolution  \n- Support for both short names and full paths\n- Helpful error messages with suggestions\")"
+      "Bash(\"/c/Program Files/GitHub CLI/gh.exe\" issue close 6 --comment \"✅ Implemented in commit 2d134cb - template selection CLI is working.\n\nFeatures:\n- \\\\`foamscript list-templates\\\\` command\n- Smart template name resolution  \n- Support for both short names and full paths\n- Helpful error messages with suggestions\")",
+      "Bash(dir:*)",
+      "Bash(git -C c:/source/foamscript log --format=\"%H %ai %s\")",
+      "Bash(git -C c:/source/foamscript log --stat --oneline)",
+      "Bash(git mv:*)",
+      "Bash(git rm:*)",
+      "Bash(echo:*)",
+      "Bash(powershell.exe -Command \"ls $env:USERPROFILE\\\\.ssh\"\")",
+      "Bash(powershell.exe -Command \"Get-ChildItem C:\\\\Users\\\\trboy\\\\.ssh\")",
+      "Bash(ping:*)",
+      "Bash(powershell.exe -Command \"ssh -i C:\\\\Users\\\\trboy\\\\.ssh\\\\fusiondiscgolf_rsa -o BatchMode=yes -o ConnectTimeout=10 trboyden@fusiondiscgolf ''echo connected''\")",
+      "Bash(powershell.exe -Command \"& ssh -v -i C:\\\\Users\\\\trboy\\\\.ssh\\\\fusiondiscgolf_rsa trboyden@192.168.1.11 ''echo connected'' 2>&1 | Select-Object -First 30\")",
+      "Bash(powershell.exe -Command \"& ssh -v -i C:\\\\Users\\\\trboy\\\\.ssh\\\\id_ed25519_fusiondiscgolf -o BatchMode=yes trboyden@192.168.1.11 ''echo connected'' 2>&1 | Select-Object -Last 20\")",
+      "Bash(powershell.exe -Command \"& ssh -i C:\\\\Users\\\\trboy\\\\.ssh\\\\fusiondiscgolf_rsa -o StrictHostKeyChecking=no -o BatchMode=yes trboyden@192.168.1.11 ''echo connected'' 2>&1\")",
+      "Bash(powershell.exe -Command \"& ssh -i C:\\\\Users\\\\trboy\\\\.ssh\\\\id_ed25519_fusiondiscgolf -o StrictHostKeyChecking=no -o BatchMode=yes trboyden@192.168.1.11 ''echo connected'' 2>&1\")",
+      "Bash(wc:*)",
+      "Bash(find:*)",
+      "Bash(git worktree remove:*)",
+      "Bash(git branch:*)",
+      "Bash(ls:*)",
+      "Bash(git status:*)",
+      "Bash(git -C \"C:\\\\source\\\\foamscript\" status)",
+      "Bash(git -C \"C:\\\\source\\\\foamscript\" diff)",
+      "Bash(git -C \"C:\\\\source\\\\foamscript\" log --oneline -5)",
+      "Bash(git -C \"C:\\\\source\\\\foamscript\" add Services/CaseService.cs foamscript.Tests/Services/TemplateServiceTests.cs foamscript.Tests/Handlers/NewStudyHandlerTests.cs)",
+      "Bash(git -C:*)"
     ]
   }
 }
