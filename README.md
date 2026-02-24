@@ -73,7 +73,7 @@ See **[Commands.md](Docs/Commands.md)** for full reference with all options, JSO
 
 ```bash
 dotnet build
-dotnet test    # 117 tests
+dotnet test    # 135 tests
 ```
 
 ### Deploy to Linux
@@ -115,7 +115,7 @@ foamscript/
 ├── Templates/           # OpenFOAM case templates (Scriban)
 │   └── external_disc_rotating-ami_transient/
 ├── Docs/Commands.md     # Full command reference
-├── foamscript.Tests/    # xUnit + Moq + FluentAssertions (117 tests)
+├── foamscript.Tests/    # xUnit + Moq + FluentAssertions (135 tests)
 └── study.example.jsonc  # Example JSON config file
 ```
 
