@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 # foamscript
 C# CLI utility for OpenFOAM case management
 =======
@@ -137,4 +136,3 @@ MIT
 ## Contributing
 
 When adding new features, update [Docs/Commands.md](Docs/Commands.md) with any new commands or options.
->>>>>>> develop
