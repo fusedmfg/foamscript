@@ -425,3 +425,10 @@ deploy.config.ps1
 
 # Gemini
 .gemini/
+
+# VS Code
+.vscode/
+
+# Claude
+.claude/
+
