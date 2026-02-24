@@ -8,6 +8,12 @@ Complete reference for all FoamScript commands with explanations and examples.
 - [convert](#convert) - Convert STEP/IGES geometry to STL
 - [generate-domain](#generate-domain) - Generate rotor and tunnel domains
 - [new-study](#new-study) - Create OpenFOAM study with angle of attack sweep
+- [mesh](#mesh) - Mesh a single OpenFOAM case
+- [mesh-study](#mesh-study) - Mesh all cases in a study
+- [solve](#solve) - Run solver on a single case
+- [solve-study](#solve-study) - Run solver on all cases in a study
+- [results](#results) - Extract force coefficients from a completed study
+- [list-templates](#list-templates) - List available templates
 
 ---
 
@@ -403,35 +409,282 @@ An alternative to specifying all CLI options is to provide a JSON config file wi
 - The `physics` and `domain` sections can be omitted entirely if defaults are acceptable
 - `featureAngle` accepts `null` or a numeric value in degrees
 
+---
+
+## mesh
+
+Generates the computational mesh for a single OpenFOAM case using blockMesh and snappyHexMesh.
+
 ### Usage
 
 ```bash
-foamscript new-study --config ~/studies/my_study.json
+foamscript mesh [OPTIONS]
 ```
 
-### Next Steps After Study Creation
+### Options
+
+| Option | Short | Description | Default |
+|--------|-------|-------------|---------|
+| `--case-dir` | `-c` | Path to case directory (required) | - |
+| `--parallel` | `-p` | Run snappyHexMesh in parallel with MPI | `false` |
+| `--cores` | | Number of CPU cores for parallel execution | `4` |
+| `--check-quality` | | Run checkMesh after meshing | `true` |
+| `--overwrite` | | Overwrite existing mesh | `true` |
+
+### Workflow
+
+**Serial:**
+1. `blockMesh` — background hex mesh
+2. `surfaceFeatureExtract` — extract edge features for snapping
+3. `snappyHexMesh -overwrite` — hex-dominant mesh with refinement
+
+**Parallel:**
+1. `blockMesh` — background hex mesh
+2. `surfaceFeatureExtract` — extract edge features
+3. `decomposePar -no-fields` — decompose mesh (no field data)
+4. Distribute `triSurface/` files to processor directories
+5. `mpirun -np <cores> snappyHexMesh -parallel -overwrite`
+6. `reconstructParMesh -constant` — reassemble mesh
+7. Patch boundary file for cyclicAMI (rotor/rotor_slave)
+
+Optional: `checkMesh` for quality validation.
+
+### Examples
+
+**Mesh a single case in serial:**
+```bash
+foamscript mesh -c ~/studies/MyStudy/MyStudy_0.0
+```
+
+**Mesh in parallel with 8 cores:**
+```bash
+foamscript mesh -c ~/studies/MyStudy/MyStudy_0.0 --parallel --cores 8
+```
+
+**Skip quality check for faster iteration:**
+```bash
+foamscript mesh -c ~/studies/MyStudy/MyStudy_0.0 --parallel --cores 4 --check-quality false
+```
+
+### Output
+
+Displays mesh statistics (cell/point/face counts), quality check results, and any warnings.
+
+---
+
+## mesh-study
+
+Generates meshes for all cases in a study directory.
+
+### Usage
 
 ```bash
-# Mesh a single case
-foamscript mesh -d ~/studies/MyStudy/MyStudy_0.0
-
-# Mesh all cases in the study (parallel, 8 cores)
-foamscript mesh-study -d ~/studies/MyStudy --parallel --cores 8
-
-# Or mesh manually
-cd ~/studies/MyStudy/MyStudy_0.0
-blockMesh
-snappyHexMesh -overwrite
-decomposePar
-mpirun -np 8 pimpleFoam -parallel
-reconstructPar
+foamscript mesh-study [OPTIONS]
 ```
+
+### Options
+
+| Option | Short | Description | Default |
+|--------|-------|-------------|---------|
+| `--study-dir` | `-s` | Path to study directory (required) | - |
+| `--parallel` | `-p` | Run snappyHexMesh in parallel per case | `false` |
+| `--cores` | | Number of CPU cores per case | `4` |
+| `--check-quality` | | Run checkMesh after each case | `true` |
+| `--overwrite` | | Overwrite existing meshes | `true` |
+| `--continue-on-error` | | Continue meshing if a case fails | `true` |
+
+### Examples
+
+**Mesh entire study in parallel:**
+```bash
+foamscript mesh-study -s ~/studies/MyStudy --parallel --cores 8
+```
+
+**Mesh with strict error handling:**
+```bash
+foamscript mesh-study -s ~/studies/MyStudy --parallel --cores 4 --continue-on-error false
+```
+
+### Output
+
+Displays a summary table showing each case name, status, cell count, and mesh quality result.
+
+---
+
+## solve
+
+Runs the OpenFOAM solver (pimpleFoam) on a single meshed case.
+
+### Usage
+
+```bash
+foamscript solve [OPTIONS]
+```
+
+### Options
+
+| Option | Short | Description | Default |
+|--------|-------|-------------|---------|
+| `--case-dir` | `-c` | Path to meshed case directory (required) | - |
+| `--parallel` | `-p` | Run solver in parallel with MPI | `false` |
+| `--cores` | | Number of CPU cores for parallel execution | `4` |
+
+### Workflow
+
+**Serial:**
+1. `pimpleFoam -case <dir>` — run solver
+
+**Parallel:**
+1. `decomposePar -force -case <dir>` — decompose with fields
+2. `mpirun -np <cores> pimpleFoam -case <dir> -parallel` — run solver
+3. `reconstructPar -case <dir>` — reassemble time directories
+
+After solving, force coefficients (Cd, Cl, CmPitch) are extracted from `postProcessing/forces/0/coefficient.dat` using time-window averaging.
+
+### Examples
+
+**Solve a single case in serial:**
+```bash
+foamscript solve -c ~/studies/MyStudy/MyStudy_0.0
+```
+
+**Solve in parallel with 8 cores:**
+```bash
+foamscript solve -c ~/studies/MyStudy/MyStudy_0.0 --parallel --cores 8
+```
+
+### Output
+
+Displays simulation time, time-averaged force coefficients (Cd, Cl, Cm), and any warnings.
+
+### Notes
+
+- The case must be meshed before solving (run `mesh` or `mesh-study` first)
+- Solver uses `decomposePar -force` (WITH fields), unlike mesh which uses `-no-fields`
+- Force coefficients are computed by the `forceCoeffs` function object in `controlDict`
+
+---
+
+## solve-study
+
+Runs the solver on all cases in a study directory.
+
+### Usage
+
+```bash
+foamscript solve-study [OPTIONS]
+```
+
+### Options
+
+| Option | Short | Description | Default |
+|--------|-------|-------------|---------|
+| `--study-dir` | `-d` | Path to study directory (required) | - |
+| `--parallel` | `-p` | Run solver in parallel per case | `false` |
+| `--cores` | | Number of CPU cores per case | `4` |
+| `--continue-on-error` | | Continue solving if a case fails | `false` |
+
+### Examples
+
+**Solve entire study in parallel:**
+```bash
+foamscript solve-study -d ~/studies/MyStudy --parallel --cores 8
+```
+
+**Solve with error tolerance:**
+```bash
+foamscript solve-study -d ~/studies/MyStudy --parallel --cores 4 --continue-on-error
+```
+
+### Output
+
+Displays a summary table showing each case name, status, and force coefficients (Cd, Cl, Cm).
+
+---
+
+## results
+
+Extracts and summarizes force coefficients from a completed study. Reads `postProcessing/forces/0/coefficient.dat` from each case and computes time-averaged Cd, Cl, CmPitch, and Cl/Cd ratio.
+
+### Usage
+
+```bash
+foamscript results [OPTIONS]
+```
+
+### Options
+
+| Option | Short | Description | Default |
+|--------|-------|-------------|---------|
+| `--study-dir` | `-d` | Path to study directory (required) | - |
+| `--format` | `-f` | Output format: `table`, `csv`, `json` | `table` |
+| `--average-window` | | Fraction of simulation to average over (0.1 = last 10%) | `0.1` |
+
+### Examples
+
+**Table output (default):**
+```bash
+foamscript results -d ~/studies/MyStudy
+```
+
+**CSV export for spreadsheet analysis:**
+```bash
+foamscript results -d ~/studies/MyStudy --format csv > results.csv
+```
+
+**JSON export for programmatic use:**
+```bash
+foamscript results -d ~/studies/MyStudy --format json > results.json
+```
+
+**Average over last 20% of simulation:**
+```bash
+foamscript results -d ~/studies/MyStudy --average-window 0.2
+```
+
+### Output Formats
+
+**Table:**
+```
+AoA (°)   Cd         Cl         Cl/Cd      CmPitch
+-------   ------     ------     ------     --------
+-5.0      0.045123   -0.123456  -2.7361    0.012345
+ 0.0      0.042000    0.001234   0.0294    0.000123
+ 5.0      0.046789    0.125678   2.6862    -0.011234
+10.0      0.055432    0.248901   4.4903    -0.023456
+```
+
+**CSV:** Comma-separated with header row, suitable for Excel/Sheets import.
+
+**JSON:** Array of objects with `angle`, `cd`, `cl`, `clCdRatio`, `cmPitch` fields.
+
+### Notes
+
+- Cases must be solved before extracting results
+- The `--average-window` controls what fraction of the simulation time is used for averaging (e.g., 0.1 = last 10% of timesteps)
+- Failed or incomplete cases are reported with warnings
+
+---
+
+## list-templates
+
+Lists all available OpenFOAM case templates.
+
+### Usage
+
+```bash
+foamscript list-templates
+```
+
+### Output
+
+Shows each template name along with metadata from `TEMPLATE.md` (domain type, feature, solver).
 
 ---
 
 ## Common Workflows
 
-### Complete Study Setup (STEP → Meshed Cases)
+### Complete Study (STEP → Results)
 
 ```bash
 # 1. Validate environment
@@ -450,10 +703,20 @@ foamscript new-study \
 
 # 3. Mesh all cases in parallel
 foamscript mesh-study \
-  -d ~/studies/DiscAnalysis \
+  -s ~/studies/DiscAnalysis \
   --parallel \
   --cores 8 \
   --check-quality
+
+# 4. Solve all cases
+foamscript solve-study \
+  -d ~/studies/DiscAnalysis \
+  --parallel \
+  --cores 8
+
+# 5. Extract results
+foamscript results -d ~/studies/DiscAnalysis --format table
+foamscript results -d ~/studies/DiscAnalysis --format csv > results.csv
 ```
 
 ### Using a Config File for Repeatable Studies
@@ -476,8 +739,10 @@ EOF
 # Run study from config
 foamscript new-study --config ~/studies/disc_study.json
 
-# Mesh study
-foamscript mesh-study -d ~/studies/DiscAnalysis --parallel --cores 8
+# Mesh, solve, results
+foamscript mesh-study -s ~/studies/DiscAnalysis --parallel --cores 8
+foamscript solve-study -d ~/studies/DiscAnalysis --parallel --cores 8
+foamscript results -d ~/studies/DiscAnalysis
 ```
 
 ### Standalone Geometry Processing
@@ -564,3 +829,16 @@ Check that:
 - `--velocity` is in m/s (not mph or other units)
 - Angles are in degrees (not radians)
 - Template's Scriban variables match what `CaseService` provides (see `TEMPLATE.md` in the template directory)
+
+### Solver doesn't start
+
+- Ensure the case is meshed first (`foamscript mesh` or `mesh-study`)
+- Check that `constant/polyMesh/` exists in the case directory
+- Verify OpenFOAM environment is sourced
+
+### Force coefficients are zero or unexpected
+
+- Check that the simulation ran to completion (look at log output)
+- Increase `--end-time` if the simulation needs more time to develop
+- Try a larger `--average-window` (e.g., 0.2) if results are noisy
+- Verify the `forceCoeffs` function object is present in `system/controlDict`

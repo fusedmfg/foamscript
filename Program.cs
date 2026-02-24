@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Serilog;
 using foamscript.Services;
+using foamscript.Handlers;
 using foamscript.Models;
 
 namespace foamscript
@@ -62,13 +63,28 @@ namespace foamscript
                 builder.Services.AddSingleton<LoggingService>();
                 builder.Services.AddSingleton<IProcessExecutor, ProcessExecutor>();
                 builder.Services.AddTransient<EnvironmentService>();
+                builder.Services.AddTransient<StlConversionService>();
+                builder.Services.AddTransient<DomainService>();
                 builder.Services.AddTransient<GeometryService>();
                 builder.Services.AddTransient<TemplateService>();
                 builder.Services.AddTransient<CaseService>();
-                builder.Services.AddTransient<AppService>();
                 builder.Services.AddTransient<MeshService>();
                 builder.Services.AddTransient<SolverService>();
                 builder.Services.AddTransient<ResultsService>();
+
+                // Command handlers.
+                builder.Services.AddTransient<ValidateHandler>();
+                builder.Services.AddTransient<ConvertHandler>();
+                builder.Services.AddTransient<GenerateDomainHandler>();
+                builder.Services.AddTransient<NewStudyHandler>();
+                builder.Services.AddTransient<MeshHandler>();
+                builder.Services.AddTransient<MeshStudyHandler>();
+                builder.Services.AddTransient<SolveHandler>();
+                builder.Services.AddTransient<SolveStudyHandler>();
+                builder.Services.AddTransient<ResultsHandler>();
+                builder.Services.AddTransient<ListTemplatesHandler>();
+
+                builder.Services.AddTransient<AppService>();
 
                 // Build the host and initialize the main application class.
                 using IHost host = builder.Build();

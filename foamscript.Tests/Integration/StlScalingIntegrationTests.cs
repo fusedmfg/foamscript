@@ -14,7 +14,7 @@ namespace foamscript.Tests.Integration
     public class StlScalingIntegrationTests : IDisposable
     {
         private readonly string _testDirectory;
-        private readonly GeometryService _geometryService;
+        private readonly StlConversionService _conversionService;
 
         public StlScalingIntegrationTests()
         {
@@ -25,7 +25,7 @@ namespace foamscript.Tests.Integration
             var processExecutor = new ProcessExecutor();
             var mockLogger = new Mock<ILogger<LoggingService>>();
             var loggingService = new LoggingService(mockLogger.Object);
-            _geometryService = new GeometryService(processExecutor, loggingService);
+            _conversionService = new StlConversionService(processExecutor, loggingService);
         }
 
         public void Dispose()
@@ -45,9 +45,9 @@ namespace foamscript.Tests.Integration
 
             // Act: Scale from mm to m (factor 0.001)
             var scaleFactor = 0.001;
-            var scaleMethod = typeof(GeometryService).GetMethod("ScaleStlFile",
+            var scaleMethod = typeof(StlConversionService).GetMethod("ScaleStlFile",
                 System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-            var result = (bool)scaleMethod!.Invoke(_geometryService, new object[] { stlFile, scaleFactor })!;
+            var result = (bool)scaleMethod!.Invoke(_conversionService, new object[] { stlFile, scaleFactor })!;
 
             // Assert: Scaling succeeded
             result.Should().BeTrue();
@@ -70,9 +70,9 @@ namespace foamscript.Tests.Integration
 
             // Act: Scale from cm to m (factor 0.01)
             var scaleFactor = 0.01;
-            var scaleMethod = typeof(GeometryService).GetMethod("ScaleStlFile",
+            var scaleMethod = typeof(StlConversionService).GetMethod("ScaleStlFile",
                 System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-            var result = (bool)scaleMethod!.Invoke(_geometryService, new object[] { stlFile, scaleFactor })!;
+            var result = (bool)scaleMethod!.Invoke(_conversionService, new object[] { stlFile, scaleFactor })!;
 
             // Assert
             result.Should().BeTrue();
@@ -93,9 +93,9 @@ namespace foamscript.Tests.Integration
 
             // Act: Scale from inches to m (factor 0.0254)
             var scaleFactor = 0.0254;
-            var scaleMethod = typeof(GeometryService).GetMethod("ScaleStlFile",
+            var scaleMethod = typeof(StlConversionService).GetMethod("ScaleStlFile",
                 System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-            var result = (bool)scaleMethod!.Invoke(_geometryService, new object[] { stlFile, scaleFactor })!;
+            var result = (bool)scaleMethod!.Invoke(_conversionService, new object[] { stlFile, scaleFactor })!;
 
             // Assert
             result.Should().BeTrue();
