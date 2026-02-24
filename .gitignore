@@ -416,3 +416,22 @@ FodyWeavers.xsd
 *.msix
 *.msm
 *.msp
+<<<<<<< HEAD
+=======
+
+# FoamScript deployment configuration (contains credentials)
+deploy.config.ps1
+
+# Claude Code worktrees
+.claude/worktrees/
+
+# Gemini
+.gemini/
+
+# VS Code
+.vscode/
+
+# Claude
+.claude/
+
+>>>>>>> develop

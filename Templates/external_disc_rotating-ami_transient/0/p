@@ -1,0 +1,59 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
+|  \\    /   O peration     | Version:  v2512                                 |
+|   \\  /    A nd           | Website:  www.openfoam.com                      |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       volScalarField;
+    object      p;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+// Hard-coded constant
+dimensions      [0 2 -2 0 0 0 0];
+
+// Constant: Starting internal pressure at 0
+internalField   uniform 0;
+
+boundaryField
+{
+    inlet
+    {
+        // Standard for inlets: Pressure is calculated based on velocity
+        type            zeroGradient;
+    }
+
+    outlet
+    {
+        type            fixedValue;
+
+        // Scriban parameter: p
+        value           uniform {{ p }};
+    }
+
+    tunnel
+    {
+        // Standard for slip walls
+        type            zeroGradient;
+    }
+
+    disc
+    {
+        // Recommended for rotating/moving bodies to improve convergence
+        type            fixedFluxPressure;
+        value           uniform 0;
+    }
+
+    "rotor.*"
+    {
+        type            cyclicAMI;
+        value           uniform 0;
+    }
+}
+
+// ************************************************************************* //

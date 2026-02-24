@@ -1,0 +1,36 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
+|  \\    /   O peration     | Version:  v2512                                 |
+|   \\  /    A nd           | Website:  www.openfoam.com                      |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      dynamicMeshDict;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+dynamicFvMesh   dynamicMotionSolverFvMesh;
+
+motionSolverLibs (fvMotionSolvers);
+
+motionSolver    solidBody;
+
+// This must match the cellZone name defined in your snappyHexMeshDict
+cellZone        rotatingZone;
+
+solidBodyMotionFunction  rotatingMotion;
+
+// Constants: Ensure the disc is centered and spinning on the Z-axis
+origin      (0 0 0);
+axis        (0 0 1);
+
+// Dial: Managed by C# (Spin rate in rad/s)
+omega       {{ omega_rotation }};
+
+
+// ************************************************************************* //

@@ -1,0 +1,56 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
+|  \\    /   O peration     | Version:  v2512                                 |
+|   \\  /    A nd           | Website:  www.openfoam.com                      |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       volScalarField;
+    object      omega;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+// Hard-coded constant
+dimensions      [0 0 -1 0 0 0 0];
+
+// Parameterized: Derived from k, U, and discDiameter
+internalField   uniform {{ omega_turbulence }};
+
+boundaryField
+{
+    inlet
+    {
+        type            fixedValue;
+        value           uniform {{ omega_turbulence }};
+    }
+
+    outlet
+    {
+        type            zeroGradient;
+    }
+
+    tunnel
+    {
+        type            slip;
+    }
+
+    disc
+    {
+        // Standard wall function for omega in k-omega SST
+        type            omegaWallFunction;
+        value           uniform {{ omega_turbulence }};
+    }
+
+    "rotor.*"
+    {
+        type            cyclicAMI;
+        value           uniform {{ omega_turbulence }};
+    }
+}
+
+
+// ************************************************************************* //
