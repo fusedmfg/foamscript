@@ -54,11 +54,29 @@ PIMPLE
     momentumPredictor   yes;
     // Dial: Managed by C# (Stability control)
     nOuterCorrectors    {{ n_outer_correctors }};
-    nCorrectors         1;
-    nNonOrthogonalCorrectors 0;
+    nCorrectors         2;
+    nNonOrthogonalCorrectors 1;
 
     pRefCell            0;
     pRefValue           0;
+}
+
+relaxationFactors
+{
+    fields
+    {
+        p               0.3;
+        pFinal          1.0;
+    }
+    equations
+    {
+        U               0.7;
+        UFinal          1.0;
+        k               0.5;
+        kFinal          1.0;
+        omega           0.5;
+        omegaFinal      1.0;
+    }
 }
 
 // ************************************************************************* //

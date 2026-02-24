@@ -46,7 +46,7 @@ castellatedMeshControls
         }
         rotor
         {
-            level (2 2);
+            level ({{ refinement_level_min }} {{ refinement_level_min }});
             faceType boundary;
             cellZone rotatingZone;
             faceZone rotatingZone;

@@ -229,6 +229,16 @@ namespace foamscript.Services
             var domainDownstream = domain.TunnelDownstream * discDiameter * margin;
             var domainRadial = domain.TunnelRadial * discDiameter * margin;
 
+            // Compute safe initial deltaT targeting Co ≈ 0.5 at finest refinement level
+            var domainLength = domainUpstream + domainDownstream;
+            var nxCells = Math.Ceiling(domainLength / discDiameter * 4);
+            var baseCellSize = domainLength / nxCells;
+            var fineCellSize = baseCellSize / Math.Pow(2, physics.RefinementLevelMax);
+            var deltaT = 0.5 * fineCellSize / Math.Max(velocityMagnitude, 1.0); // Co = 0.5
+
+            // Cap maxDeltaT to prevent excessive jumps
+            var maxDeltaT = physics.EndTime / 100.0;
+
             return new
             {
                 ux = ux,
@@ -252,7 +262,9 @@ namespace foamscript.Services
                 aref = aref,
                 domain_upstream = domainUpstream,
                 domain_downstream = domainDownstream,
-                domain_radial = domainRadial
+                domain_radial = domainRadial,
+                delta_t = deltaT,
+                max_delta_t = maxDeltaT
             };
         }
 
