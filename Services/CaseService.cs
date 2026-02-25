@@ -272,7 +272,9 @@ namespace foamscript.Services
                 domain_downstream = domainDownstream,
                 domain_radial = domainRadial,
                 delta_t = deltaT,
-                max_delta_t = maxDeltaT
+                max_delta_t = maxDeltaT,
+                max_iterations = physics.MaxIterations,
+                write_interval = physics.WriteInterval
             };
         }
 

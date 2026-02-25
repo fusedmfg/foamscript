@@ -1,0 +1,103 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
+|  \\    /   O peration     | Version:  v2512                                 |
+|   \\  /    A nd           | Website:  www.openfoam.com                      |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      snappyHexMeshDict;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+castellatedMesh true;
+snap            true;
+addLayers       false; // Keep false for initial AoA sweeps to ensure stability
+
+geometry
+{
+    disc.stl   { type triSurfaceMesh; name disc; }
+    rotor.stl  { type triSurfaceMesh; name rotor; }
+}
+
+castellatedMeshControls
+{
+    maxLocalCells 1000000;
+    maxGlobalCells 5000000;
+    minRefinementCells 10;
+    nCellsBetweenLevels 3;
+
+    features
+    (
+        // Refine edges of the disc specifically
+        { file "disc.eMesh"; level {{ feature_level }}; }
+    );
+
+    refinementSurfaces
+    {
+        disc
+        {
+            level ({{ refinement_level_min }} {{ refinement_level_max }});
+            patchInfo { type wall; }
+        }
+        rotor
+        {
+            level ({{ refinement_level_min }} {{ refinement_level_min }});
+            // MRF: no faceType boundary — rotor is internal zone, not a patch
+            cellZone rotatingZone;
+            faceZone rotatingZone;
+            cellZoneInside inside;
+        }
+        // tunnel boundary defined by blockMesh (inlet/outlet/walls)
+    }
+
+    refinementRegions
+    {
+        // No volume refinement regions for baseline sweeps
+    }
+
+    resolveFeatureAngle 30;
+
+    // Point inside the tunnel domain, downstream of the disc (away from geometry)
+    locationInMesh ({{ domain_downstream * 0.5 }} {{ domain_radial * 0.5 }} {{ domain_radial * 0.5 }});
+
+    allowFreeStandingZoneFaces true;
+}
+
+snapControls
+{
+    nSmoothPatch 3;
+    tolerance 2.0;
+    nSolveIter 300;
+    nRelaxIter 5;
+    nFeatureSnapIter 10;
+}
+
+addLayersControls { /* Keep empty for baseline sweeps */ }
+
+meshQualityControls
+{
+    maxNonOrtho 65;
+    maxBoundarySkewness 20;
+    maxInternalSkewness 4;
+    maxConcave 80;
+    minVol 1e-13;
+    minTetQuality 1e-15;
+    minArea -1;
+    minTwist 0.02;
+    minDeterminant 0.001;
+    minFaceWeight 0.05;
+    minVolRatio 0.01;
+    minTriangleTwist -1;
+    nSmoothScale 4;
+    errorReduction 0.75;
+    relaxed { maxNonOrtho 75; }
+}
+
+mergeTolerance 1e-6;
+
+// ************************************************************************* //

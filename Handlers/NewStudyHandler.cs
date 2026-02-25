@@ -68,6 +68,8 @@ namespace foamscript.Handlers
                         TurbulenceIntensity = model.TurbulenceIntensity,
                         EndTime = model.EndTime,
                         NOuterCorrectors = model.NOuterCorrectors,
+                        MaxIterations = model.MaxIterations,
+                        WriteInterval = model.WriteInterval,
                         RefinementLevelMin = model.RefinementLevelMin,
                         RefinementLevelMax = model.RefinementLevelMax
                     },
@@ -230,7 +232,7 @@ namespace foamscript.Handlers
             // If null or empty, use default
             if (string.IsNullOrEmpty(templatePathOrName))
             {
-                return Path.Combine(templatesDir, "external_disc_rotating-ami_transient");
+                return Path.Combine(templatesDir, "external_disc_mrf_steady");
             }
 
             // If it's an absolute path or contains path separators, use as-is

@@ -30,7 +30,7 @@ namespace foamscript.Models
 
         // ── Optional study inputs (with sensible defaults) ────────────────────
 
-        [Option('t', "template", Required = false, HelpText = "Template name or path (defaults to external_disc_rotating-ami_transient)")]
+        [Option('t', "template", Required = false, HelpText = "Template name or path (defaults to external_disc_mrf_steady)")]
         public string? TemplatePath { get; set; }
 
         [Option('v', "velocity", Required = false, Default = 20.0, HelpText = "Free stream velocity magnitude (m/s, default: 20.0)")]
@@ -64,6 +64,12 @@ namespace foamscript.Models
 
         [Option("outer-correctors", Required = false, Default = 3, HelpText = "PIMPLE outer corrector iterations (default: 3)")]
         public int NOuterCorrectors { get; set; } = 3;
+
+        [Option("max-iterations", Required = false, Default = 1000, HelpText = "Maximum solver iterations for steady-state simpleFoam (default: 1000)")]
+        public int MaxIterations { get; set; } = 1000;
+
+        [Option("write-interval", Required = false, Default = 100, HelpText = "Write results every N iterations (default: 100)")]
+        public int WriteInterval { get; set; } = 100;
 
         [Option("refinement-min", Required = false, Default = 3, HelpText = "snappyHexMesh minimum refinement level (default: 3)")]
         public int RefinementLevelMin { get; set; } = 3;

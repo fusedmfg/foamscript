@@ -18,7 +18,8 @@ namespace foamscript.Services
         }
 
         /// <summary>
-        /// Runs the solver (pimpleFoam) on a single meshed case.
+        /// Runs the OpenFOAM solver on a single meshed case.
+        /// Automatically detects the solver (simpleFoam, pimpleFoam, etc.) from controlDict.
         /// </summary>
         public SolveResult SolveCase(string caseDir, bool parallel, int cores)
         {
@@ -52,14 +53,21 @@ namespace foamscript.Services
                     return result;
                 }
 
+                // Detect solver from controlDict (simpleFoam, pimpleFoam, etc.)
+                var solverName = DetectSolver(caseDir);
+                var isTransient = solverName == "pimpleFoam";
+
                 if (parallel)
                 {
                     // Clean old processor directories if present
                     CleanProcessorDirs(caseDir);
 
-                    // Decompose (WITH fields — different from mesh workflow)
+                    // Decompose — transient solvers use -force (time-varying fields)
                     Console.WriteLine($"Decomposing case for {cores} processors...");
-                    var decomposeResult = _processExecutor.Execute("decomposePar", $"-case {caseDir} -force");
+                    var decomposeArgs = isTransient
+                        ? $"-case {caseDir} -force"
+                        : $"-case {caseDir}";
+                    var decomposeResult = _processExecutor.Execute("decomposePar", decomposeArgs);
 
                     if (decomposeResult.ExitCode != 0)
                     {
@@ -72,19 +80,19 @@ namespace foamscript.Services
                     Console.WriteLine("✓ Domain decomposed successfully");
 
                     // Run solver in parallel
-                    Console.WriteLine($"Running pimpleFoam in parallel ({cores} cores)...");
-                    var solverArgs = $"-np {cores} pimpleFoam -case {caseDir} -parallel";
+                    Console.WriteLine($"Running {solverName} in parallel ({cores} cores)...");
+                    var solverArgs = $"-np {cores} {solverName} -case {caseDir} -parallel";
                     var solverResult = _processExecutor.Execute("mpirun", solverArgs);
 
                     if (solverResult.ExitCode != 0)
                     {
                         result.IsSuccess = false;
-                        result.ErrorMessage = $"pimpleFoam (parallel) failed with exit code {solverResult.ExitCode}";
-                        LogToolError("pimpleFoam (parallel)", solverResult);
+                        result.ErrorMessage = $"{solverName} (parallel) failed with exit code {solverResult.ExitCode}";
+                        LogToolError($"{solverName} (parallel)", solverResult);
                         return result;
                     }
 
-                    Console.WriteLine("✓ pimpleFoam completed successfully");
+                    Console.WriteLine($"✓ {solverName} completed successfully");
 
                     // Reconstruct
                     Console.WriteLine("Reconstructing fields...");
@@ -102,18 +110,18 @@ namespace foamscript.Services
                 else
                 {
                     // Run solver in serial
-                    Console.WriteLine("Running pimpleFoam...");
-                    var solverResult = _processExecutor.Execute("pimpleFoam", $"-case {caseDir}");
+                    Console.WriteLine($"Running {solverName}...");
+                    var solverResult = _processExecutor.Execute(solverName, $"-case {caseDir}");
 
                     if (solverResult.ExitCode != 0)
                     {
                         result.IsSuccess = false;
-                        result.ErrorMessage = $"pimpleFoam failed with exit code {solverResult.ExitCode}";
-                        LogToolError("pimpleFoam", solverResult);
+                        result.ErrorMessage = $"{solverName} failed with exit code {solverResult.ExitCode}";
+                        LogToolError(solverName, solverResult);
                         return result;
                     }
 
-                    Console.WriteLine("✓ pimpleFoam completed successfully");
+                    Console.WriteLine($"✓ {solverName} completed successfully");
                 }
 
                 // Try to extract force coefficients from postProcessing
@@ -293,6 +301,32 @@ namespace foamscript.Services
             {
                 return null;
             }
+        }
+
+        /// <summary>
+        /// Detects the solver application from the case's controlDict file.
+        /// Falls back to "simpleFoam" if the application line cannot be parsed.
+        /// </summary>
+        internal static string DetectSolver(string caseDir)
+        {
+            var controlDictPath = Path.Combine(caseDir, "system", "controlDict");
+            if (!File.Exists(controlDictPath))
+                return "simpleFoam";
+
+            var lines = File.ReadAllLines(controlDictPath);
+            foreach (var line in lines)
+            {
+                var trimmed = line.Trim();
+                if (trimmed.StartsWith("application"))
+                {
+                    // Parse "application     simpleFoam;" → "simpleFoam"
+                    var match = Regex.Match(trimmed, @"application\s+(\w+)\s*;");
+                    if (match.Success)
+                        return match.Groups[1].Value;
+                }
+            }
+
+            return "simpleFoam";
         }
 
         /// <summary>

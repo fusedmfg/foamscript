@@ -59,16 +59,16 @@ namespace foamscript.Tests.Services
 
         private void SetupSerialSolverSuccess(string caseDir) =>
             _mockProcessExecutor
-                .Setup(x => x.Execute("pimpleFoam", $"-case {caseDir}"))
+                .Setup(x => x.Execute("simpleFoam", $"-case {caseDir}"))
                 .Returns(new ProcessResult { ExitCode = 0, Output = "" });
 
         private void SetupParallelSolverSuccess(string caseDir, int cores = 4)
         {
             _mockProcessExecutor
-                .Setup(x => x.Execute("decomposePar", $"-case {caseDir} -force"))
+                .Setup(x => x.Execute("decomposePar", $"-case {caseDir}"))
                 .Returns(new ProcessResult { ExitCode = 0 });
             _mockProcessExecutor
-                .Setup(x => x.Execute("mpirun", $"-np {cores} pimpleFoam -case {caseDir} -parallel"))
+                .Setup(x => x.Execute("mpirun", $"-np {cores} simpleFoam -case {caseDir} -parallel"))
                 .Returns(new ProcessResult { ExitCode = 0 });
             _mockProcessExecutor
                 .Setup(x => x.Execute("reconstructPar", $"-case {caseDir}"))
@@ -119,7 +119,7 @@ namespace foamscript.Tests.Services
         // ── SolveCase — Serial Workflow ──────────────────────────────────────────
 
         [Fact]
-        public void SolveCase_Serial_CallsPimpleFoam()
+        public void SolveCase_Serial_CallsSimpleFoam()
         {
             var caseDir = CreateMeshedCaseDir();
             SetupSerialSolverSuccess(caseDir);
@@ -128,7 +128,7 @@ namespace foamscript.Tests.Services
 
             result.IsSuccess.Should().BeTrue();
             _mockProcessExecutor.Verify(
-                x => x.Execute("pimpleFoam", $"-case {caseDir}"),
+                x => x.Execute("simpleFoam", $"-case {caseDir}"),
                 Times.Once);
         }
 
@@ -137,13 +137,13 @@ namespace foamscript.Tests.Services
         {
             var caseDir = CreateMeshedCaseDir();
             _mockProcessExecutor
-                .Setup(x => x.Execute("pimpleFoam", $"-case {caseDir}"))
+                .Setup(x => x.Execute("simpleFoam", $"-case {caseDir}"))
                 .Returns(new ProcessResult { ExitCode = 1, Output = "FOAM FATAL ERROR" });
 
             var result = _service.SolveCase(caseDir, false, 4);
 
             result.IsSuccess.Should().BeFalse();
-            result.ErrorMessage.Should().Contain("pimpleFoam failed");
+            result.ErrorMessage.Should().Contain("simpleFoam failed");
         }
 
         // ── SolveCase — Parallel Workflow ────────────────────────────────────────
@@ -158,9 +158,9 @@ namespace foamscript.Tests.Services
 
             result.IsSuccess.Should().BeTrue();
             _mockProcessExecutor.Verify(
-                x => x.Execute("decomposePar", $"-case {caseDir} -force"), Times.Once);
+                x => x.Execute("decomposePar", $"-case {caseDir}"), Times.Once);
             _mockProcessExecutor.Verify(
-                x => x.Execute("mpirun", $"-np 4 pimpleFoam -case {caseDir} -parallel"), Times.Once);
+                x => x.Execute("mpirun", $"-np 4 simpleFoam -case {caseDir} -parallel"), Times.Once);
             _mockProcessExecutor.Verify(
                 x => x.Execute("reconstructPar", $"-case {caseDir}"), Times.Once);
         }
@@ -170,7 +170,7 @@ namespace foamscript.Tests.Services
         {
             var caseDir = CreateMeshedCaseDir();
             _mockProcessExecutor
-                .Setup(x => x.Execute("decomposePar", $"-case {caseDir} -force"))
+                .Setup(x => x.Execute("decomposePar", $"-case {caseDir}"))
                 .Returns(new ProcessResult { ExitCode = 1 });
 
             var result = _service.SolveCase(caseDir, true, 4);
@@ -184,16 +184,16 @@ namespace foamscript.Tests.Services
         {
             var caseDir = CreateMeshedCaseDir();
             _mockProcessExecutor
-                .Setup(x => x.Execute("decomposePar", $"-case {caseDir} -force"))
+                .Setup(x => x.Execute("decomposePar", $"-case {caseDir}"))
                 .Returns(new ProcessResult { ExitCode = 0 });
             _mockProcessExecutor
-                .Setup(x => x.Execute("mpirun", $"-np 4 pimpleFoam -case {caseDir} -parallel"))
+                .Setup(x => x.Execute("mpirun", $"-np 4 simpleFoam -case {caseDir} -parallel"))
                 .Returns(new ProcessResult { ExitCode = 1 });
 
             var result = _service.SolveCase(caseDir, true, 4);
 
             result.IsSuccess.Should().BeFalse();
-            result.ErrorMessage.Should().Contain("pimpleFoam (parallel) failed");
+            result.ErrorMessage.Should().Contain("simpleFoam (parallel) failed");
         }
 
         [Fact]
@@ -201,10 +201,10 @@ namespace foamscript.Tests.Services
         {
             var caseDir = CreateMeshedCaseDir();
             _mockProcessExecutor
-                .Setup(x => x.Execute("decomposePar", $"-case {caseDir} -force"))
+                .Setup(x => x.Execute("decomposePar", $"-case {caseDir}"))
                 .Returns(new ProcessResult { ExitCode = 0 });
             _mockProcessExecutor
-                .Setup(x => x.Execute("mpirun", $"-np 4 pimpleFoam -case {caseDir} -parallel"))
+                .Setup(x => x.Execute("mpirun", $"-np 4 simpleFoam -case {caseDir} -parallel"))
                 .Returns(new ProcessResult { ExitCode = 0 });
             _mockProcessExecutor
                 .Setup(x => x.Execute("reconstructPar", $"-case {caseDir}"))
@@ -264,7 +264,7 @@ namespace foamscript.Tests.Services
 
             // Setup serial solver success for both cases
             _mockProcessExecutor
-                .Setup(x => x.Execute("pimpleFoam", It.IsAny<string>()))
+                .Setup(x => x.Execute("simpleFoam", It.IsAny<string>()))
                 .Returns(new ProcessResult { ExitCode = 0, Output = "" });
 
             var result = _service.SolveStudy(studyDir, false, 4, false);
@@ -284,10 +284,10 @@ namespace foamscript.Tests.Services
 
             // First case fails, second succeeds
             _mockProcessExecutor
-                .Setup(x => x.Execute("pimpleFoam", $"-case {case0}"))
+                .Setup(x => x.Execute("simpleFoam", $"-case {case0}"))
                 .Returns(new ProcessResult { ExitCode = 1 });
             _mockProcessExecutor
-                .Setup(x => x.Execute("pimpleFoam", $"-case {case5}"))
+                .Setup(x => x.Execute("simpleFoam", $"-case {case5}"))
                 .Returns(new ProcessResult { ExitCode = 0 });
 
             var result = _service.SolveStudy(studyDir, false, 4, true);
@@ -304,7 +304,7 @@ namespace foamscript.Tests.Services
             var case0 = Path.Combine(studyDir, "Study_0.0");
 
             _mockProcessExecutor
-                .Setup(x => x.Execute("pimpleFoam", $"-case {case0}"))
+                .Setup(x => x.Execute("simpleFoam", $"-case {case0}"))
                 .Returns(new ProcessResult { ExitCode = 1 });
 
             var result = _service.SolveStudy(studyDir, false, 4, false);
@@ -313,6 +313,38 @@ namespace foamscript.Tests.Services
             result.ErrorMessage.Should().Contain("aborted");
             // Should not have tried the second case
             result.CaseSummaries.Should().HaveCount(1);
+        }
+
+        // ── DetectSolver ───────────────────────────────────────────────────────────
+
+        [Fact]
+        public void DetectSolver_NoControlDict_ReturnsSimpleFoam()
+        {
+            var caseDir = CreateMeshedCaseDir();
+            var result = SolverService.DetectSolver(caseDir);
+            result.Should().Be("simpleFoam");
+        }
+
+        [Fact]
+        public void DetectSolver_SimpleFoamControlDict_ReturnsSimpleFoam()
+        {
+            var caseDir = CreateMeshedCaseDir();
+            File.WriteAllText(Path.Combine(caseDir, "system", "controlDict"),
+                "application     simpleFoam;\n");
+
+            var result = SolverService.DetectSolver(caseDir);
+            result.Should().Be("simpleFoam");
+        }
+
+        [Fact]
+        public void DetectSolver_PimpleFoamControlDict_ReturnsPimpleFoam()
+        {
+            var caseDir = CreateMeshedCaseDir();
+            File.WriteAllText(Path.Combine(caseDir, "system", "controlDict"),
+                "application     pimpleFoam;\n");
+
+            var result = SolverService.DetectSolver(caseDir);
+            result.Should().Be("pimpleFoam");
         }
 
         // ── ParseForceCoeffsFile ─────────────────────────────────────────────────

@@ -1,0 +1,33 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
+|  \\    /   O peration     | Version:  v2512                                 |
+|   \\  /    A nd           | Website:  www.openfoam.com                      |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      MRFProperties;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+MRF1
+{
+    cellZone        rotatingZone;
+    active          yes;
+
+    // All patches inside the rotor zone rotate with the disc
+    nonRotatingPatches ();
+
+    // Rotation axis at CAD origin, spinning around Z-axis
+    origin          (0 0 0);
+    axis            (0 0 1);
+
+    // Dial: Managed by C# (Spin rate in rad/s)
+    omega           constant {{ omega_rotation }};
+}
+
+// ************************************************************************* //

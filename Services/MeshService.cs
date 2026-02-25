@@ -185,8 +185,12 @@ namespace foamscript.Services
                     Console.WriteLine("✓ snappyHexMesh completed successfully");
                 }
 
-                // Step: Convert rotor wall patches to cyclicAMI (required for AMI rotation)
-                PatchBoundaryForAMI(caseDir);
+                // Step: Convert rotor wall patches to cyclicAMI (only for AMI templates)
+                var createPatchPath = Path.Combine(caseDir, "system", "createPatchDict");
+                if (File.Exists(createPatchPath))
+                {
+                    PatchBoundaryForAMI(caseDir);
+                }
 
 
                 // Step 3: Check mesh quality (optional)

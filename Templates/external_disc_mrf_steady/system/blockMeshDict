@@ -1,0 +1,78 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
+|  \\    /   O peration     | Version:  v2512                                 |
+|   \\  /    A nd           | Website:  www.openfoam.com                      |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      blockMeshDict;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+scale   1;
+
+// Domain sized to tunnel extents (with 10% margin)
+// X: -upstream to +downstream, Y/Z: -radial to +radial
+
+vertices
+(
+    (-{{ domain_upstream }}  -{{ domain_radial }}  -{{ domain_radial }}) // 0
+    ( {{ domain_downstream }} -{{ domain_radial }}  -{{ domain_radial }}) // 1
+    ( {{ domain_downstream }}  {{ domain_radial }}  -{{ domain_radial }}) // 2
+    (-{{ domain_upstream }}   {{ domain_radial }}  -{{ domain_radial }}) // 3
+    (-{{ domain_upstream }}  -{{ domain_radial }}   {{ domain_radial }}) // 4
+    ( {{ domain_downstream }} -{{ domain_radial }}   {{ domain_radial }}) // 5
+    ( {{ domain_downstream }}  {{ domain_radial }}   {{ domain_radial }}) // 6
+    (-{{ domain_upstream }}   {{ domain_radial }}   {{ domain_radial }}) // 7
+);
+
+{{- # Calculate cell counts: ~20 cells per disc diameter in each direction }}
+{{- nx = math.ceil((domain_upstream + domain_downstream) / disc_diameter * 4) }}
+{{- ny = math.ceil(2 * domain_radial / disc_diameter * 4) }}
+{{- nz = ny }}
+
+blocks
+(
+    hex (0 1 2 3 4 5 6 7) ({{ nx }} {{ ny }} {{ nz }}) simpleGrading (1 1 1)
+);
+
+edges
+();
+
+boundary
+(
+    inlet
+    {
+        type patch;
+        faces
+        (
+            (0 4 7 3) // upstream face (x = -upstream)
+        );
+    }
+    outlet
+    {
+        type patch;
+        faces
+        (
+            (2 6 5 1) // downstream face (x = +downstream)
+        );
+    }
+    tunnel
+    {
+        type wall;
+        faces
+        (
+            (3 7 6 2) // top
+            (1 5 4 0) // bottom
+            (0 3 2 1) // front (z = -radial)
+            (4 5 6 7) // back (z = +radial)
+        );
+    }
+);
+
+// ************************************************************************* //
