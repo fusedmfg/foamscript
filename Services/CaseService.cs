@@ -229,15 +229,23 @@ namespace foamscript.Services
             var domainDownstream = domain.TunnelDownstream * discDiameter * margin;
             var domainRadial = domain.TunnelRadial * discDiameter * margin;
 
-            // Compute safe initial deltaT targeting Co ≈ 0.5 at finest refinement level
+            // Compute safe initial deltaT targeting Co ≈ 0.125 at finest refinement level
+            // (4× safety factor — snappyHexMesh creates smaller cells than theoretical estimate)
             var domainLength = domainUpstream + domainDownstream;
             var nxCells = Math.Ceiling(domainLength / discDiameter * 4);
             var baseCellSize = domainLength / nxCells;
             var fineCellSize = baseCellSize / Math.Pow(2, physics.RefinementLevelMax);
-            var deltaT = 0.5 * fineCellSize / Math.Max(velocityMagnitude, 1.0); // Co = 0.5
+            var deltaT = 0.125 * fineCellSize / Math.Max(velocityMagnitude, 1.0);
 
-            // Cap maxDeltaT to prevent excessive jumps
-            var maxDeltaT = physics.EndTime / 100.0;
+            // Cap maxDeltaT: constrained by both flow time and mesh motion Courant number
+            // Mesh motion velocity at rotor boundary (rotor radius ≈ 1.5× disc radius)
+            var rotorRadius = discDiameter * 0.75;
+            var meshMotionVelocity = Math.Abs(omegaRotation) * rotorRadius;
+            var maxDeltaTFlow = physics.EndTime / 100.0;
+            var maxDeltaTMeshMotion = meshMotionVelocity > 0
+                ? 0.5 * fineCellSize / meshMotionVelocity
+                : maxDeltaTFlow;
+            var maxDeltaT = Math.Min(maxDeltaTFlow, maxDeltaTMeshMotion);
 
             return new
             {

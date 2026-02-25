@@ -70,11 +70,11 @@ relaxationFactors
     }
     equations
     {
-        U               0.7;
+        U               0.5;
         UFinal          1.0;
-        k               0.5;
+        k               0.3;
         kFinal          1.0;
-        omega           0.5;
+        omega           0.3;
         omegaFinal      1.0;
     }
 }
