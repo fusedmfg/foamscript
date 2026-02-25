@@ -3,13 +3,14 @@ using CommandLine;
 namespace foamscript.Models
 {
     /// <summary>
-    /// Model for the 'mesh' verb - meshes a single OpenFOAM case with blockMesh and snappyHexMesh.
+    /// Model for the 'mesh' verb - meshes a single case or all cases in a study.
+    /// Auto-detects whether the path is a case (has constant/ + system/) or a study directory.
     /// </summary>
-    [Verb("mesh", HelpText = "Generate mesh for an OpenFOAM case using blockMesh and snappyHexMesh.")]
-    public class MeshCaseModel : VerbModel
+    [Verb("mesh", HelpText = "Generate mesh for an OpenFOAM case or study directory.")]
+    public class MeshModel : VerbModel
     {
-        [Option('c', "case-dir", Required = true, HelpText = "Path to case directory")]
-        public string CaseDir { get; set; } = string.Empty;
+        [Option('d', "dir", Required = true, HelpText = "Path to case or study directory")]
+        public string Dir { get; set; } = string.Empty;
 
         [Option('p', "parallel", Required = false, Default = false, HelpText = "Run snappyHexMesh in parallel")]
         public bool Parallel { get; set; } = false;

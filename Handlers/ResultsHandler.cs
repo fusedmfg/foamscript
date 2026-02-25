@@ -16,9 +16,18 @@ namespace foamscript.Handlers
 
         public int Handle(ResultsModel model)
         {
-            _loggingService.LogInformation($"Extracting results from {model.StudyDir}");
+            // Auto-detect: if user pointed at a single case, use its parent as the study dir
+            var dir = model.Dir;
+            if (CaseDiscovery.IsCase(dir))
+            {
+                var parent = Directory.GetParent(dir)?.FullName;
+                if (parent != null)
+                    dir = parent;
+            }
 
-            var summary = _resultsService.ExtractResults(model.StudyDir, model.Format, model.AverageWindow);
+            _loggingService.LogInformation($"Extracting results from {dir}");
+
+            var summary = _resultsService.ExtractResults(dir, model.Format, model.AverageWindow);
 
             if (summary.IsSuccess)
             {

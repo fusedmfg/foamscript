@@ -78,9 +78,7 @@ namespace foamscript
                 builder.Services.AddTransient<GenerateDomainHandler>();
                 builder.Services.AddTransient<NewStudyHandler>();
                 builder.Services.AddTransient<MeshHandler>();
-                builder.Services.AddTransient<MeshStudyHandler>();
                 builder.Services.AddTransient<SolveHandler>();
-                builder.Services.AddTransient<SolveStudyHandler>();
                 builder.Services.AddTransient<ResultsHandler>();
                 builder.Services.AddTransient<ListTemplatesHandler>();
 

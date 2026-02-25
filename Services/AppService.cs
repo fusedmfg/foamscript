@@ -11,9 +11,7 @@ namespace foamscript
         private readonly GenerateDomainHandler _generateDomainHandler;
         private readonly NewStudyHandler _newStudyHandler;
         private readonly MeshHandler _meshHandler;
-        private readonly MeshStudyHandler _meshStudyHandler;
         private readonly SolveHandler _solveHandler;
-        private readonly SolveStudyHandler _solveStudyHandler;
         private readonly ResultsHandler _resultsHandler;
         private readonly ListTemplatesHandler _listTemplatesHandler;
 
@@ -24,9 +22,7 @@ namespace foamscript
             GenerateDomainHandler generateDomainHandler,
             NewStudyHandler newStudyHandler,
             MeshHandler meshHandler,
-            MeshStudyHandler meshStudyHandler,
             SolveHandler solveHandler,
-            SolveStudyHandler solveStudyHandler,
             ResultsHandler resultsHandler,
             ListTemplatesHandler listTemplatesHandler)
         {
@@ -36,9 +32,7 @@ namespace foamscript
             _generateDomainHandler = generateDomainHandler;
             _newStudyHandler = newStudyHandler;
             _meshHandler = meshHandler;
-            _meshStudyHandler = meshStudyHandler;
             _solveHandler = solveHandler;
-            _solveStudyHandler = solveStudyHandler;
             _resultsHandler = resultsHandler;
             _listTemplatesHandler = listTemplatesHandler;
         }
@@ -53,10 +47,8 @@ namespace foamscript
                     ConvertModel m => _convertHandler.Handle(m),
                     GenerateDomainModel m => _generateDomainHandler.Handle(m),
                     NewStudyModel m => _newStudyHandler.Handle(m),
-                    MeshCaseModel m => _meshHandler.Handle(m),
-                    MeshStudyModel m => _meshStudyHandler.Handle(m),
-                    SolveCaseModel m => _solveHandler.Handle(m),
-                    SolveStudyModel m => _solveStudyHandler.Handle(m),
+                    MeshModel m => _meshHandler.Handle(m),
+                    SolveModel m => _solveHandler.Handle(m),
                     ResultsModel m => _resultsHandler.Handle(m),
                     ListTemplatesModel m => _listTemplatesHandler.Handle(m),
                     _ => throw new NotImplementedException($"The verb of type {model.GetType().Name} is not implemented.")

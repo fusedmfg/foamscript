@@ -4,12 +4,13 @@ namespace foamscript.Models
 {
     /// <summary>
     /// Model for the 'results' verb - extracts and summarizes force coefficients from a completed study.
+    /// Auto-detects whether the path is a case or study directory.
     /// </summary>
-    [Verb("results", HelpText = "Extract and summarize force coefficients from a completed study.")]
+    [Verb("results", HelpText = "Extract and summarize force coefficients from a solved case or study.")]
     public class ResultsModel : VerbModel
     {
-        [Option('d', "study-dir", Required = true, HelpText = "Path to study directory containing solved cases")]
-        public string StudyDir { get; set; } = string.Empty;
+        [Option('d', "dir", Required = true, HelpText = "Path to case or study directory containing solved cases")]
+        public string Dir { get; set; } = string.Empty;
 
         [Option('f', "format", Required = false, Default = "table", HelpText = "Output format: table, csv, json")]
         public string Format { get; set; } = "table";
