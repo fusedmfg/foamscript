@@ -17,14 +17,14 @@ FoamFile
 dimensions      [0 1 -1 0 0 0 0];
 
 // Parameterized: Initialize to freestream velocity
-internalField   uniform ({{ ux }} {{ uy }} 0);
+internalField   uniform ({{ ux }} 0 {{ uz }});
 
 boundaryField
 {
     inlet
     {
         type            fixedValue;
-        value           uniform ({{ ux }} {{ uy }} 0);
+        value           uniform ({{ ux }} 0 {{ uz }});
     }
 
     outlet

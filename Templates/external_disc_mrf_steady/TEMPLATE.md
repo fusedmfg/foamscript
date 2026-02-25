@@ -11,7 +11,7 @@ using the Multiple Reference Frame (MRF) approach with k-omega SST turbulence.
 ## Template Variables (Scriban)
 | Variable | Source | Description |
 |----------|--------|-------------|
-| `ux`, `uy` | C# (from velocity + AoA) | Freestream velocity components (m/s) |
+| `ux`, `uz` | C# (from velocity + AoA) | Freestream velocity components (m/s) — X streamwise, Z vertical |
 | `p` | C# (constant 0) | Reference pressure |
 | `k` | C# (from velocity + TI) | Turbulent kinetic energy |
 | `omega_turbulence` | C# (from k + disc diameter) | Specific dissipation rate |

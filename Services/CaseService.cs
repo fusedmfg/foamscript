@@ -193,10 +193,10 @@ namespace foamscript.Services
             // Calculate velocity components for this angle
             var angleRad = angle * Math.PI / 180.0;
             caseInfo.Ux = velocity * Math.Cos(angleRad);
-            caseInfo.Uy = velocity * Math.Sin(angleRad);
+            caseInfo.Uz = velocity * Math.Sin(angleRad);
 
             // Calculate all template parameters
-            var context = CalculateTemplateContext(caseInfo.Ux, caseInfo.Uy, omega, cores, discDiameter, physics, domain);
+            var context = CalculateTemplateContext(caseInfo.Ux, caseInfo.Uz, omega, cores, discDiameter, physics, domain);
 
             // Process template with Scriban
             _templateService.ProcessTemplate(templatePath, caseDir, context);
@@ -210,12 +210,12 @@ namespace foamscript.Services
         /// <summary>
         /// Calculates all template context parameters for Scriban rendering.
         /// </summary>
-        private static object CalculateTemplateContext(double ux, double uy, double omegaRotation,
+        private static object CalculateTemplateContext(double ux, double uz, double omegaRotation,
             int cores, double discDiameter, StudyPhysicsConfig physics, StudyDomainConfig domain)
         {
             const double cmu = 0.09; // Standard k-omega SST turbulence model constant
 
-            var velocityMagnitude = Math.Sqrt(ux * ux + uy * uy);
+            var velocityMagnitude = Math.Sqrt(ux * ux + uz * uz);
             var k = 1.5 * Math.Pow(velocityMagnitude * physics.TurbulenceIntensity, 2);
             var mixingLength = 0.07 * discDiameter;
             var omegaTurbulence = Math.Sqrt(k) / (Math.Pow(cmu, 0.25) * mixingLength);
@@ -250,7 +250,7 @@ namespace foamscript.Services
             return new
             {
                 ux = ux,
-                uy = uy,
+                uz = uz,
                 p = 0,
                 turbulence_intensity = physics.TurbulenceIntensity,
                 k = k,

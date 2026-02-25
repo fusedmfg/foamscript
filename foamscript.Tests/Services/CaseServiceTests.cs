@@ -93,7 +93,7 @@ endsolid disc
 
             // A simple templated file to verify Scriban rendering works
             File.WriteAllText(Path.Combine(templateDir, "0", "U"),
-                "Ux {{ ux }};\nUy {{ uy }};");
+                "Ux {{ ux }};\nUz {{ uz }};");
             File.WriteAllText(Path.Combine(templateDir, "constant", "transportProperties"),
                 "nu {{ nu }};");
             File.WriteAllText(Path.Combine(templateDir, "system", "controlDict"),
@@ -238,7 +238,7 @@ endsolid disc
 
             result.IsSuccess.Should().BeTrue();
             result.Cases[0].Ux.Should().BeApproximately(20.0, 1e-10);
-            result.Cases[0].Uy.Should().BeApproximately(0.0, 1e-10);
+            result.Cases[0].Uz.Should().BeApproximately(0.0, 1e-10);
         }
 
         [Fact]
@@ -257,7 +257,7 @@ endsolid disc
             result.IsSuccess.Should().BeTrue();
             var angleRad = 5.0 * Math.PI / 180.0;
             result.Cases[0].Ux.Should().BeApproximately(20.0 * Math.Cos(angleRad), 1e-10);
-            result.Cases[0].Uy.Should().BeApproximately(20.0 * Math.Sin(angleRad), 1e-10);
+            result.Cases[0].Uz.Should().BeApproximately(20.0 * Math.Sin(angleRad), 1e-10);
         }
 
         // ── CreateStudy — RPM Conversion ────────────────────────────────────────────

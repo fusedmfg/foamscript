@@ -52,9 +52,9 @@ namespace foamscript.Models
         public double Ux { get; set; }
 
         /// <summary>
-        /// Calculated Y velocity component (m/s).
+        /// Calculated Z velocity component (m/s).
         /// </summary>
-        public double Uy { get; set; }
+        public double Uz { get; set; }
 
         /// <summary>
         /// Rotation speed (rad/s).

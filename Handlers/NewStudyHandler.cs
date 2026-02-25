@@ -161,7 +161,7 @@ namespace foamscript.Handlers
                 {
                     Console.WriteLine($"  • {Path.GetFileName(caseInfo.CaseDir)}");
                     Console.WriteLine($"      AoA: {caseInfo.AngleOfAttack}°");
-                    Console.WriteLine($"      Velocity: Ux={caseInfo.Ux:F3} m/s, Uy={caseInfo.Uy:F3} m/s");
+                    Console.WriteLine($"      Velocity: Ux={caseInfo.Ux:F3} m/s, Uz={caseInfo.Uz:F3} m/s");
                     Console.WriteLine($"      Omega: {caseInfo.Omega:F3} rad/s ({config.Rpm} RPM)");
                 }
 

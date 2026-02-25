@@ -280,7 +280,7 @@ All scales are relative to the detected disc diameter.
 2. **Processes geometry** (convert STEP/IGES → STL, scale to meters, validate)
 3. **Generates domain** (`rotor.stl` AMI rotating region, `tunnel.stl` stationary far-field)
 4. **For each angle of attack:**
-   - Calculates `Ux = V·cos(α)`, `Uy = V·sin(α)`, `ω = RPM × 2π/60`
+   - Calculates `Ux = V·cos(α)`, `Uz = V·sin(α)`, `ω = RPM × 2π/60`
    - Derives turbulence parameters (`k`, `ω_turb`) from physics config
    - Renders Scriban template files with all parameters
    - Copies geometry STL files to `constant/triSurface/`
