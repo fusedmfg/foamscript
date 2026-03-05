@@ -39,7 +39,10 @@ boundaryField
 
     disc
     {
-        type            noSlip;
+        type            rotatingWallVelocity;
+        origin          (0 0 0);
+        axis            (0 0 1);
+        omega           constant {{ omega_rotation }};
     }
 }
 

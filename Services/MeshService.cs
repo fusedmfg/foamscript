@@ -70,6 +70,27 @@ namespace foamscript.Services
 
                 Console.WriteLine("✓ blockMesh completed successfully");
 
+                // Step 1.5: Orient disc STL normals outward.
+                // gmsh preserves BREP face orientation from STEP files. Shapr3D's Parasolid
+                // kernel may produce inward-facing normals, which causes snappyHexMesh to
+                // create boundary faces with reversed area vectors → all force coefficient
+                // signs flip. surfaceOrient ray-casts from (0,0,0) — the disc center — to
+                // determine inside vs outside, then reorients all normals outward.
+                Console.WriteLine("Orienting disc surface normals...");
+                var discStl = Path.Combine(caseDir, "constant", "triSurface", "disc.stl");
+                var orientResult = _processExecutor.Execute("surfaceOrient",
+                    $"{discStl} {discStl} -inside \"(0 0 0)\"");
+
+                if (orientResult.ExitCode != 0)
+                {
+                    result.Warnings.Add("surfaceOrient failed — disc normals may be incorrect");
+                    _loggingService.LogError($"surfaceOrient failed: {orientResult.Output}");
+                }
+                else
+                {
+                    Console.WriteLine("✓ Disc surface normals oriented outward");
+                }
+
                 // Step 2: Extract surface features (generates .eMesh files for snappyHexMesh)
                 Console.WriteLine("Extracting surface features...");
                 var featureResult = _processExecutor.Execute("surfaceFeatureExtract", $"-case {caseDir}");

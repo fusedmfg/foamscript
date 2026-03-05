@@ -14,20 +14,7 @@ FoamFile
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-MRF1
-{
-    cellZone        rotatingZone;
-    active          yes;
-
-    // All patches inside the rotor zone rotate with the disc
-    nonRotatingPatches ();
-
-    // Rotation axis at CAD origin, spinning around Z-axis
-    origin          (0 0 0);
-    axis            (0 0 1);
-
-    // Dial: Managed by C# (Spin rate in rad/s)
-    omega           constant {{ omega_rotation }};
-}
+// Rotation handled by rotatingWallVelocity BC on disc patch (0/U).
+// No MRF zone needed for external disc aerodynamics.
 
 // ************************************************************************* //

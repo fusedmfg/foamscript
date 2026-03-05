@@ -286,7 +286,7 @@ namespace foamscript.Services
             var triSurfaceDir = Path.Combine(caseDir, "constant", "triSurface");
             Directory.CreateDirectory(triSurfaceDir);
 
-            var stlFiles = new[] { "disc.stl", "rotor.stl", "tunnel.stl" };
+            var stlFiles = new[] { "disc.stl", "tunnel.stl" };
 
             foreach (var stlFile in stlFiles)
             {

@@ -21,7 +21,6 @@ addLayers       false; // Keep false for initial AoA sweeps to ensure stability
 geometry
 {
     disc.stl   { type triSurfaceMesh; name disc; }
-    rotor.stl  { type triSurfaceMesh; name rotor; }
 }
 
 castellatedMeshControls
@@ -43,14 +42,6 @@ castellatedMeshControls
         {
             level ({{ refinement_level_min }} {{ refinement_level_max }});
             patchInfo { type wall; }
-        }
-        rotor
-        {
-            level ({{ refinement_level_min }} {{ refinement_level_min }});
-            // MRF: no faceType boundary — rotor is internal zone, not a patch
-            cellZone rotatingZone;
-            faceZone rotatingZone;
-            cellZoneInside inside;
         }
         // tunnel boundary defined by blockMesh (inlet/outlet/walls)
     }

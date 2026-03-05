@@ -332,7 +332,6 @@ endsolid disc
             var triSurfaceDir = Path.Combine(result.Cases[0].CaseDir, "constant", "triSurface");
             Directory.Exists(triSurfaceDir).Should().BeTrue();
             File.Exists(Path.Combine(triSurfaceDir, "disc.stl")).Should().BeTrue();
-            File.Exists(Path.Combine(triSurfaceDir, "rotor.stl")).Should().BeTrue();
             File.Exists(Path.Combine(triSurfaceDir, "tunnel.stl")).Should().BeTrue();
         }
 
