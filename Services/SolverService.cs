@@ -254,7 +254,9 @@ namespace foamscript.Services
 
         /// <summary>
         /// Parses a forceCoeffs coefficient.dat file.
-        /// Format: Time Cd Cs Cl CmRoll CmPitch CmYaw Cd(f) Cd(r) Cs(f) Cs(r) Cl(f) Cl(r)
+        /// Reads the header line to determine column indices dynamically,
+        /// supporting both legacy and v2512+ formats.
+        /// v2512 format: Time Cd Cd(f) Cd(r) Cl Cl(f) Cl(r) CmPitch CmRoll CmYaw Cs Cs(f) Cs(r)
         /// </summary>
         internal static (double Cd, double Cl, double CmPitch, double LastTime)? ParseForceCoeffsFile(string filePath, double averageWindow = 0.1)
         {
@@ -263,18 +265,47 @@ namespace foamscript.Services
                 var lines = File.ReadAllLines(filePath);
                 var dataLines = new List<(double Time, double Cd, double Cl, double CmPitch)>();
 
+                // Parse header to find column indices dynamically
+                int cdCol = -1, clCol = -1, cmPitchCol = -1;
+                foreach (var line in lines)
+                {
+                    if (line.TrimStart().StartsWith("# Time"))
+                    {
+                        var headers = line.Split(new[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries);
+                        // headers[0] = "#", headers[1] = "Time", headers[2+] = column names
+                        // Data line: parts[0] = Time, parts[1+] = data columns
+                        // So data index = header index - 1
+                        for (int i = 2; i < headers.Length; i++)
+                        {
+                            switch (headers[i])
+                            {
+                                case "Cd": cdCol = i - 1; break;
+                                case "Cl": clCol = i - 1; break;
+                                case "CmPitch": cmPitchCol = i - 1; break;
+                            }
+                        }
+                        break;
+                    }
+                }
+
+                // Fallback to v2512 indices if header parsing fails
+                if (cdCol < 0) cdCol = 1;
+                if (clCol < 0) clCol = 4;
+                if (cmPitchCol < 0) cmPitchCol = 7;
+
+                var minCols = Math.Max(Math.Max(cdCol, clCol), cmPitchCol) + 1;
+
                 foreach (var line in lines)
                 {
                     if (line.StartsWith("#") || string.IsNullOrWhiteSpace(line))
                         continue;
 
                     var parts = line.Split(new[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries);
-                    // Expected columns: Time(0) Cd(1) Cs(2) Cl(3) CmRoll(4) CmPitch(5) CmYaw(6) ...
-                    if (parts.Length >= 6 &&
+                    if (parts.Length >= minCols &&
                         double.TryParse(parts[0], out var time) &&
-                        double.TryParse(parts[1], out var cd) &&
-                        double.TryParse(parts[3], out var cl) &&
-                        double.TryParse(parts[5], out var cmPitch))
+                        double.TryParse(parts[cdCol], out var cd) &&
+                        double.TryParse(parts[clCol], out var cl) &&
+                        double.TryParse(parts[cmPitchCol], out var cmPitch))
                     {
                         dataLines.Add((time, cd, cl, cmPitch));
                     }
