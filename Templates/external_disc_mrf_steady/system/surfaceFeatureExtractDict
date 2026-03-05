@@ -25,11 +25,4 @@ disc.stl
     writeObj            yes;
 }
 
-rotor.stl
-{
-    extractionMethod    extractFromSurface;
-    includedAngle       150;
-    writeObj            yes;
-}
-
 // ************************************************************************* //

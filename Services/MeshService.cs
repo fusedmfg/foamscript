@@ -74,12 +74,12 @@ namespace foamscript.Services
                 // gmsh preserves BREP face orientation from STEP files. Shapr3D's Parasolid
                 // kernel may produce inward-facing normals, which causes snappyHexMesh to
                 // create boundary faces with reversed area vectors → all force coefficient
-                // signs flip. surfaceOrient ray-casts from (0,0,0) — the disc center — to
-                // determine inside vs outside, then reorients all normals outward.
+                // signs flip. surfaceOrient uses a known-outside point (0,0,-1) — below
+                // the disc — to determine outward direction, then reorients all normals.
                 Console.WriteLine("Orienting disc surface normals...");
                 var discStl = Path.Combine(caseDir, "constant", "triSurface", "disc.stl");
                 var orientResult = _processExecutor.Execute("surfaceOrient",
-                    $"{discStl} {discStl} -inside \"(0 0 0)\"");
+                    $"{discStl} \"(0 0 -1)\" {discStl}");
 
                 if (orientResult.ExitCode != 0)
                 {
