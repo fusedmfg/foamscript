@@ -28,8 +28,9 @@ namespace foamscript.Models
         /// <summary>Kinematic viscosity of air (m²/s). Default: 1.5e-5 (air at ~20°C, sea level).</summary>
         public double Nu { get; set; } = 1.5e-5;
 
-        /// <summary>Freestream turbulence intensity as a fraction (e.g., 0.05 = 5%). Default: 0.05.</summary>
-        public double TurbulenceIntensity { get; set; } = 0.05;
+        /// <summary>Freestream turbulence intensity as a fraction (e.g., 0.01 = 1%). Default: 0.01.
+        /// Aerospace standard for bluff body external aero (AIAA best practices).</summary>
+        public double TurbulenceIntensity { get; set; } = 0.01;
 
         /// <summary>Simulation end time in seconds. Default: 1.0.</summary>
         public double EndTime { get; set; } = 1.0;
@@ -43,11 +44,11 @@ namespace foamscript.Models
         /// <summary>Write interval for steady-state output (every N iterations). Default: 100.</summary>
         public int WriteInterval { get; set; } = 100;
 
-        /// <summary>snappyHexMesh minimum refinement level around geometry. Default: 3.</summary>
-        public int RefinementLevelMin { get; set; } = 3;
+        /// <summary>snappyHexMesh minimum refinement level around geometry. Default: 5.</summary>
+        public int RefinementLevelMin { get; set; } = 5;
 
-        /// <summary>snappyHexMesh maximum refinement level around geometry. Default: 4.</summary>
-        public int RefinementLevelMax { get; set; } = 4;
+        /// <summary>snappyHexMesh maximum refinement level around geometry. Default: 6.</summary>
+        public int RefinementLevelMax { get; set; } = 6;
     }
 
     /// <summary>

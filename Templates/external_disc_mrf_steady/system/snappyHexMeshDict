@@ -16,7 +16,7 @@ FoamFile
 
 castellatedMesh true;
 snap            true;
-addLayers       false; // Keep false for initial AoA sweeps to ensure stability
+addLayers       true;
 
 geometry
 {
@@ -26,9 +26,9 @@ geometry
 castellatedMeshControls
 {
     maxLocalCells 1000000;
-    maxGlobalCells 5000000;
+    maxGlobalCells 10000000;
     minRefinementCells 10;
-    nCellsBetweenLevels 3;
+    nCellsBetweenLevels 5;
 
     features
     (
@@ -68,7 +68,34 @@ snapControls
     nFeatureSnapIter 10;
 }
 
-addLayersControls { /* Keep empty for baseline sweeps */ }
+addLayersControls
+{
+    layers
+    {
+        disc
+        {
+            nSurfaceLayers  8;
+        }
+    }
+    relativeSizes       true;
+    expansionRatio      1.2;
+    firstLayerThickness 0.2;
+    minThickness        0.1;
+    nGrow               0;
+    featureAngle        180;
+    maxFaceThicknessRatio 0.5;
+    nSmoothSurfaceNormals 5;
+    nSmoothThickness    10;
+    minMedialAxisAngle  90;
+    maxThicknessToMedialRatio 0.5;
+    nMedialAxisIter     100;
+    nSmoothNormals      3;
+    slipFeatureAngle    30;
+    nRelaxIter          5;
+    nBufferCellsNoExtrude 0;
+    nLayerIter          50;
+    nRelaxedIter        20;
+}
 
 meshQualityControls
 {

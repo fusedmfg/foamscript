@@ -56,8 +56,8 @@ namespace foamscript.Models
         [Option("nu", Required = false, Default = 1.5e-5, HelpText = "Kinematic viscosity of air (m²/s, default: 1.5e-5 for air at 20°C sea level)")]
         public double Nu { get; set; } = 1.5e-5;
 
-        [Option("turbulence-intensity", Required = false, Default = 0.05, HelpText = "Freestream turbulence intensity as a fraction (default: 0.05 = 5%)")]
-        public double TurbulenceIntensity { get; set; } = 0.05;
+        [Option("turbulence-intensity", Required = false, Default = 0.01, HelpText = "Freestream turbulence intensity as a fraction (default: 0.01 = 1%)")]
+        public double TurbulenceIntensity { get; set; } = 0.01;
 
         [Option("end-time", Required = false, Default = 1.0, HelpText = "Simulation end time in seconds (default: 1.0)")]
         public double EndTime { get; set; } = 1.0;
@@ -71,11 +71,11 @@ namespace foamscript.Models
         [Option("write-interval", Required = false, Default = 100, HelpText = "Write results every N iterations (default: 100)")]
         public int WriteInterval { get; set; } = 100;
 
-        [Option("refinement-min", Required = false, Default = 3, HelpText = "snappyHexMesh minimum refinement level (default: 3)")]
-        public int RefinementLevelMin { get; set; } = 3;
+        [Option("refinement-min", Required = false, Default = 5, HelpText = "snappyHexMesh minimum refinement level (default: 5)")]
+        public int RefinementLevelMin { get; set; } = 5;
 
-        [Option("refinement-max", Required = false, Default = 4, HelpText = "snappyHexMesh maximum refinement level (default: 4)")]
-        public int RefinementLevelMax { get; set; } = 4;
+        [Option("refinement-max", Required = false, Default = 6, HelpText = "snappyHexMesh maximum refinement level (default: 6)")]
+        public int RefinementLevelMax { get; set; } = 6;
 
         // ── Domain geometry parameters ────────────────────────────────────────
 
