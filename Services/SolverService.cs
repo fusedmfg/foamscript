@@ -328,8 +328,9 @@ namespace foamscript.Services
 
                 return (avgCd, avgCl, avgCm, dataLines[^1].Time);
             }
-            catch
+            catch (Exception ex)
             {
+                Console.Error.WriteLine($"Failed to parse force coefficients: {ex.Message}");
                 return null;
             }
         }

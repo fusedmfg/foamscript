@@ -157,8 +157,8 @@ FoamScript was built using **Claude Code** (Anthropic's AI coding agent) as the 
 │           PROJECT STATISTICS AT A GLANCE         │
 ├─────────────────────────────────────────────────┤
 │  Development Period    19 days (Feb 15-Mar 5)    │
-│  Total Commits         82                        │
-│  AI Co-Authored        68 / 82 (82.9%)           │
+│  Total Commits         83                        │
+│  AI Co-Authored        69 / 83 (83.1%)           │
 │  Total C# Lines        8,086                     │
 │  Production Code       4,532 lines               │
 │  Test Code             3,554 lines               │
@@ -173,11 +173,11 @@ FoamScript was built using **Claude Code** (Anthropic's AI coding agent) as the 
 
 | Model | Commits | Share |
 |-------|---------|-------|
-| Claude Sonnet 4.5 | 32 | 50.0% |
-| Claude Opus 4.6 | 21 | 32.8% |
-| Claude Sonnet 4.6 | 11 | 17.2% |
-| **Total AI** | **64** | **82.1%** |
-| Human-only | 14 | 17.9% |
+| Claude Sonnet 4.5 | 32 | 46.4% |
+| Claude Opus 4.6 | 26 | 37.7% |
+| Claude Sonnet 4.6 | 11 | 15.9% |
+| **Total AI** | **69** | **83.1%** |
+| Human-only | 14 | 16.9% |
 
 ### Development Timeline
 
@@ -196,7 +196,7 @@ Feb 26-Mar 2   0     BLOCKED — $20/mo usage limit hit (see §8.3)
 Mar 3-4        2     Sign reversal fix, surfaceOrient, rotatingWallVelocity
 Mar 5          2     Coefficient parsing fix, template upgrade, grid convergence
 ──────────  ───────  ─────────────────────────────────────────
-Total         82     Validated pipeline with grid convergence
+Total         83     Validated pipeline with grid convergence
 ```
 
 ### Code Distribution

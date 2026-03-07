@@ -47,12 +47,14 @@ namespace foamscript.Tests.Services
             return studyDir;
         }
 
+        // v2512 format: 13 columns — Time Cd Cd(f) Cd(r) Cl Cl(f) Cl(r) CmPitch CmRoll CmYaw Cs Cs(f) Cs(r)
+        // Sub-columns use half-values so aggregate = Cd(f) + Cd(r), etc.
         private static string MakeCoeffLine(double time, double cd, double cl, double cm) =>
-            $"{time:F4}\t{cd:F6}\t0.001\t{cl:F6}\t0.0001\t{cm:F6}\t0.0001";
+            $"{time:F4}\t{cd:F6}\t{cd / 2:F6}\t{cd / 2:F6}\t{cl:F6}\t{cl / 2:F6}\t{cl / 2:F6}\t{cm:F6}\t0.000100\t0.000050\t0.001000\t0.000500\t0.000500";
 
         private static string MakeCoeffFile(params (double time, double cd, double cl, double cm)[] entries)
         {
-            var lines = new List<string> { "# Time Cd Cs Cl CmRoll CmPitch CmYaw" };
+            var lines = new List<string> { "# Time        Cd            Cd(f)         Cd(r)         Cl            Cl(f)         Cl(r)         CmPitch       CmRoll        CmYaw         Cs            Cs(f)         Cs(r)" };
             foreach (var (time, cd, cl, cm) in entries)
                 lines.Add(MakeCoeffLine(time, cd, cl, cm));
             return string.Join("\n", lines);

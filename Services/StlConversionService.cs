@@ -315,8 +315,9 @@ namespace foamscript.Services
                 File.WriteAllLines(stlFile, scaledLines);
                 return true;
             }
-            catch
+            catch (Exception ex)
             {
+                Console.Error.WriteLine($"Failed to scale STL file: {ex.Message}");
                 return false;
             }
         }

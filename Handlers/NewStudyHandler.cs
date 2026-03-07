@@ -85,6 +85,23 @@ namespace foamscript.Handlers
                 };
             }
 
+            // Validate physics parameters
+            var validationErrors = new List<string>();
+            if (config.Velocity <= 0) validationErrors.Add($"Velocity must be positive (got {config.Velocity})");
+            if (config.Physics.Nu <= 0) validationErrors.Add($"Kinematic viscosity (nu) must be positive (got {config.Physics.Nu})");
+            if (config.Physics.RefinementLevelMin > config.Physics.RefinementLevelMax)
+                validationErrors.Add($"Refinement min ({config.Physics.RefinementLevelMin}) cannot exceed max ({config.Physics.RefinementLevelMax})");
+            if (config.Rpm < 0) validationErrors.Add($"RPM must be non-negative (got {config.Rpm})");
+
+            if (validationErrors.Count > 0)
+            {
+                Console.WriteLine("✗ Invalid parameter values:");
+                foreach (var err in validationErrors)
+                    Console.WriteLine($"    {err}");
+                Console.WriteLine();
+                return -1;
+            }
+
             // Resolve template path
             string templatePath;
             try

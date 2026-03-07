@@ -311,8 +311,9 @@ namespace foamscript.Services
                     .Select(s => double.Parse(s.Trim()))
                     .ToArray();
             }
-            catch
+            catch (Exception ex)
             {
+                Console.Error.WriteLine($"Failed to parse angles '{anglesString}': {ex.Message}");
                 return Array.Empty<double>();
             }
         }
