@@ -12,10 +12,10 @@ namespace foamscript.Models
         [Option('d', "dir", Required = true, HelpText = "Path to case or study directory (must be meshed first)")]
         public string Dir { get; set; } = string.Empty;
 
-        [Option('p', "parallel", Required = false, Default = false, HelpText = "Run solver in parallel with MPI")]
+        [Option('p', "parallel", Required = false, Default = false, HelpText = "Run solver in parallel with MPI (auto-enabled when --cores > 1)")]
         public bool Parallel { get; set; } = false;
 
-        [Option("cores", Required = false, Default = 4, HelpText = "Number of CPU cores for parallel execution")]
-        public int Cores { get; set; } = 4;
+        [Option("cores", Required = false, Default = 1, HelpText = "Number of CPU cores (implies parallel when > 1)")]
+        public int Cores { get; set; } = 1;
     }
 }

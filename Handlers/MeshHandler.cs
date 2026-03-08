@@ -28,20 +28,22 @@ namespace foamscript.Handlers
 
         private int HandleCase(MeshModel model)
         {
+            var parallel = model.Parallel || model.Cores > 1;
+
             _loggingService.LogInformation($"Meshing case at {model.Dir}");
 
             Console.WriteLine();
             Console.WriteLine("=== Mesh Generation ===");
             Console.WriteLine();
             Console.WriteLine($"Case directory: {model.Dir}");
-            Console.WriteLine($"Parallel: {(model.Parallel ? $"Yes ({model.Cores} cores)" : "No")}");
+            Console.WriteLine($"Parallel: {(parallel ? $"Yes ({model.Cores} cores)" : "No")}");
             Console.WriteLine($"Check quality: {(model.CheckQuality ? "Yes" : "No")}");
             Console.WriteLine($"Overwrite: {(model.Overwrite ? "Yes" : "No")}");
             Console.WriteLine();
 
             var result = _meshService.MeshCase(
                 model.Dir,
-                model.Parallel,
+                parallel,
                 model.Cores,
                 model.CheckQuality,
                 model.Overwrite);
@@ -94,20 +96,22 @@ namespace foamscript.Handlers
 
         private int HandleStudy(MeshModel model)
         {
+            var parallel = model.Parallel || model.Cores > 1;
+
             _loggingService.LogInformation($"Meshing study at {model.Dir}");
 
             Console.WriteLine();
             Console.WriteLine("=== Study Mesh Generation ===");
             Console.WriteLine();
             Console.WriteLine($"Study directory: {model.Dir}");
-            Console.WriteLine($"Parallel: {(model.Parallel ? $"Yes ({model.Cores} cores per case)" : "No")}");
+            Console.WriteLine($"Parallel: {(parallel ? $"Yes ({model.Cores} cores per case)" : "No")}");
             Console.WriteLine($"Check quality: {(model.CheckQuality ? "Yes" : "No")}");
             Console.WriteLine($"Overwrite: {(model.Overwrite ? "Yes" : "No")}");
             Console.WriteLine();
 
             var result = _meshService.MeshStudy(
                 model.Dir,
-                model.Parallel,
+                parallel,
                 model.Cores,
                 model.CheckQuality,
                 model.Overwrite,

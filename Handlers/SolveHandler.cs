@@ -28,16 +28,18 @@ namespace foamscript.Handlers
 
         private int HandleCase(SolveModel model)
         {
+            var parallel = model.Parallel || model.Cores > 1;
+
             _loggingService.LogInformation($"Solving case at {model.Dir}");
 
             Console.WriteLine();
             Console.WriteLine("=== Solver Execution ===");
             Console.WriteLine();
             Console.WriteLine($"Case directory: {model.Dir}");
-            Console.WriteLine($"Parallel: {(model.Parallel ? $"Yes ({model.Cores} cores)" : "No")}");
+            Console.WriteLine($"Parallel: {(parallel ? $"Yes ({model.Cores} cores)" : "No")}");
             Console.WriteLine();
 
-            var result = _solverService.SolveCase(model.Dir, model.Parallel, model.Cores);
+            var result = _solverService.SolveCase(model.Dir, parallel, model.Cores);
 
             if (result.IsSuccess)
             {
@@ -80,16 +82,18 @@ namespace foamscript.Handlers
 
         private int HandleStudy(SolveModel model)
         {
+            var parallel = model.Parallel || model.Cores > 1;
+
             _loggingService.LogInformation($"Solving study at {model.Dir}");
 
             Console.WriteLine();
             Console.WriteLine("=== Study Solver Execution ===");
             Console.WriteLine();
             Console.WriteLine($"Study directory: {model.Dir}");
-            Console.WriteLine($"Parallel: {(model.Parallel ? $"Yes ({model.Cores} cores per case)" : "No")}");
+            Console.WriteLine($"Parallel: {(parallel ? $"Yes ({model.Cores} cores per case)" : "No")}");
             Console.WriteLine();
 
-            var result = _solverService.SolveStudy(model.Dir, model.Parallel, model.Cores, continueOnError: true);
+            var result = _solverService.SolveStudy(model.Dir, parallel, model.Cores, continueOnError: true);
 
             Console.WriteLine();
             Console.WriteLine("=== Study Solve Summary ===");

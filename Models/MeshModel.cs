@@ -12,11 +12,11 @@ namespace foamscript.Models
         [Option('d', "dir", Required = true, HelpText = "Path to case or study directory")]
         public string Dir { get; set; } = string.Empty;
 
-        [Option('p', "parallel", Required = false, Default = false, HelpText = "Run snappyHexMesh in parallel")]
+        [Option('p', "parallel", Required = false, Default = false, HelpText = "Run snappyHexMesh in parallel (auto-enabled when --cores > 1)")]
         public bool Parallel { get; set; } = false;
 
-        [Option("cores", Required = false, Default = 4, HelpText = "Number of CPU cores for parallel execution")]
-        public int Cores { get; set; } = 4;
+        [Option("cores", Required = false, Default = 1, HelpText = "Number of CPU cores (implies parallel when > 1)")]
+        public int Cores { get; set; } = 1;
 
         [Option("check-quality", Required = false, Default = true, HelpText = "Run checkMesh to verify mesh quality")]
         public bool CheckQuality { get; set; } = true;
