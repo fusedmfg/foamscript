@@ -10,33 +10,32 @@
   // ── Study options ────────────────────────────────────────────────────────────
   // All optional. Values shown below are the defaults.
 
-  "templateName": "external_disc_rotating-ami_transient", // Template name or full path (run 'foamscript list-templates')
+  "templateName": "external_disc_rotatingwall_steady", // Template name or full path (run 'foamscript list-templates')
   "velocity": 20.0,        // Freestream velocity magnitude (m/s)
   "rpm": 1000.0,           // Disc rotation speed (RPM)
   "inputUnits": "mm",      // Source geometry units: mm | cm | m | in | ft  (STEP/IGES only)
   "meshSize": 0.05,        // gmsh mesh size factor for STEP/IGES conversion (lower = finer)
   "featureAngle": null,    // Edge preservation angle in degrees, or null to disable
-  "cores": 4,              // CPU cores for parallel decomposition
+  "cores": 0,              // CPU cores (0 = auto-detect all available; set FOAMSCRIPT_MAX_CORES to limit)
 
   // ── Physics parameters ───────────────────────────────────────────────────────
   // Fluid properties and solver settings. All optional — defaults shown.
 
   "physics": {
     "nu": 1.5e-5,               // Kinematic viscosity (m²/s) — air at ~20°C sea level
-    "turbulenceIntensity": 0.05, // Freestream turbulence intensity (0.05 = 5%)
-    "endTime": 1.0,             // Simulation end time (seconds)
-    "nOuterCorrectors": 3,      // PIMPLE outer corrector iterations
-    "refinementLevelMin": 3,    // snappyHexMesh minimum refinement level around geometry
-    "refinementLevelMax": 4     // snappyHexMesh maximum refinement level around geometry
+    "turbulenceIntensity": 0.01, // Freestream turbulence intensity (0.01 = 1%, AIAA default)
+    "endTime": 1000,             // Maximum solver iterations (steady-state)
+    "refinementLevelMin": 5,    // snappyHexMesh minimum refinement level around geometry
+    "refinementLevelMax": 6     // snappyHexMesh maximum refinement level around geometry
   },
 
   // ── Domain geometry parameters ───────────────────────────────────────────────
-  // Controls the size of the AMI rotating zone and wind tunnel. All optional.
+  // Controls the size of the rotor zone and wind tunnel. All optional.
   // All scales and extents are relative to the detected disc diameter.
 
   "domain": {
-    "rotorRadiusScale": 1.25,  // AMI cylinder radius = disc_radius × scale (~25% clearance)
-    "rotorHeightScale": 1.5,   // AMI cylinder height = disc_height × scale
+    "rotorRadiusScale": 1.25,  // Rotor cylinder radius = disc_radius × scale (~25% clearance)
+    "rotorHeightScale": 1.5,   // Rotor cylinder height = disc_height × scale
     "tunnelUpstream": 5.0,     // Wind tunnel upstream extent in disc diameters  (-x direction)
     "tunnelDownstream": 10.0,  // Wind tunnel downstream extent in disc diameters (+x direction)
     "tunnelRadial": 5.0,       // Wind tunnel radial extent in disc diameters    (+/-y and +/-z)

@@ -53,10 +53,8 @@ foamscript new-study --config study.json
 | `convert` | Convert STEP/IGES → STL via gmsh with unit scaling |
 | `generate-domain` | Generate rotor cylinder + tunnel box STL from disc geometry |
 | `new-study` | Full pipeline: geometry → domain → templated cases for AoA sweep |
-| `mesh` | Run blockMesh + snappyHexMesh on a single case (serial or parallel) |
-| `mesh-study` | Batch mesh all cases in a study directory |
-| `solve` | Run solver on a single meshed case (serial or parallel) |
-| `solve-study` | Batch solve all cases in a study directory |
+| `mesh` | Mesh a case or study directory (auto-detects cores, parallel by default) |
+| `solve` | Solve a case or study directory (auto-detects cores, parallel by default) |
 | `report` | Generate AIAA-quality HTML + PDF analysis report from a completed study |
 | `list-templates` | List available OpenFOAM case templates |
 
@@ -114,6 +112,7 @@ foamscript/
 │   ├── HtmlReportGenerator.cs   # Scriban HTML report with embedded SVG charts
 │   ├── PdfReportGenerator.cs    # PdfSharpCore PDF report with PNG charts
 │   ├── ResidualParser.cs        # OpenFOAM solver log convergence parser
+│   ├── CoreResolver.cs          # Auto-detect CPU cores + FOAMSCRIPT_MAX_CORES env var
 │   ├── EnvironmentService.cs    # OpenFOAM environment validation
 │   └── TemplateService.cs       # Scriban template rendering
 ├── Templates/           # OpenFOAM case + report templates (Scriban)
