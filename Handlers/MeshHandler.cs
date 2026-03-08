@@ -28,7 +28,7 @@ namespace foamscript.Handlers
 
         private int HandleCase(MeshModel model)
         {
-            var parallel = model.Parallel || model.Cores > 1;
+            var (cores, parallel) = CoreResolver.Resolve(model.Cores);
 
             _loggingService.LogInformation($"Meshing case at {model.Dir}");
 
@@ -36,7 +36,7 @@ namespace foamscript.Handlers
             Console.WriteLine("=== Mesh Generation ===");
             Console.WriteLine();
             Console.WriteLine($"Case directory: {model.Dir}");
-            Console.WriteLine($"Parallel: {(parallel ? $"Yes ({model.Cores} cores)" : "No")}");
+            Console.WriteLine($"Cores: {cores} ({(parallel ? "parallel" : "serial")})");
             Console.WriteLine($"Check quality: {(model.CheckQuality ? "Yes" : "No")}");
             Console.WriteLine($"Overwrite: {(model.Overwrite ? "Yes" : "No")}");
             Console.WriteLine();
@@ -44,7 +44,7 @@ namespace foamscript.Handlers
             var result = _meshService.MeshCase(
                 model.Dir,
                 parallel,
-                model.Cores,
+                cores,
                 model.CheckQuality,
                 model.Overwrite);
 
@@ -96,7 +96,7 @@ namespace foamscript.Handlers
 
         private int HandleStudy(MeshModel model)
         {
-            var parallel = model.Parallel || model.Cores > 1;
+            var (cores, parallel) = CoreResolver.Resolve(model.Cores);
 
             _loggingService.LogInformation($"Meshing study at {model.Dir}");
 
@@ -104,7 +104,7 @@ namespace foamscript.Handlers
             Console.WriteLine("=== Study Mesh Generation ===");
             Console.WriteLine();
             Console.WriteLine($"Study directory: {model.Dir}");
-            Console.WriteLine($"Parallel: {(parallel ? $"Yes ({model.Cores} cores per case)" : "No")}");
+            Console.WriteLine($"Cores per case: {cores} ({(parallel ? "parallel" : "serial")})");
             Console.WriteLine($"Check quality: {(model.CheckQuality ? "Yes" : "No")}");
             Console.WriteLine($"Overwrite: {(model.Overwrite ? "Yes" : "No")}");
             Console.WriteLine();
@@ -112,7 +112,7 @@ namespace foamscript.Handlers
             var result = _meshService.MeshStudy(
                 model.Dir,
                 parallel,
-                model.Cores,
+                cores,
                 model.CheckQuality,
                 model.Overwrite,
                 continueOnError: true);

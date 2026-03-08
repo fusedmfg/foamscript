@@ -28,7 +28,7 @@ namespace foamscript.Handlers
 
         private int HandleCase(SolveModel model)
         {
-            var parallel = model.Parallel || model.Cores > 1;
+            var (cores, parallel) = CoreResolver.Resolve(model.Cores);
 
             _loggingService.LogInformation($"Solving case at {model.Dir}");
 
@@ -36,10 +36,10 @@ namespace foamscript.Handlers
             Console.WriteLine("=== Solver Execution ===");
             Console.WriteLine();
             Console.WriteLine($"Case directory: {model.Dir}");
-            Console.WriteLine($"Parallel: {(parallel ? $"Yes ({model.Cores} cores)" : "No")}");
+            Console.WriteLine($"Cores: {cores} ({(parallel ? "parallel" : "serial")})");
             Console.WriteLine();
 
-            var result = _solverService.SolveCase(model.Dir, parallel, model.Cores);
+            var result = _solverService.SolveCase(model.Dir, parallel, cores);
 
             if (result.IsSuccess)
             {
@@ -82,7 +82,7 @@ namespace foamscript.Handlers
 
         private int HandleStudy(SolveModel model)
         {
-            var parallel = model.Parallel || model.Cores > 1;
+            var (cores, parallel) = CoreResolver.Resolve(model.Cores);
 
             _loggingService.LogInformation($"Solving study at {model.Dir}");
 
@@ -90,10 +90,10 @@ namespace foamscript.Handlers
             Console.WriteLine("=== Study Solver Execution ===");
             Console.WriteLine();
             Console.WriteLine($"Study directory: {model.Dir}");
-            Console.WriteLine($"Parallel: {(parallel ? $"Yes ({model.Cores} cores per case)" : "No")}");
+            Console.WriteLine($"Cores per case: {cores} ({(parallel ? "parallel" : "serial")})");
             Console.WriteLine();
 
-            var result = _solverService.SolveStudy(model.Dir, parallel, model.Cores, continueOnError: true);
+            var result = _solverService.SolveStudy(model.Dir, parallel, cores, continueOnError: true);
 
             Console.WriteLine();
             Console.WriteLine("=== Study Solve Summary ===");

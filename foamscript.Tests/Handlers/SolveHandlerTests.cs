@@ -59,76 +59,78 @@ namespace foamscript.Tests.Handlers
             return studyDir;
         }
 
-        // ── Parallel Inference — Single Case ───────────────────────────────────
+        // ── Core Resolution — Single Case ──────────────────────────────────────
 
         [Fact]
-        public void HandleCase_CoresGreaterThanOne_InfersParallel()
+        public void HandleCase_ExplicitCores_UsesSpecifiedCount()
         {
             var caseDir = CreateCaseDir();
             _mockSolverService
                 .Setup(x => x.SolveCase(caseDir, true, 4))
                 .Returns(new SolveResult { IsSuccess = true });
 
-            var model = new SolveModel { Dir = caseDir, Parallel = false, Cores = 4 };
+            var model = new SolveModel { Dir = caseDir, Cores = 4 };
             _handler.Handle(model);
 
-            // Verify SolveCase was called with parallel=true even though model.Parallel=false
             _mockSolverService.Verify(x => x.SolveCase(caseDir, true, 4), Times.Once);
         }
 
         [Fact]
-        public void HandleCase_CoresEqualsOne_RemainSerial()
+        public void HandleCase_SingleCore_RunsSerial()
         {
             var caseDir = CreateCaseDir();
             _mockSolverService
                 .Setup(x => x.SolveCase(caseDir, false, 1))
                 .Returns(new SolveResult { IsSuccess = true });
 
-            var model = new SolveModel { Dir = caseDir, Parallel = false, Cores = 1 };
+            var model = new SolveModel { Dir = caseDir, Cores = 1 };
             _handler.Handle(model);
 
             _mockSolverService.Verify(x => x.SolveCase(caseDir, false, 1), Times.Once);
         }
 
         [Fact]
-        public void HandleCase_ExplicitParallel_StaysParallel()
+        public void HandleCase_ZeroCores_AutoDetectsParallel()
         {
             var caseDir = CreateCaseDir();
+            var expectedCores = Environment.ProcessorCount;
+            var expectedParallel = expectedCores > 1;
+
             _mockSolverService
-                .Setup(x => x.SolveCase(caseDir, true, 1))
+                .Setup(x => x.SolveCase(caseDir, expectedParallel, expectedCores))
                 .Returns(new SolveResult { IsSuccess = true });
 
-            var model = new SolveModel { Dir = caseDir, Parallel = true, Cores = 1 };
+            var model = new SolveModel { Dir = caseDir, Cores = 0 };
             _handler.Handle(model);
 
-            _mockSolverService.Verify(x => x.SolveCase(caseDir, true, 1), Times.Once);
+            _mockSolverService.Verify(x => x.SolveCase(caseDir, expectedParallel, expectedCores), Times.Once);
         }
 
-        // ── Parallel Inference — Study ─────────────────────────────────────────
+        // ── Core Resolution — Study ────────────────────────────────────────────
 
         [Fact]
-        public void HandleStudy_CoresGreaterThanOne_InfersParallel()
+        public void HandleStudy_ExplicitCores_UsesSpecifiedCount()
         {
             var studyDir = CreateStudyDir("Study_0.0", "Study_5.0");
             _mockSolverService
                 .Setup(x => x.SolveStudy(studyDir, true, 8, true))
                 .Returns(new StudySolveResult { IsSuccess = true });
 
-            var model = new SolveModel { Dir = studyDir, Parallel = false, Cores = 8 };
+            var model = new SolveModel { Dir = studyDir, Cores = 8 };
             _handler.Handle(model);
 
             _mockSolverService.Verify(x => x.SolveStudy(studyDir, true, 8, true), Times.Once);
         }
 
         [Fact]
-        public void HandleStudy_CoresEqualsOne_RemainSerial()
+        public void HandleStudy_SingleCore_RunsSerial()
         {
             var studyDir = CreateStudyDir("Study_0.0");
             _mockSolverService
                 .Setup(x => x.SolveStudy(studyDir, false, 1, true))
                 .Returns(new StudySolveResult { IsSuccess = true });
 
-            var model = new SolveModel { Dir = studyDir, Parallel = false, Cores = 1 };
+            var model = new SolveModel { Dir = studyDir, Cores = 1 };
             _handler.Handle(model);
 
             _mockSolverService.Verify(x => x.SolveStudy(studyDir, false, 1, true), Times.Once);
@@ -137,17 +139,10 @@ namespace foamscript.Tests.Handlers
         // ── Default Model Values ───────────────────────────────────────────────
 
         [Fact]
-        public void SolveModel_DefaultCores_IsOne()
+        public void SolveModel_DefaultCores_IsZero()
         {
             var model = new SolveModel();
-            model.Cores.Should().Be(1);
-        }
-
-        [Fact]
-        public void SolveModel_DefaultParallel_IsFalse()
-        {
-            var model = new SolveModel();
-            model.Parallel.Should().BeFalse();
+            model.Cores.Should().Be(0);
         }
     }
 }

@@ -60,75 +60,78 @@ namespace foamscript.Tests.Handlers
             return studyDir;
         }
 
-        // ── Parallel Inference — Single Case ───────────────────────────────────
+        // ── Core Resolution — Single Case ──────────────────────────────────────
 
         [Fact]
-        public void HandleCase_CoresGreaterThanOne_InfersParallel()
+        public void HandleCase_ExplicitCores_UsesSpecifiedCount()
         {
             var caseDir = CreateCaseDir();
             _mockMeshService
                 .Setup(x => x.MeshCase(caseDir, true, 4, true, true))
                 .Returns(new MeshResult { IsSuccess = true });
 
-            var model = new MeshModel { Dir = caseDir, Parallel = false, Cores = 4, CheckQuality = true, Overwrite = true };
+            var model = new MeshModel { Dir = caseDir, Cores = 4, CheckQuality = true, Overwrite = true };
             _handler.Handle(model);
 
             _mockMeshService.Verify(x => x.MeshCase(caseDir, true, 4, true, true), Times.Once);
         }
 
         [Fact]
-        public void HandleCase_CoresEqualsOne_RemainSerial()
+        public void HandleCase_SingleCore_RunsSerial()
         {
             var caseDir = CreateCaseDir();
             _mockMeshService
                 .Setup(x => x.MeshCase(caseDir, false, 1, true, true))
                 .Returns(new MeshResult { IsSuccess = true });
 
-            var model = new MeshModel { Dir = caseDir, Parallel = false, Cores = 1, CheckQuality = true, Overwrite = true };
+            var model = new MeshModel { Dir = caseDir, Cores = 1, CheckQuality = true, Overwrite = true };
             _handler.Handle(model);
 
             _mockMeshService.Verify(x => x.MeshCase(caseDir, false, 1, true, true), Times.Once);
         }
 
         [Fact]
-        public void HandleCase_ExplicitParallel_StaysParallel()
+        public void HandleCase_ZeroCores_AutoDetectsParallel()
         {
             var caseDir = CreateCaseDir();
+            var expectedCores = Environment.ProcessorCount;
+            var expectedParallel = expectedCores > 1;
+
             _mockMeshService
-                .Setup(x => x.MeshCase(caseDir, true, 1, true, true))
+                .Setup(x => x.MeshCase(caseDir, expectedParallel, expectedCores, true, true))
                 .Returns(new MeshResult { IsSuccess = true });
 
-            var model = new MeshModel { Dir = caseDir, Parallel = true, Cores = 1, CheckQuality = true, Overwrite = true };
+            var model = new MeshModel { Dir = caseDir, Cores = 0, CheckQuality = true, Overwrite = true };
             _handler.Handle(model);
 
-            _mockMeshService.Verify(x => x.MeshCase(caseDir, true, 1, true, true), Times.Once);
+            _mockMeshService.Verify(x => x.MeshCase(caseDir, expectedParallel, expectedCores, true, true), Times.Once);
         }
 
-        // ── Parallel Inference — Study ─────────────────────────────────────────
+        // ── Core Resolution — Study ────────────────────────────────────────────
 
         [Fact]
-        public void HandleStudy_CoresGreaterThanOne_InfersParallel()
+        public void HandleStudy_ExplicitCores_UsesSpecifiedCount()
         {
             var studyDir = CreateStudyDir("Study_0.0", "Study_5.0");
             _mockMeshService
                 .Setup(x => x.MeshStudy(studyDir, true, 8, true, true, true))
                 .Returns(new StudyMeshResult { IsSuccess = true });
 
-            var model = new MeshModel { Dir = studyDir, Parallel = false, Cores = 8, CheckQuality = true, Overwrite = true };
+            var model = new MeshModel { Dir = studyDir, Cores = 8, CheckQuality = true, Overwrite = true };
             _handler.Handle(model);
 
             _mockMeshService.Verify(x => x.MeshStudy(studyDir, true, 8, true, true, true), Times.Once);
         }
 
         [Fact]
-        public void HandleStudy_CoresEqualsOne_RemainSerial()
+        public void HandleStudy_SingleCore_RunsSerial()
         {
             var studyDir = CreateStudyDir("Study_0.0");
             _mockMeshService
                 .Setup(x => x.MeshStudy(studyDir, false, 1, true, true, true))
                 .Returns(new StudyMeshResult { IsSuccess = true });
 
-            var model = new MeshModel { Dir = studyDir, Parallel = false, Cores = 1, CheckQuality = true, Overwrite = true };
+            var model = new MeshModel { Dir = studyDir, Cores = 1, CheckQuality = true, Overwrite = true };
             _handler.Handle(model);
 
             _mockMeshService.Verify(x => x.MeshStudy(studyDir, false, 1, true, true, true), Times.Once);
@@ -137,17 +140,10 @@ namespace foamscript.Tests.Handlers
         // ── Default Model Values ───────────────────────────────────────────────
 
         [Fact]
-        public void MeshModel_DefaultCores_IsOne()
+        public void MeshModel_DefaultCores_IsZero()
         {
             var model = new MeshModel();
-            model.Cores.Should().Be(1);
-        }
-
-        [Fact]
-        public void MeshModel_DefaultParallel_IsFalse()
-        {
-            var model = new MeshModel();
-            model.Parallel.Should().BeFalse();
+            model.Cores.Should().Be(0);
         }
     }
 }
