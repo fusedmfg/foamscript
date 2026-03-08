@@ -21,7 +21,7 @@ namespace foamscript.Services
         /// Runs the OpenFOAM solver on a single meshed case.
         /// Automatically detects the solver (simpleFoam, pimpleFoam, etc.) from controlDict.
         /// </summary>
-        public SolveResult SolveCase(string caseDir, bool parallel, int cores)
+        public virtual SolveResult SolveCase(string caseDir, bool parallel, int cores)
         {
             var result = new SolveResult { CaseDir = caseDir };
 
@@ -155,7 +155,7 @@ namespace foamscript.Services
         /// <summary>
         /// Runs the solver on all cases in an OpenFOAM study.
         /// </summary>
-        public StudySolveResult SolveStudy(string studyDir, bool parallel, int cores, bool continueOnError)
+        public virtual StudySolveResult SolveStudy(string studyDir, bool parallel, int cores, bool continueOnError)
         {
             var result = new StudySolveResult { StudyDir = studyDir };
 

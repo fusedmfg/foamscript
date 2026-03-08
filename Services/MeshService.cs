@@ -20,7 +20,7 @@ namespace foamscript.Services
         /// <summary>
         /// Meshes an OpenFOAM case using blockMesh and snappyHexMesh.
         /// </summary>
-        public MeshResult MeshCase(string caseDir, bool parallel, int cores, bool checkQuality, bool overwrite)
+        public virtual MeshResult MeshCase(string caseDir, bool parallel, int cores, bool checkQuality, bool overwrite)
         {
             var result = new MeshResult
             {
@@ -249,7 +249,7 @@ namespace foamscript.Services
         /// <summary>
         /// Meshes all cases in an OpenFOAM study.
         /// </summary>
-        public StudyMeshResult MeshStudy(string studyDir, bool parallel, int cores, bool checkQuality, bool overwrite, bool continueOnError)
+        public virtual StudyMeshResult MeshStudy(string studyDir, bool parallel, int cores, bool checkQuality, bool overwrite, bool continueOnError)
         {
             var result = new StudyMeshResult
             {
