@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{ study_name }} - Aerodynamic Analysis Report</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Times New Roman', 'Georgia', serif;
+    color: #333;
+    line-height: 1.6;
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 40px 60px;
+    background: #fff;
+  }
+  h1 {
+    font-size: 24px;
+    font-weight: bold;
+    text-align: center;
+    margin-bottom: 8px;
+    color: #111;
+  }
+  h2 {
+    font-size: 18px;
+    font-weight: bold;
+    margin: 30px 0 12px 0;
+    padding-bottom: 4px;
+    border-bottom: 1px solid #ccc;
+    color: #222;
+  }
+  h3 {
+    font-size: 15px;
+    font-weight: bold;
+    margin: 20px 0 8px 0;
+    color: #333;
+  }
+  .subtitle {
+    text-align: center;
+    font-size: 13px;
+    color: #666;
+    margin-bottom: 30px;
+  }
+  .metadata {
+    text-align: center;
+    font-size: 12px;
+    color: #888;
+    margin-bottom: 40px;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 12px 0 20px 0;
+    font-size: 13px;
+  }
+  th, td {
+    border: 1px solid #ddd;
+    padding: 8px 12px;
+    text-align: left;
+  }
+  th {
+    background: #f5f5f5;
+    font-weight: bold;
+    color: #222;
+  }
+  td.numeric {
+    text-align: right;
+    font-family: 'Courier New', monospace;
+  }
+  .chart-container {
+    margin: 20px 0;
+    text-align: center;
+  }
+  .chart-container svg {
+    max-width: 100%;
+    height: auto;
+  }
+  .chart-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+    justify-content: center;
+  }
+  .chart-half {
+    flex: 1;
+    min-width: 450px;
+    max-width: 550px;
+  }
+  .status-ok { color: #2ca02c; font-weight: bold; }
+  .status-fail { color: #d62728; font-weight: bold; }
+  .footer {
+    margin-top: 40px;
+    padding-top: 12px;
+    border-top: 1px solid #ccc;
+    font-size: 11px;
+    color: #999;
+    text-align: center;
+  }
+  @media print {
+    body { padding: 20px; }
+    .chart-container svg { max-width: 90%; }
+  }
+</style>
+</head>
+<body>
+
+<h1>{{ study_name }}</h1>
+<div class="subtitle">Aerodynamic Analysis Report</div>
+<div class="metadata">
+  Generated: {{ generation_date }} | FoamScript {{ version }} | Template: {{ template_name }}
+</div>
+
+<!-- Section 1: Physics & Solver Configuration -->
+<h2>1. Physics &amp; Solver Configuration</h2>
+<table>
+  <tr><th>Parameter</th><th>Value</th></tr>
+  <tr><td>Freestream velocity</td><td class="numeric">{{ velocity }} m/s</td></tr>
+  <tr><td>RPM</td><td class="numeric">{{ rpm }}</td></tr>
+  <tr><td>Turbulence intensity</td><td class="numeric">{{ turbulence_intensity }}%</td></tr>
+  <tr><td>Kinematic viscosity</td><td class="numeric">{{ nu }} m&sup2;/s</td></tr>
+  <tr><td>Turbulence model</td><td>k-&omega; SST</td></tr>
+  <tr><td>Solver</td><td>{{ solver_name }} (steady-state RANS)</td></tr>
+  <tr><td>Max iterations</td><td class="numeric">{{ max_iterations }}</td></tr>
+  <tr><td>Refinement levels</td><td class="numeric">{{ refinement_min }}&ndash;{{ refinement_max }}</td></tr>
+  <tr><td>Boundary layers</td><td>8 layers, expansion ratio 1.2</td></tr>
+</table>
+
+<!-- Section 2: Mesh Summary -->
+<h2>2. Mesh Summary</h2>
+<table>
+  <tr>
+    <th>Case</th>
+    <th>AoA (&deg;)</th>
+    <th>Cells</th>
+    <th>Points</th>
+    <th>Faces</th>
+    <th>Quality</th>
+  </tr>
+  {{ for case_mesh in mesh_stats }}
+  <tr>
+    <td>{{ case_mesh.case_name }}</td>
+    <td class="numeric">{{ case_mesh.aoa }}</td>
+    <td class="numeric">{{ case_mesh.cells }}</td>
+    <td class="numeric">{{ case_mesh.points }}</td>
+    <td class="numeric">{{ case_mesh.faces }}</td>
+    <td class="{{ if case_mesh.quality_passed }}status-ok{{ else }}status-fail{{ end }}">
+      {{ if case_mesh.quality_passed }}Passed{{ else }}Failed{{ end }}
+    </td>
+  </tr>
+  {{ end }}
+</table>
+
+<!-- Section 3: Aerodynamic Coefficient Polars -->
+<h2>3. Aerodynamic Coefficient Polars</h2>
+
+<div class="chart-row">
+  <div class="chart-half">
+    <div class="chart-container">{{ cl_vs_aoa_chart }}</div>
+  </div>
+  <div class="chart-half">
+    <div class="chart-container">{{ cd_vs_aoa_chart }}</div>
+  </div>
+</div>
+
+<div class="chart-row">
+  <div class="chart-half">
+    <div class="chart-container">{{ cm_vs_aoa_chart }}</div>
+  </div>
+  <div class="chart-half">
+    <div class="chart-container">{{ ld_vs_aoa_chart }}</div>
+  </div>
+</div>
+
+<div class="chart-container">
+  {{ drag_polar_chart }}
+</div>
+
+<!-- Section 4: Coefficient Summary -->
+<h2>4. Coefficient Summary</h2>
+<table>
+  <tr>
+    <th>AoA (&deg;)</th>
+    <th>C<sub>D</sub></th>
+    <th>C<sub>L</sub></th>
+    <th>C<sub>m,pitch</sub></th>
+    <th>L/D</th>
+    <th>Status</th>
+  </tr>
+  {{ for case_result in cases }}
+  <tr>
+    <td class="numeric">{{ case_result.aoa }}</td>
+    <td class="numeric">{{ case_result.cd }}</td>
+    <td class="numeric">{{ case_result.cl }}</td>
+    <td class="numeric">{{ case_result.cm }}</td>
+    <td class="numeric">{{ case_result.ld }}</td>
+    <td class="{{ if case_result.converged }}status-ok{{ else }}status-fail{{ end }}">
+      {{ if case_result.converged }}OK{{ else }}FAIL{{ end }}
+    </td>
+  </tr>
+  {{ end }}
+</table>
+
+<!-- Section 5: Convergence History -->
+<h2>5. Convergence History</h2>
+{{ for convergence in convergence_charts }}
+<h3>{{ convergence.case_name }}</h3>
+<div class="chart-container">{{ convergence.chart }}</div>
+{{ end }}
+
+<div class="footer">
+  Generated by FoamScript {{ version }} &mdash; AIAA-standard aerodynamic analysis report
+</div>
+
+</body>
+</html>

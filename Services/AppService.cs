@@ -12,7 +12,7 @@ namespace foamscript
         private readonly NewStudyHandler _newStudyHandler;
         private readonly MeshHandler _meshHandler;
         private readonly SolveHandler _solveHandler;
-        private readonly ResultsHandler _resultsHandler;
+        private readonly ReportHandler _reportHandler;
         private readonly ListTemplatesHandler _listTemplatesHandler;
 
         public AppService(
@@ -23,7 +23,7 @@ namespace foamscript
             NewStudyHandler newStudyHandler,
             MeshHandler meshHandler,
             SolveHandler solveHandler,
-            ResultsHandler resultsHandler,
+            ReportHandler reportHandler,
             ListTemplatesHandler listTemplatesHandler)
         {
             _loggingService = loggingService;
@@ -33,7 +33,7 @@ namespace foamscript
             _newStudyHandler = newStudyHandler;
             _meshHandler = meshHandler;
             _solveHandler = solveHandler;
-            _resultsHandler = resultsHandler;
+            _reportHandler = reportHandler;
             _listTemplatesHandler = listTemplatesHandler;
         }
 
@@ -49,7 +49,7 @@ namespace foamscript
                     NewStudyModel m => _newStudyHandler.Handle(m),
                     MeshModel m => _meshHandler.Handle(m),
                     SolveModel m => _solveHandler.Handle(m),
-                    ResultsModel m => _resultsHandler.Handle(m),
+                    ReportModel m => _reportHandler.Handle(m),
                     ListTemplatesModel m => _listTemplatesHandler.Handle(m),
                     _ => throw new NotImplementedException($"The verb of type {model.GetType().Name} is not implemented.")
                 };

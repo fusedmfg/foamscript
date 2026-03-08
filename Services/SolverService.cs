@@ -84,6 +84,9 @@ namespace foamscript.Services
                     var solverArgs = $"-np {cores} {solverName} -case {caseDir} -parallel";
                     var solverResult = _processExecutor.Execute("mpirun", solverArgs);
 
+                    // Persist solver log for report generation
+                    PersistSolverLog(caseDir, solverName, solverResult.Output);
+
                     if (solverResult.ExitCode != 0)
                     {
                         result.IsSuccess = false;
@@ -112,6 +115,9 @@ namespace foamscript.Services
                     // Run solver in serial
                     Console.WriteLine($"Running {solverName}...");
                     var solverResult = _processExecutor.Execute(solverName, $"-case {caseDir}");
+
+                    // Persist solver log for report generation
+                    PersistSolverLog(caseDir, solverName, solverResult.Output);
 
                     if (solverResult.ExitCode != 0)
                     {
@@ -370,6 +376,26 @@ namespace foamscript.Services
             foreach (var dir in processorDirs)
             {
                 Directory.Delete(dir, recursive: true);
+            }
+        }
+
+        /// <summary>
+        /// Saves solver stdout to a log file in the case directory (e.g., log.simpleFoam).
+        /// This is standard OpenFOAM practice and provides residual data for report generation.
+        /// </summary>
+        private static void PersistSolverLog(string caseDir, string solverName, string? output)
+        {
+            if (string.IsNullOrEmpty(output))
+                return;
+
+            try
+            {
+                var logPath = Path.Combine(caseDir, $"log.{solverName}");
+                File.WriteAllText(logPath, output);
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"Failed to write solver log: {ex.Message}");
             }
         }
 

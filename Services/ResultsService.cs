@@ -12,7 +12,7 @@ namespace foamscript.Services
         /// <summary>
         /// Extracts force coefficient results from all cases in a study directory.
         /// </summary>
-        public ResultsSummary ExtractResults(string studyDir, string format, double averageWindow)
+        public ResultsSummary ExtractResults(string studyDir, double averageWindow = 0.1)
         {
             var summary = new ResultsSummary { StudyDir = studyDir };
 

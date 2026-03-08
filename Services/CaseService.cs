@@ -29,7 +29,13 @@ namespace foamscript.Services
             try
             {
                 result.StudyName = config.ProjectName;
-                result.StudyDir = Path.GetFullPath(Path.Combine(config.OutputDir, config.ProjectName));
+
+                // Avoid double nesting when output dir already ends with project name
+                // e.g., --output-dir /run/MyStudy --project-name MyStudy → /run/MyStudy (not /run/MyStudy/MyStudy)
+                var outputDirName = Path.GetFileName(Path.GetFullPath(config.OutputDir));
+                result.StudyDir = string.Equals(outputDirName, config.ProjectName, StringComparison.OrdinalIgnoreCase)
+                    ? Path.GetFullPath(config.OutputDir)
+                    : Path.GetFullPath(Path.Combine(config.OutputDir, config.ProjectName));
 
                 // Validate template exists
                 if (!Directory.Exists(templatePath))

@@ -65,7 +65,7 @@ namespace foamscript.Tests.Services
         [Fact]
         public void ExtractResults_NonExistentDir_ReturnsFailure()
         {
-            var result = _service.ExtractResults("/nonexistent/study", "table", 0.1);
+            var result = _service.ExtractResults("/nonexistent/study", 0.1);
 
             result.IsSuccess.Should().BeFalse();
             result.ErrorMessage.Should().Contain("not found");
@@ -78,7 +78,7 @@ namespace foamscript.Tests.Services
             Directory.CreateDirectory(studyDir);
             _tempDirs.Add(studyDir);
 
-            var result = _service.ExtractResults(studyDir, "table", 0.1);
+            var result = _service.ExtractResults(studyDir, 0.1);
 
             result.IsSuccess.Should().BeFalse();
             result.ErrorMessage.Should().Contain("No valid OpenFOAM cases");
@@ -97,7 +97,7 @@ namespace foamscript.Tests.Services
                 ("Study_0.0", coeffData),
                 ("Study_5.0", coeffData));
 
-            var result = _service.ExtractResults(studyDir, "table", 0.1);
+            var result = _service.ExtractResults(studyDir, 0.1);
 
             result.IsSuccess.Should().BeTrue();
             result.Cases.Should().HaveCount(2);
@@ -117,7 +117,7 @@ namespace foamscript.Tests.Services
                 ("Study_-5.0", coeffData),
                 ("Study_0.0", coeffData));
 
-            var result = _service.ExtractResults(studyDir, "table", 0.1);
+            var result = _service.ExtractResults(studyDir, 0.1);
 
             result.Cases[0].AngleOfAttack.Should().Be(-5.0);
             result.Cases[1].AngleOfAttack.Should().Be(0.0);
@@ -129,7 +129,7 @@ namespace foamscript.Tests.Services
         {
             var studyDir = CreateStudyWithResults(("Study_0.0", null!));
 
-            var result = _service.ExtractResults(studyDir, "table", 0.1);
+            var result = _service.ExtractResults(studyDir, 0.1);
 
             result.IsSuccess.Should().BeTrue();
             result.Cases.Should().HaveCount(1);

@@ -71,6 +71,10 @@ namespace foamscript
                 builder.Services.AddTransient<MeshService>();
                 builder.Services.AddTransient<SolverService>();
                 builder.Services.AddTransient<ResultsService>();
+                builder.Services.AddTransient<ReportService>();
+                builder.Services.AddTransient<ChartGenerator>();
+                builder.Services.AddTransient<HtmlReportGenerator>();
+                builder.Services.AddTransient<PdfReportGenerator>();
 
                 // Command handlers.
                 builder.Services.AddTransient<ValidateHandler>();
@@ -79,7 +83,7 @@ namespace foamscript
                 builder.Services.AddTransient<NewStudyHandler>();
                 builder.Services.AddTransient<MeshHandler>();
                 builder.Services.AddTransient<SolveHandler>();
-                builder.Services.AddTransient<ResultsHandler>();
+                builder.Services.AddTransient<ReportHandler>();
                 builder.Services.AddTransient<ListTemplatesHandler>();
 
                 builder.Services.AddTransient<AppService>();
