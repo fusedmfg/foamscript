@@ -19,11 +19,11 @@ foamscript new-study \
   -a -5,0,5,10 \
   --velocity 20 --rpm 1000 --input-units mm --cores 4
 
-# Mesh all cases in parallel
-foamscript mesh-study -d ~/OpenFOAM/$USER-v2512/run/DiscAnalysis --parallel --cores 4
+# Mesh all cases (auto-detects CPU cores, runs parallel)
+foamscript mesh -d ~/OpenFOAM/$USER-v2512/run/DiscAnalysis
 
 # Solve all cases
-foamscript solve-study -d ~/OpenFOAM/$USER-v2512/run/DiscAnalysis --parallel --cores 4
+foamscript solve -d ~/OpenFOAM/$USER-v2512/run/DiscAnalysis
 
 # Generate AIAA-quality analysis report (HTML + PDF)
 foamscript report -d ~/OpenFOAM/$USER-v2512/run/DiscAnalysis
@@ -38,6 +38,7 @@ foamscript new-study --config study.json
 - **AIAA-Quality Reports**: Publication-standard HTML + PDF reports with aerodynamic polars, drag polar, convergence history, mesh statistics, and coefficient tables
 - **Configurable Physics**: Turbulence intensity, viscosity, end time, refinement levels — all via CLI or JSON (AIAA defaults: TI 1%, PBiCGStab+DILU, refinement 5/6, 8 boundary layers)
 - **Configurable Domain**: Tunnel sizing, rotor scaling, mesh resolution — defaults follow CFD convention (5D upstream, 10D downstream, 5D radial)
+- **Auto-Parallel**: Detects CPU cores automatically; `--cores N` to override, `FOAMSCRIPT_MAX_CORES` env var to cap
 - **Parallel Meshing**: blockMesh → surfaceFeatureExtract → decomposePar → snappyHexMesh (MPI) → reconstructParMesh
 - **Parallel Solving**: decomposePar → simpleFoam (MPI) → reconstructPar
 - **Post-Processing**: Force coefficient extraction (Cd, Cl, CmPitch) with time-window averaging and Cl/Cd ratio
@@ -73,7 +74,7 @@ See **[Commands.md](Docs/Commands.md)** for full reference with all options, JSO
 
 ```bash
 dotnet build
-dotnet test    # 169 tests
+dotnet test    # 192 tests
 ```
 
 ### Deploy to Linux
@@ -119,7 +120,7 @@ foamscript/
 │   ├── external_disc_rotatingwall_steady/
 │   └── report/report.html
 ├── Docs/Commands.md     # Full command reference
-├── foamscript.Tests/    # xUnit + Moq + FluentAssertions (169 tests)
+├── foamscript.Tests/    # xUnit + Moq + FluentAssertions (192 tests)
 └── study.example.jsonc  # Example JSON config file
 ```
 

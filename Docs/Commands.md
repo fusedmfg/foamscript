@@ -426,19 +426,20 @@ foamscript mesh [OPTIONS]
 | Option | Short | Description | Default |
 |--------|-------|-------------|---------|
 | `--dir` | `-d` | Path to case or study directory (required) | - |
-| `--parallel` | `-p` | Run snappyHexMesh in parallel with MPI | `false` |
-| `--cores` | | Number of CPU cores for parallel execution | `4` |
+| `--cores` | | Number of CPU cores (0 = auto-detect all available) | `0` |
 | `--check-quality` | | Run checkMesh after meshing | `true` |
 | `--overwrite` | | Overwrite existing mesh | `true` |
 
+Parallel mode is enabled automatically when cores > 1. Set `FOAMSCRIPT_MAX_CORES` environment variable to cap auto-detected core count.
+
 ### Workflow
 
-**Serial:**
+**Serial (1 core):**
 1. `blockMesh` — background hex mesh
 2. `surfaceFeatureExtract` — extract edge features for snapping
 3. `snappyHexMesh -overwrite` — hex-dominant mesh with refinement
 
-**Parallel:**
+**Parallel (2+ cores):**
 1. `blockMesh` — background hex mesh
 2. `surfaceFeatureExtract` — extract edge features
 3. `decomposePar -no-fields` — decompose mesh (no field data)
@@ -450,19 +451,19 @@ Optional: `checkMesh` for quality validation.
 
 ### Examples
 
-**Mesh a single case in serial:**
+**Mesh a study (auto-detects all CPU cores):**
 ```bash
-foamscript mesh -d ~/studies/MyStudy/MyStudy_0.0
+foamscript mesh -d ~/studies/MyStudy
 ```
 
-**Mesh entire study in parallel with 8 cores:**
+**Mesh with explicit core count:**
 ```bash
-foamscript mesh -d ~/studies/MyStudy --parallel --cores 8
+foamscript mesh -d ~/studies/MyStudy --cores 8
 ```
 
-**Skip quality check for faster iteration:**
+**Force serial for debugging:**
 ```bash
-foamscript mesh -d ~/studies/MyStudy/MyStudy_0.0 --parallel --cores 4 --check-quality false
+foamscript mesh -d ~/studies/MyStudy/MyStudy_0.0 --cores 1 --check-quality false
 ```
 
 ### Output
@@ -487,15 +488,16 @@ foamscript solve [OPTIONS]
 | Option | Short | Description | Default |
 |--------|-------|-------------|---------|
 | `--dir` | `-d` | Path to meshed case or study directory (required) | - |
-| `--parallel` | `-p` | Run solver in parallel with MPI | `false` |
-| `--cores` | | Number of CPU cores for parallel execution | `4` |
+| `--cores` | | Number of CPU cores (0 = auto-detect all available) | `0` |
+
+Parallel mode is enabled automatically when cores > 1. Set `FOAMSCRIPT_MAX_CORES` environment variable to cap auto-detected core count.
 
 ### Workflow
 
-**Serial:**
+**Serial (1 core):**
 1. `<solver> -case <dir>` — run detected solver
 
-**Parallel:**
+**Parallel (2+ cores):**
 1. `decomposePar -case <dir>` — decompose with fields
 2. `mpirun -np <cores> <solver> -case <dir> -parallel` — run solver
 3. `reconstructPar -case <dir>` — reassemble time directories
@@ -504,14 +506,19 @@ After solving, force coefficients (Cd, Cl, CmPitch) are extracted from `postProc
 
 ### Examples
 
-**Solve a single case in serial:**
+**Solve a study (auto-detects all CPU cores):**
 ```bash
-foamscript solve -d ~/studies/MyStudy/MyStudy_0.0
+foamscript solve -d ~/studies/MyStudy
 ```
 
-**Solve entire study in parallel with 8 cores:**
+**Solve with explicit core count:**
 ```bash
-foamscript solve -d ~/studies/MyStudy --parallel --cores 8
+foamscript solve -d ~/studies/MyStudy --cores 8
+```
+
+**Force serial for debugging:**
+```bash
+foamscript solve -d ~/studies/MyStudy/MyStudy_0.0 --cores 1
 ```
 
 ### Output
@@ -625,22 +632,14 @@ foamscript new-study \
   --input-units mm \
   --cores 8
 
-# 3. Mesh all cases in parallel
-foamscript mesh \
-  -d ~/studies/DiscAnalysis \
-  --parallel \
-  --cores 8 \
-  --check-quality
+# 3. Mesh all cases (auto-detects cores, runs parallel)
+foamscript mesh -d ~/studies/DiscAnalysis
 
 # 4. Solve all cases
-foamscript solve \
-  -d ~/studies/DiscAnalysis \
-  --parallel \
-  --cores 8
+foamscript solve -d ~/studies/DiscAnalysis
 
-# 5. Extract results
-foamscript results -d ~/studies/DiscAnalysis --format table
-foamscript results -d ~/studies/DiscAnalysis --format csv > results.csv
+# 5. Generate report
+foamscript report -d ~/studies/DiscAnalysis
 ```
 
 ### Using a Config File for Repeatable Studies
@@ -663,10 +662,10 @@ EOF
 # Run study from config
 foamscript new-study --config ~/studies/disc_study.json
 
-# Mesh, solve, results
-foamscript mesh -d ~/studies/DiscAnalysis --parallel --cores 8
-foamscript solve -d ~/studies/DiscAnalysis --parallel --cores 8
-foamscript results -d ~/studies/DiscAnalysis
+# Mesh, solve, report
+foamscript mesh -d ~/studies/DiscAnalysis
+foamscript solve -d ~/studies/DiscAnalysis
+foamscript report -d ~/studies/DiscAnalysis
 ```
 
 ### Standalone Geometry Processing
