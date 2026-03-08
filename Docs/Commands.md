@@ -10,7 +10,7 @@ Complete reference for all FoamScript commands with explanations and examples.
 - [new-study](#new-study) - Create OpenFOAM study with angle of attack sweep
 - [mesh](#mesh) - Mesh a case or study directory
 - [solve](#solve) - Run solver on a case or study directory
-- [results](#results) - Extract force coefficients from a case or study
+- [report](#report) - Generate AIAA-quality analysis report (HTML + PDF)
 - [list-templates](#list-templates) - List available templates
 
 ---
@@ -533,14 +533,14 @@ foamscript solve -d ~/studies/MyStudy/MyStudy_0.0 --cores 1
 
 ---
 
-## results
+## report
 
-Extracts and summarizes force coefficients from a completed case or study. Reads `postProcessing/forces/0/coefficient.dat` from each case and computes time-averaged Cd, Cl, CmPitch, and Cl/Cd ratio. Auto-detects whether the path is a single case or a study directory.
+Generates publication-quality analysis reports from a completed case or study. Produces HTML (self-contained with embedded SVG charts) and/or PDF reports with aerodynamic polar charts, drag polar, convergence history, mesh statistics, physics configuration, and coefficient tables.
 
 ### Usage
 
 ```bash
-foamscript results [OPTIONS]
+foamscript report [OPTIONS]
 ```
 
 ### Options
@@ -548,52 +548,53 @@ foamscript results [OPTIONS]
 | Option | Short | Description | Default |
 |--------|-------|-------------|---------|
 | `--dir` | `-d` | Path to case or study directory (required) | - |
-| `--format` | `-f` | Output format: `table`, `csv`, `json` | `table` |
+| `--format` | `-f` | Output format: `html`, `pdf`, or `both` | `both` |
+| `--output` | `-o` | Output directory | `{study_dir}/report/` |
 | `--average-window` | | Fraction of simulation to average over (0.1 = last 10%) | `0.1` |
+
+### Report Contents
+
+- **Aerodynamic polars**: Cl, Cd, CmPitch, and L/D vs angle of attack
+- **Drag polar**: Cl vs Cd
+- **Convergence history**: Residual plots from solver logs (Ux, Uy, Uz, p, k, omega)
+- **Mesh statistics**: Cell counts per case
+- **Physics configuration**: Velocity, RPM, turbulence intensity, viscosity, solver, refinement levels
+- **Coefficient table**: Time-averaged Cd, Cl, CmPitch, Cl/Cd for all angles
 
 ### Examples
 
-**Table output (default):**
+**Generate both HTML and PDF (default):**
 ```bash
-foamscript results -d ~/studies/MyStudy
+foamscript report -d ~/studies/MyStudy
 ```
 
-**CSV export for spreadsheet analysis:**
+**HTML only:**
 ```bash
-foamscript results -d ~/studies/MyStudy --format csv > results.csv
+foamscript report -d ~/studies/MyStudy --format html
 ```
 
-**JSON export for programmatic use:**
+**Custom output directory:**
 ```bash
-foamscript results -d ~/studies/MyStudy --format json > results.json
+foamscript report -d ~/studies/MyStudy -o ~/reports
 ```
 
 **Average over last 20% of simulation:**
 ```bash
-foamscript results -d ~/studies/MyStudy --average-window 0.2
+foamscript report -d ~/studies/MyStudy --average-window 0.2
 ```
 
-### Output Formats
+### Output
 
-**Table:**
-```
-AoA (°)   Cd         Cl         Cl/Cd      CmPitch
--------   ------     ------     ------     --------
--5.0      0.045123   -0.123456  -2.7361    0.012345
- 0.0      0.042000    0.001234   0.0294    0.000123
- 5.0      0.046789    0.125678   2.6862    -0.011234
-10.0      0.055432    0.248901   4.4903    -0.023456
-```
-
-**CSV:** Comma-separated with header row, suitable for Excel/Sheets import.
-
-**JSON:** Array of objects with `angle`, `cd`, `cl`, `clCdRatio`, `cmPitch` fields.
+Reports are saved to `{study_dir}/report/` by default:
+- `{StudyName}_report.html` — self-contained HTML with inline CSS and embedded SVG charts
+- `{StudyName}_report.pdf` — publication-quality PDF with embedded PNG charts
 
 ### Notes
 
-- Cases must be solved before extracting results
-- The `--average-window` controls what fraction of the simulation time is used for averaging (e.g., 0.1 = last 10% of timesteps)
-- Failed or incomplete cases are reported with warnings
+- Cases must be solved before generating reports
+- Convergence plots require solver log files (`log.simpleFoam`, etc.) in each case directory
+- The `--average-window` controls what fraction of the simulation time is used for averaging coefficients
+- Single-case and multi-case studies are both supported
 
 ---
 
@@ -763,5 +764,5 @@ Check that:
 
 - Check that the simulation ran to completion (look at log output)
 - Increase `--end-time` if the simulation needs more time to develop
-- Try a larger `--average-window` (e.g., 0.2) if results are noisy
+- Try a larger `--average-window` (e.g., 0.2) if coefficients are noisy
 - Verify the `forceCoeffs` function object is present in `system/controlDict`
