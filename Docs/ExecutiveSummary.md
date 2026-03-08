@@ -1,8 +1,10 @@
 # FoamScript Executive Summary
 
-**Date:** March 5, 2026
-**Version:** 0.2.0 (Validated Pipeline with Grid Convergence)
+**Last Updated:** March 8, 2026
+**Version:** 0.3.0 (AIAA Reports + Auto-Parallel)
 **Repository:** [fusedmfg/foamscript](https://github.com/fusedmfg/foamscript) (private)
+
+*This is a living document revised alongside development. It serves two purposes: (1) document what FoamScript is and how it solves OpenFOAM complexity, and (2) provide an honest narrative on developing this application using a human/AI pair-coding approach.*
 
 ---
 
@@ -33,7 +35,7 @@ FoamScript collapses this entire workflow into four commands:
 foamscript new-study --model-source disc.step --angles 0,5,10 --velocity 30 --rpm 5000
 foamscript mesh -d ./DiscStudy
 foamscript solve -d ./DiscStudy
-foamscript results -d ./DiscStudy
+foamscript report -d ./DiscStudy
 ```
 
 **Key capabilities:**
@@ -43,11 +45,12 @@ foamscript results -d ./DiscStudy
 | **STEP-to-STL Conversion** | Automated CAD conversion via gmsh with unit detection and scaling |
 | **Domain Generation** | Auto-sized wind tunnel from geometry bounding box (10x/5x/5x extents) |
 | **Template System** | Scriban-powered OpenFOAM dictionary generation from parameterized templates |
-| **Parallel Meshing** | blockMesh → surfaceFeatureExtract → decomposePar → snappyHexMesh (MPI) → reconstruct |
+| **Parallel Meshing** | blockMesh → surfaceOrient → surfaceFeatureExtract → decomposePar → snappyHexMesh (MPI) → reconstruct |
 | **Template-Aware Solving** | Auto-detects solver (simpleFoam/pimpleFoam) from controlDict |
 | **Parametric Studies** | Generate and process multiple angle-of-attack cases automatically |
 | **Auto-Detection** | Single `-d` flag intelligently detects case vs. study directories |
-| **Results Extraction** | Force coefficients (Cd, Cl, CmPitch, Cl/Cd ratio) in table, CSV, or JSON |
+| **Auto-Parallel** | CPU cores auto-detected; `--cores N` to override, `FOAMSCRIPT_MAX_CORES` env var to cap |
+| **AIAA-Quality Reports** | Publication-standard HTML + PDF reports with aerodynamic polars, convergence history, mesh statistics, and coefficient tables |
 | **Environment Validation** | Pre-flight checks for OpenFOAM, gmsh, and system dependencies |
 
 ### Validation Status
@@ -98,13 +101,14 @@ Cl/Cd ratio converged to <0.3% across all levels. Default set to Medium (5,6).
 - **Error reduction:** Parameterized templates eliminate hand-editing of OpenFOAM dictionaries
 - **Reproducibility:** Every study is version-controlled and parameter-tracked
 - **Accessibility:** Engineers unfamiliar with OpenFOAM internals can run simulations
+- **Publication-ready output:** AIAA-quality HTML and PDF reports with aerodynamic polars, convergence history, and coefficient tables
 
 ### For Product Development Teams
 
 - **Parametric sweeps:** Test dozens of design variants with a single command
 - **Structured output:** JSON/CSV export for integration with design databases
 - **Consistency:** Same mesh settings, solver parameters, and quality checks every run
-- **Parallel execution:** Multi-core meshing and solving out of the box
+- **Auto-parallel:** CPU cores detected automatically; no manual configuration needed
 
 ### For Organizations
 
@@ -156,15 +160,16 @@ FoamScript was built using **Claude Code** (Anthropic's AI coding agent) as the 
 ┌─────────────────────────────────────────────────┐
 │           PROJECT STATISTICS AT A GLANCE         │
 ├─────────────────────────────────────────────────┤
-│  Development Period    19 days (Feb 15-Mar 5)    │
-│  Total Commits         83                        │
-│  AI Co-Authored        69 / 83 (83.1%)           │
-│  Total C# Lines        8,086                     │
-│  Production Code       4,532 lines               │
-│  Test Code             3,554 lines               │
-│  Test/Production Ratio 78.4%                     │
+│  Development Period    22 days (Feb 15-Mar 8)    │
+│  Active Days           10                        │
+│  Total Commits         94                        │
+│  AI Co-Authored        80 / 94 (85.1%)           │
+│  Total C# Lines        10,491                    │
+│  Production Code       6,014 lines               │
+│  Test Code             4,477 lines               │
+│  Test/Production Ratio 74.5%                     │
 │  Passing Tests         192                       │
-│  Template Files        41                        │
+│  Template Files        42                        │
 │  GitHub Issues         30 (25 closed, 5 open)    │
 └─────────────────────────────────────────────────┘
 ```
@@ -173,11 +178,11 @@ FoamScript was built using **Claude Code** (Anthropic's AI coding agent) as the 
 
 | Model | Commits | Share |
 |-------|---------|-------|
-| Claude Sonnet 4.5 | 32 | 46.4% |
-| Claude Opus 4.6 | 26 | 37.7% |
-| Claude Sonnet 4.6 | 11 | 15.9% |
-| **Total AI** | **69** | **83.1%** |
-| Human-only | 14 | 16.9% |
+| Claude Opus 4.6 | 37 | 46.3% |
+| Claude Sonnet 4.5 | 32 | 40.0% |
+| Claude Sonnet 4.6 | 11 | 13.8% |
+| **Total AI** | **80** | **85.1%** |
+| Human-only | 14 | 14.9% |
 
 ### Development Timeline
 
@@ -192,42 +197,44 @@ Feb 19-22      0     (No development)
 Feb 23 (Su)    5     SSH config, remote testing
 Feb 24 (Mo)   15     Refactoring, AMI debugging, MRF migration
 Feb 25 (Tu)    3     CLI unification, axis fix, validation
-Feb 26-Mar 2   0     BLOCKED — $20/mo usage limit hit (see §8.3)
-Mar 3-4        2     Sign reversal fix, surfaceOrient, rotatingWallVelocity
-Mar 5          2     Coefficient parsing fix, template upgrade, grid convergence
+Feb 26-Mar 4   0     BLOCKED — usage limit hit (see §8.3)
+Mar 5 (We)     5     Coefficient parsing, template upgrade, grid convergence
+Mar 6-7        2     Audit remediation, template rename, v2512 test fixtures
+Mar 8 (Sa)     9     Report command, auto-parallel, documentation audit
 ──────────  ───────  ─────────────────────────────────────────
-Total         83     Validated pipeline with grid convergence
+Total         94     Full pipeline with AIAA reports + auto-parallel
 ```
 
 ### Code Distribution
 
 ```
-Production Code by Component (4,479 lines):
+Production Code by Component (6,014 lines):
 
-  MeshService          451 ████████████████████████  10.1%
-  DomainService        354 ██████████████████        7.9%
-  SolverService        354 ██████████████████        7.9%
-  StlConversionService 340 █████████████████         7.6%
-  CaseService          328 ████████████████          7.3%
-  NewStudyHandler      257 █████████████             5.7%
-  EnvironmentService   234 ████████████              5.2%
-  MeshHandler          159 ████████                  3.6%
-  ResultsService       145 ███████                   3.2%
-  SolveHandler         132 ██████                    2.9%
-  Other (25 files)   1,725 ███████████████████████████████████████ 38.5%
+  MeshService          472 ██████████████████        7.8%
+  SolverService        412 ████████████████          6.9%
+  ReportService        407 ███████████████           6.8%
+  PdfReportGenerator   359 █████████████             6.0%
+  DomainService        355 █████████████             5.9%
+  StlConversionService 341 ████████████              5.7%
+  CaseService          335 ████████████              5.6%
+  ChartGenerator       320 ████████████              5.3%
+  NewStudyHandler      274 ██████████                4.6%
+  EnvironmentService   234 █████████                 3.9%
+  Other (30 files)   2,505 ███████████████████████████████████████ 41.7%
 
-Test Code by Component (3,458 lines):
+Test Code by Component (4,477 lines):
 
-  MeshServiceTests         704 ████████████████████  20.4%
-  GeometryServiceTests     486 ██████████████        14.1%
-  SolverServiceTests       434 ████████████          12.6%
-  CaseServiceTests         449 █████████████         13.0%
-  EnvironmentServiceTests  361 ██████████            10.4%
-  ResultsServiceTests      248 ███████               7.2%
-  TemplateServiceTests     243 ███████               7.0%
-  NewStudyHandlerTests     241 ███████               7.0%
-  StlScalingIntegTests     223 ██████                6.4%
-  CaseDiscoveryTests        69 ██                    2.0%
+  MeshServiceTests         732 ████████████████████  16.3%
+  SolverServiceTests       503 █████████████         11.2%
+  GeometryServiceTests     487 █████████████         10.9%
+  CaseServiceTests         448 ████████████          10.0%
+  EnvironmentServiceTests  361 ██████████             8.1%
+  ResidualParserTests      271 ███████                6.1%
+  ResultsServiceTests      250 ███████                5.6%
+  TemplateServiceTests     243 ██████                 5.4%
+  NewStudyHandlerTests     241 ██████                 5.4%
+  ChartGeneratorTests      222 ██████                 5.0%
+  Other (4 files)          719 ████████████████████  16.1%
 ```
 
 ---
@@ -273,6 +280,34 @@ The CLI unification was executed efficiently because a detailed plan was reviewe
 **4. SSH/remote execution is fragile in AI workflows**
 Remote Linux testing required explicit instructions about SSH keys, environment sourcing, and stdout capture. AI agents struggle with non-interactive SSH sessions. Pre-configured CI/CD pipelines would be more reliable.
 
+### 5.3 AI vs. Traditional Development Comparison
+
+```
+Metric                     AI-Assisted    Traditional (Est.)    Ratio
+─────────────────────────  ─────────────  ──────────────────    ─────
+Calendar time              22 days        8-12 weeks            3-4x faster
+Active coding days         10 days        30-40 days            3-4x fewer
+Lines of code produced     10,491         10,491                Same output
+Test/Production ratio      74.5%          40-60% (typical)      Higher
+Refactoring confidence     High           Moderate              Better
+Documentation              Comprehensive  Often deferred        Better
+Cross-file consistency     High           Variable              Better
+Domain knowledge required  Same           Same                  No change
+Debugging novel issues     Moderate       High                  Worse for AI
+Architecture decisions     Human-driven   Human-driven          No change
+```
+
+**Key finding:** AI assistance compressed approximately 8-12 weeks of solo developer effort into 22 calendar days (10 active). The acceleration was most dramatic for:
+- Boilerplate generation (models, handlers, DI wiring) — 10x faster
+- Test writing — 5x faster
+- Refactoring across multiple files — 5x faster
+- Documentation — 3x faster
+
+The acceleration was minimal for:
+- Debugging physics/simulation failures (AMI instability) — similar time
+- Architecture decisions — similar time
+- Linux environment configuration — similar time
+
 ### 5.4 Critical Oversight: Tests That Validated Assumptions, Not Reality
 
 **The coefficient.dat column parsing bug** is the most significant quality failure in this project and warrants detailed examination because it reveals a systemic risk with AI-generated test suites.
@@ -289,33 +324,31 @@ Remote Linux testing required explicit instructions about SSH keys, environment 
 3. **Test count is not test quality.** 142 passing tests provided false confidence. The metric that matters is whether tests validate against ground truth, not whether they pass.
 4. **Human review of test data is essential.** The engineer should have asked: "Does this test data look like real OpenFOAM output?" — a question that would have revealed the format mismatch instantly.
 
-### 5.3 AI vs. Traditional Development Comparison
+### 5.5 Documentation Staleness Is a Silent Defect
 
-```
-Metric                     AI-Assisted    Traditional (Est.)    Ratio
-─────────────────────────  ─────────────  ──────────────────    ─────
-Calendar time              10 days        6-8 weeks             4-6x faster
-Active coding sessions     ~7 sessions    ~30 sessions          4x fewer
-Lines of code produced     7,937          7,937                 Same output
-Test coverage              77.2%          40-60% (typical)      Higher
-Refactoring confidence     High           Moderate              Better
-Documentation              Comprehensive  Often deferred        Better
-Cross-file consistency     High           Variable              Better
-Domain knowledge required  Same           Same                  No change
-Debugging novel issues     Moderate       High                  Worse for AI
-Architecture decisions     Human-driven   Human-driven          No change
-```
+**Example configs with old defaults silently override production behavior.** The `study.example.jsonc` file shipped with defaults from an early development iteration — `cores: 4` (should be `0` for auto-detect), `turbulenceIntensity: 0.05` (should be `0.01`), `refinementLevelMin: 3` (should be `5`), and a template name that no longer existed (`external_disc_rotating-ami_transient`). Users copying the example file would silently get inferior physics settings with no warning.
 
-**Key finding:** AI assistance compressed approximately 6-8 weeks of solo developer effort into 10 calendar days. The acceleration was most dramatic for:
-- Boilerplate generation (models, handlers, DI wiring) — 10x faster
-- Test writing — 5x faster
-- Refactoring across multiple files — 5x faster
-- Documentation — 3x faster
+Similarly, the `convert` command documentation in `Commands.md` listed `--input-units` with a default of `mm` (actual: `m`), `--mesh-size` with a default of `0.05` (actual: `1.0`), and used named options (`--input`, `--output`) instead of the actual positional arguments. These errors persisted for weeks undetected.
 
-The acceleration was minimal for:
-- Debugging physics/simulation failures (AMI instability) — similar time
-- Architecture decisions — similar time
-- Linux environment configuration — similar time
+**Lesson:** Documentation audits need a file checklist (README, Commands.md, study.example.jsonc, ExecutiveSummary.md) that is reviewed after any change to defaults, CLI flags, or command behavior. Stale documentation is worse than missing documentation — it actively misleads users and creates debugging sessions that trace back to "I used the example config."
+
+### 5.6 Context Limit Recovery Requires Checkpoint Discipline
+
+When AI coding sessions hit context limits mid-task, the todo list is the checkpoint mechanism — but only if continuation sessions check it first. Multiple times during this project, a session hit its context limit while partway through a multi-step task. The next session would start fresh, often re-discovering work that was already in progress or repeating exploration that had already been done.
+
+**What works:** Updating the todo list in real-time as tasks progress, with explicit status markers (in_progress, completed, pending). Writing partial results to MEMORY.md before context compaction. Structuring tasks so each step produces a committed artifact — if the session dies, the work is saved.
+
+**What doesn't work:** Starting new sessions without checking the todo list. Assuming the AI agent will remember context from a compaction summary (it loses nuance). Batching multiple related changes into a single uncommitted session — if the context dies, everything is lost.
+
+**Lesson:** The system should prioritize completing in-progress tasks over starting new ones. Every session should begin by reading the todo list and MEMORY.md before taking any action.
+
+### 5.7 Retroactive Issue Creation Reveals Process Gaps
+
+After 93 commits, the project had only 19 GitHub issues — a clear signal that features were being implemented without proper tracking. A retroactive audit identified 11 significant features (auto-parallel, report command, coefficient parsing, surfaceOrient, template upgrade, and more) that were built across multiple commits but never tracked as issues.
+
+Creating issues after the fact with commit references (`Implemented in abc123`) restored traceability, but the process gap reveals a broader pattern: **AI pair-coding sessions naturally skip issue creation because the conversation IS the specification.** The engineer describes what they want, the AI builds it, and neither stops to create a tracking artifact. This is fast but leaves no paper trail for future developers (or future sessions of the same project).
+
+**Lesson:** Issue creation should be the first step of any feature, not an afterthought. A simple discipline — "before the AI writes code, create a GitHub issue" — ensures that every feature has a traceable origin, acceptance criteria, and linkage to commits. For projects using AI pair-coding, this is especially important because conversation context is ephemeral.
 
 ---
 
@@ -382,12 +415,12 @@ Based on the development history, approximately **70-75% of AI compute was produ
 
 | Metric | Value | Assessment |
 |--------|-------|------------|
-| Production LOC | 4,532 | Lean for feature scope |
-| Test LOC | 3,554 | Strong investment |
-| Test/Prod Ratio | 78.4% | Above industry average |
+| Production LOC | 6,014 | Substantial for CLI tool scope |
+| Test LOC | 4,477 | Strong investment |
+| Test/Prod Ratio | 74.5% | Above industry average (~40-60% typical) |
 | Passing Tests | 192 | Zero failures |
-| Template Files | 41 | Comprehensive OpenFOAM coverage |
-| GitHub Issues | 30 total (25 closed) | Comprehensive tracking |
+| Template Files | 42 | Comprehensive OpenFOAM coverage |
+| GitHub Issues | 30 total (25 closed, 5 open) | Comprehensive tracking |
 | Build Status | Clean | Zero warnings |
 | Pipeline Validated | Yes | SimFlow match + grid convergence |
 
@@ -395,123 +428,165 @@ Based on the development history, approximately **70-75% of AI compute was produ
 
 | Metric | Value |
 |--------|-------|
-| Avg commits/active day | 11.0 |
+| Avg commits/active day | 9.4 |
 | Peak day (Feb 16) | 30 commits |
-| Lines per active day | 1,134 |
-| Tests per active day | 20.3 |
-| Issues closed per active day | 1.4 |
+| Lines per active day | 1,049 |
+| Tests per active day | 19.2 |
+| Issues closed per active day | 2.5 |
 
 ---
 
 ## 8. Development Cost Analysis
 
-### 8.1 AI-Assisted Development Costs
+### 8.1 Engineer Rate Justification
 
-Claude Code is subscription-based ($100/month for the Pro plan used in this project). Cost estimation below uses the 10-day active development window.
+This project requires dual expertise that is uncommon in a single contractor:
+
+1. **Senior .NET software architecture** — dependency injection, CLI design, Scriban templating, charting (ScottPlot 5.x), PDF generation (PdfSharpCore), xUnit/Moq testing, cross-platform deployment
+2. **CFD/OpenFOAM domain knowledge** — meshing pipelines (blockMesh/snappyHexMesh), turbulence models (kOmegaSST), force coefficient conventions (AIAA standards), solver tuning, grid convergence analysis
+
+Market rates for each discipline independently:
+
+| Role | Rate Range | Sources |
+|------|-----------|---------|
+| Senior .NET architect/contractor (US) | $120-200/hr | ZipRecruiter, Rise 2026 Edition |
+| Senior software consultant (independent, 5+ yrs) | $120-300/hr | Cleveroad, FullStack Labs 2025 Price Guide |
+| CFD/aerospace engineering consultant | $100-200/hr | CFD Online, Kolabtree, Glassdoor |
+| Systems-level aerospace engineer | $165-198/hr | ZipRecruiter senior-level data |
+
+**Dual-expertise premium:** Finding one person with both skillsets is rare. The intersection of senior .NET architecture and OpenFOAM CFD knowledge commands a premium, placing the effective rate at **$225/hr** (conservative end of the $200-250/hr range for rare skillset intersections).
+
+### 8.2 AI-Assisted Development Costs
+
+This project used Claude Code's **Pro plan ($20/month)**, the base subscription that most developers would use. The subscription is non-refundable — it cannot be prorated.
+
+**Scenario A — No extra usage enabled (what happened in this project):**
 
 | Cost Category | Amount | Notes |
 |---------------|--------|-------|
-| Claude Code subscription | $100/month | Pro plan, flat rate regardless of usage |
-| Prorated to project (10 days) | ~$33 | 10/30 of monthly cost |
+| Claude Code Pro subscription | $20 | Non-refundable monthly subscription |
+| Human engineer productive time | $8,438 | 37.5 hrs × $225/hr |
+| Rate-limit downtime penalty | $9,000 | 40 hrs × $225/hr (see §8.3) |
 | Linux workstation (existing) | $0 | Already owned, no incremental cost |
 | OpenFOAM / gmsh licenses | $0 | Open-source software |
-| **Total AI-assisted cost** | **~$33** | |
+| **Total AI-assisted cost** | **~$17,458** | |
 
-**Cost per deliverable:**
+**Scenario B — Extra usage enabled (pay overage in $20 increments):**
+
+| Cost Category | Amount | Notes |
+|---------------|--------|-------|
+| Claude Code Pro subscription | $20 | Non-refundable base |
+| Extra usage increments | ~$60-$100 | 3-5 additional $20 increments (non-refundable, paid when limit hit) |
+| Human engineer productive time | $8,438 | 37.5 hrs × $225/hr (irreducible) |
+| Reduced downtime penalty | ~$1,500-$3,000 | Context breaks still cause some idle time |
+| **Total AI-assisted cost (Scenario B)** | **~$10,000-$11,500** | |
+
+**Key insight:** The $20 subscription cost is economically irrelevant. The real costs are:
+1. **Human engineer time: $8,438** — irreducible, regardless of AI capability (domain expertise, architecture, review)
+2. **Rate-limit downtime: $9,000** — reducible with higher-tier plan or extra usage enabled
+
+**Cost per deliverable (Scenario A — $17,458 total):**
 
 | Metric | Value |
 |--------|-------|
-| Cost per line of C# code | $0.004 |
-| Cost per test | $0.23 |
-| Cost per commit | $0.42 |
-| Cost per GitHub issue resolved | $3.30 |
+| Cost per line of C# code | $1.66 |
+| Cost per test | $90.93 |
+| Cost per commit | $185.72 |
+| Cost per GitHub issue resolved | $698.32 |
 
-### 8.2 Traditional Development Cost Estimate
+### 8.3 Rate Limiting Impact (The Dominant Hidden Cost)
 
-For an equivalent scope (CLI tool with 8 command handlers, 7 services, 41 templates, 192 tests, full documentation) developed by a solo developer without AI assistance:
+The Pro plan's usage limit caused a **complete development stoppage from February 26 through March 2** — nearly a full week. The engineer was blocked from using Claude Code entirely, waiting for the weekly limit to reset. This was not a minor throttle; it was a hard stop.
 
-| Cost Category | Amount | Assumptions |
-|---------------|--------|-------------|
-| Developer time (6-8 weeks) | $15,000 - $24,000 | Mid-level .NET developer, $75-100/hr, 25-30 hrs/week |
-| OpenFOAM consulting | $2,000 - $5,000 | CFD domain review, template validation |
-| Testing / QA | $2,000 - $3,000 | Manual testing, CI/CD setup |
-| **Total traditional cost** | **$19,000 - $32,000** | |
-
-### 8.3 Rate Limiting Impact (Hidden Cost — Much Worse Than Initially Reported)
-
-The initial version of this report (Feb 25) underestimated the rate limiting impact. The actual experience was significantly worse.
-
-**The $20/month usage limit** (which the Pro plan effectively imposed via weekly spending caps) caused a **complete development stoppage from February 26 through March 2** — nearly a full week. The engineer was blocked from using Claude Code entirely, waiting for the weekly limit to reset on Monday at 3:00 PM. This was not a minor throttle; it was a hard stop.
-
-| Factor | Initially Reported (Feb 25) | Actual Experience (Mar 5) |
+| Factor | Initially Reported (Feb 25) | Actual Experience (Mar 8) |
 |--------|---------------------------|--------------------------|
 | Rate limit hits | ~8-12 occurrences | ~15-20 occurrences + 1 full week blocked |
 | Average wait time | ~15-30 minutes | **5-7 full days** for weekly reset |
 | Total idle time | ~3-5 hours | **~40+ hours** (full work week) |
 | Context window exhaustions | ~4-5 continuations | ~8-10 continuations |
-| Engineering cost of idle time | ~$300-$500 | **$4,000-$8,000** at $100-200/hr |
+| Engineering cost of idle time | ~$300-$500 | **$9,000** at $225/hr |
 
-**The rate limiting didn't just convert compute savings into idle time — it destroyed project momentum.** Critical bugs (coefficient parsing, surfaceOrient argument order) went undetected for a week because the engineer couldn't run validation. The weekly reset schedule (Monday 3:00 PM) meant that hitting the limit on a Tuesday effectively killed the entire week.
+**The rate limiting didn't just convert compute savings into idle time — it destroyed project momentum.** Critical bugs (coefficient parsing, surfaceOrient argument order) went undetected for a week because the engineer couldn't run validation. The weekly reset schedule meant that hitting the limit on a Tuesday effectively killed the entire week.
 
-**Economic impact:** At a billing rate of $100-200/hr, 40+ hours of blocked engineering time represents $4,000-$8,000 in lost productivity — dwarfing the $100/month subscription cost by 40-80x. The initial report's estimate of $300-$500 was a significant undercount.
+**Economic impact:** At $225/hr, 40 hours of blocked engineering time represents **$9,000** in lost productivity — **450x** the $20 subscription cost. The rate-limit downtime is the single largest cost component of AI-assisted development on the Pro plan.
 
 ### 8.4 Plan Tier Comparison
 
-Anthropic offers multiple Claude Code subscription tiers. The table below estimates how the project timeline and cost would change with higher-tier plans:
+Anthropic offers multiple Claude Code subscription tiers. The table below estimates the economic impact of each:
 
-| Plan | Monthly Cost | Rate Limits | Est. Project Duration | Est. Total Cost | Notes |
-|------|-------------|-------------|----------------------|----------------|-------|
-| **Pro (actual)** | $100 | Standard | 10 days (7 active) | ~$2,033 | Rate limits caused ~3-5 hrs idle |
-| **Max (5x)** | $200 | 5x Pro | ~7 days (5 active) | ~$2,147 | Eliminates most rate limit waits |
-| **Max (20x)** | $100\* | 20x Pro | ~5-6 days (4 active) | ~$2,053 | Near-unlimited; minimal idle time |
+| Plan | Monthly Cost | Rate Limits | Downtime Penalty | Est. Total Project Cost |
+|------|-------------|-------------|------------------|------------------------|
+| **Pro (actual)** | $20 | Standard | $9,000 (40 hrs blocked) | ~$17,458 |
+| **Pro + extra usage** | $20 + ~$80 | Extended | ~$2,250 (10 hrs blocked) | ~$10,788 |
+| **Max (5x)** | $100 | 5x Pro | ~$1,125 (5 hrs blocked) | ~$9,583 |
+| **Max (20x)** | $200 | 20x Pro | ~$225 (1 hr blocked) | ~$8,883 |
 
-\* *Max 20x pricing at time of project was $100/month during promotional period; standard pricing is $200/month.*
+**ROI of upgrading Pro → Max ($100/month):**
+- Additional subscription cost: $80
+- Downtime savings: ~$7,875 (35 hours reclaimed × $225/hr)
+- **Return: 98x on the $80 investment**
 
-**Key insight:** The incremental cost of a higher-tier plan ($100-$200/month) is trivial compared to the engineer idle time it eliminates. At $100/hr, saving just 2 hours of rate-limit idle time pays for the entire plan upgrade. For intensive development projects, the Max plan is strictly ROI-positive.
+Each $20 extra usage increment buys back hours of developer idle time at $225/hr. Even reclaiming 6 minutes of idle time makes the $20 increment ROI-positive. For intensive development projects, running on the base Pro plan without extra usage is the most expensive option despite having the lowest subscription cost.
 
-**Projected timeline with unlimited access:**
+### 8.5 Traditional Development Cost Estimate
 
-If rate limits and context window exhaustions were eliminated entirely:
-- Active development days could compress from 7 to 4-5 (30-40% reduction)
-- Session continuations (which lose context and require re-explanation) would be fewer
-- Peak-day throughput (30 commits) could become the norm rather than the exception
-- Estimated project completion: **5-6 calendar days** instead of 10
+The traditional cost estimate must reflect the dual-expertise requirement discussed in §8.1.
 
-### 8.5 Cost Comparison
+**Option A — Single senior contractor with dual expertise (rare):**
+
+| Cost Category | Amount | Assumptions |
+|---------------|--------|-------------|
+| Contractor time | $63,000 - $94,500 | $225/hr × 280-420 hrs (8-12 weeks at 35 hrs/week) |
+| **Total** | **$63,000 - $94,500** | |
+
+**Option B — Two specialists (more realistic hire):**
+
+| Cost Category | Amount | Assumptions |
+|---------------|--------|-------------|
+| Senior .NET developer | $35,000 - $49,000 | $175/hr × 200-280 hrs |
+| CFD/OpenFOAM consultant | $16,000 - $24,000 | $200/hr × 80-120 hrs |
+| Integration/coordination overhead | $7,650 - $10,950 | +15% for two-person coordination |
+| **Total** | **$58,650 - $83,950** | |
+
+**Midpoint estimate: ~$75,000** (averaging across both options).
+
+### 8.6 Cost Comparison
 
 ```
-                       AI-Assisted    Traditional     Savings
-                       ───────────    ───────────     ───────
-Direct cost              $33          $19K-$32K       99.8%
-Calendar time            10 days      6-8 weeks       4-6x faster
-Engineer hours           ~20 hrs      150-240 hrs     7-12x fewer
-Cost per LOC             $0.004       $2.40-$4.03     600-1000x less
-Rate limit idle time     ~3-5 hrs     N/A             Hidden cost
+                         AI-Assisted (A)   Traditional       Savings
+                         ───────────────   ───────────       ───────
+Total cost                 $17,458         $63K-$95K         72-82%
+Calendar time              22 days         8-12 weeks        3-4x faster
+Active engineer hours      37.5 hrs        280-420 hrs       85-91% fewer
+Cost per LOC               $1.66           $6.00-$9.01       63-82% less
 ```
 
 **Important caveats:**
 
-1. **The $33 figure understates the human cost.** The engineer spent approximately 20 hours providing direction, reviewing output, debugging physics, and validating results. At a $100/hr rate, that adds ~$2,000 of human time, bringing the true AI-assisted cost to approximately **$2,033** — still a **90-94% savings** over traditional development.
+1. **AI-assisted development requires an experienced engineer.** The cost savings assume the human has both software architecture expertise and CFD domain knowledge. Without domain expertise, the AI produces syntactically correct but physically invalid simulations (see §5.4). The $225/hr rate reflects this rare skillset — cheaper engineers would spend longer, potentially negating the savings.
 
-2. **Rate limit idle time adds ~$300-$500 of hidden cost.** When the engineer is blocked waiting for rate limits to reset, that time is economically unproductive. A Max plan eliminates most of this waste for an incremental $100/month.
+2. **The downtime penalty is the swing factor.** Scenario A ($17,458 with 40 hrs blocked) vs. Scenario B (~$10,500 with extra usage) shows that **enabling extra usage reduces total project cost by ~40%** despite increasing subscription spend. The Pro plan without extra usage is a false economy.
 
-3. **AI-assisted development requires an experienced engineer.** The cost savings assume the human has both software architecture expertise and CFD domain knowledge. Without domain expertise, the AI would produce syntactically correct but physically invalid simulations (as demonstrated by the force coefficient calibration issues).
+3. **Active engineer involvement is dramatically reduced.** AI-assisted development required 37.5 hours of active human involvement vs. 280-420 hours traditionally — an **85-91% reduction**. The engineer's role shifts from writing code to directing, reviewing, and validating.
 
-4. **Subscription cost is amortized.** The $100/month covers all projects for the month. If the developer uses Claude Code for multiple projects, the per-project cost drops further.
+4. **Traditional cost assumes a single project.** The AI subscription covers all projects for the month. Multiple concurrent projects would further amortize the subscription cost, though the human time cost scales linearly per project.
 
-### 8.6 ROI Summary
+### 8.7 ROI Summary
 
-| Scenario | Total Cost | Time to Deliver | ROI vs. Traditional |
+| Scenario | Total Cost | Time to Deliver | Cost vs. Traditional |
 |----------|-----------|-----------------|---------------------|
-| **AI-assisted — Pro plan (actual)** | ~$2,033 | 10 days | Baseline |
-| **AI-assisted — Max plan (projected)** | ~$2,150 | 5-6 days | 5% more cost, 40-50% faster |
-| Traditional (solo dev) | ~$25,500 | 7 weeks | — |
-| **Savings (Pro vs. Traditional)** | **~$23,467** | **~39 days** | **~12x cost reduction** |
-| **Savings (Max vs. Traditional)** | **~$23,350** | **~43 days** | **~12x cost, 7-10x faster** |
+| **AI-assisted — Pro, no extra usage (actual)** | ~$17,458 | 22 days | **77% savings** |
+| **AI-assisted — Pro, extra usage enabled** | ~$10,500 | ~15 days | **86% savings** |
+| **AI-assisted — Max plan** | ~$9,500 | ~12 days | **88% savings** |
+| Traditional (single contractor, $225/hr) | ~$78,750 | 8-12 weeks | Baseline |
+| Traditional (two specialists) | ~$71,300 | 8-12 weeks | Baseline |
 
-The return on investment is driven primarily by the reduction in billable engineering hours. The AI subscription cost ($33-$67) is negligible compared to the human time savings. Even accounting for the engineer's oversight hours, the AI-assisted approach delivered the same output at roughly one-tenth the cost and one-fifth the calendar time. Upgrading to the Max plan adds minimal cost while significantly compressing the timeline.
+**Bottom line:** Even with the most conservative AI-assisted scenario (Pro plan, no extra usage, full downtime penalty), the project cost 77% less and was delivered 3-4x faster than traditional development. The story is compelling without cherry-picking: the honest numbers show that AI pair-coding delivers roughly **4x faster at one-quarter the cost**, with the bulk of savings coming from reduced active engineering hours rather than from cheap subscriptions.
+
+The largest cost-optimization opportunity is not the AI subscription tier — it's eliminating rate-limit downtime. Upgrading from Pro ($20/month) to Max ($100/month) costs $80 but saves ~$7,875 in blocked engineer time, making it the highest-ROI investment in the entire project.
 
 ---
 
-*This document was last updated on March 5, 2026.*
+*Last updated: March 8, 2026.*
+*This is a living document revised alongside development.*
 *AI assistance provided by Anthropic Claude (Sonnet 4.5, Sonnet 4.6, Opus 4.6) via Claude Code.*
