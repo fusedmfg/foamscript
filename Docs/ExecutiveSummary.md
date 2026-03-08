@@ -163,9 +163,9 @@ FoamScript was built using **Claude Code** (Anthropic's AI coding agent) as the 
 │  Production Code       4,532 lines               │
 │  Test Code             3,554 lines               │
 │  Test/Production Ratio 78.4%                     │
-│  Passing Tests         144                       │
+│  Passing Tests         192                       │
 │  Template Files        41                        │
-│  GitHub Issues         16 (10 closed, 6 open)    │
+│  GitHub Issues         30 (25 closed, 5 open)    │
 └─────────────────────────────────────────────────┘
 ```
 
@@ -385,9 +385,9 @@ Based on the development history, approximately **70-75% of AI compute was produ
 | Production LOC | 4,532 | Lean for feature scope |
 | Test LOC | 3,554 | Strong investment |
 | Test/Prod Ratio | 78.4% | Above industry average |
-| Passing Tests | 144 | Zero failures |
+| Passing Tests | 192 | Zero failures |
 | Template Files | 41 | Comprehensive OpenFOAM coverage |
-| GitHub Issues | 16 total (10 closed) | Well-tracked |
+| GitHub Issues | 30 total (25 closed) | Comprehensive tracking |
 | Build Status | Clean | Zero warnings |
 | Pipeline Validated | Yes | SimFlow match + grid convergence |
 
@@ -428,7 +428,7 @@ Claude Code is subscription-based ($100/month for the Pro plan used in this proj
 
 ### 8.2 Traditional Development Cost Estimate
 
-For an equivalent scope (CLI tool with 8 command handlers, 7 services, 41 templates, 142 tests, full documentation) developed by a solo developer without AI assistance:
+For an equivalent scope (CLI tool with 8 command handlers, 7 services, 41 templates, 192 tests, full documentation) developed by a solo developer without AI assistance:
 
 | Cost Category | Amount | Assumptions |
 |---------------|--------|-------------|

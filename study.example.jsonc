@@ -24,7 +24,8 @@
   "physics": {
     "nu": 1.5e-5,               // Kinematic viscosity (m²/s) — air at ~20°C sea level
     "turbulenceIntensity": 0.01, // Freestream turbulence intensity (0.01 = 1%, AIAA default)
-    "endTime": 1000,             // Maximum solver iterations (steady-state)
+    "maxIterations": 1000,       // Maximum solver iterations (steady-state simpleFoam)
+    "endTime": 1.0,              // Simulation end time in seconds (transient pimpleFoam only)
     "refinementLevelMin": 5,    // snappyHexMesh minimum refinement level around geometry
     "refinementLevelMax": 6     // snappyHexMesh maximum refinement level around geometry
   },

@@ -72,19 +72,20 @@ Converts STEP or IGES CAD geometry files to STL format with unit conversion and 
 ### Usage
 
 ```bash
-foamscript convert [OPTIONS]
+foamscript convert <input> <output> [OPTIONS]
 ```
 
 ### Options
 
 | Option | Short | Description | Default |
 |--------|-------|-------------|---------|
-| `--input` | `-i` | Input STEP/IGES file path (required) | - |
-| `--output` | `-o` | Output STL file path (required) | - |
-| `--input-units` | `-u` | Input file units: mm, cm, m, in, ft | `mm` |
-| `--mesh-size` | `-m` | Mesh size scaling factor (lower = finer mesh) | `0.05` |
-| `--feature-angle` | | Feature angle for edge preservation (degrees) | - |
+| `<input>` | | Input STEP/IGES file path (positional, required) | - |
+| `<output>` | | Output STL file path (positional, required) | - |
+| `--input-units` | `-u` | Input file units: mm, cm, m, in, ft | `m` |
+| `--mesh-size` | `-s` | Mesh size scaling factor (lower = finer mesh) | `1.0` |
+| `--feature-angle` | `-a` | Feature angle for edge preservation (degrees) | - |
 | `--validate` | | Run surfaceCheck validation after conversion | `false` |
+| `--verbose` | `-v` | Show detailed gmsh output | `false` |
 
 ### How It Works
 
@@ -96,18 +97,13 @@ foamscript convert [OPTIONS]
 
 **Convert disc from millimeters to meters:**
 ```bash
-foamscript convert \
-  --input disc.step \
-  --output disc.stl \
-  --input-units mm \
-  --mesh-size 0.05
+foamscript convert disc.step disc.stl \
+  --input-units mm
 ```
 
-**Convert with edge preservation:**
+**Convert with edge preservation and finer mesh:**
 ```bash
-foamscript convert \
-  --input disc.step \
-  --output disc.stl \
+foamscript convert disc.step disc.stl \
   --input-units mm \
   --mesh-size 0.05 \
   --feature-angle 30
@@ -115,9 +111,7 @@ foamscript convert \
 
 **Convert and validate:**
 ```bash
-foamscript convert \
-  --input disc.step \
-  --output disc.stl \
+foamscript convert disc.step disc.stl \
   --input-units mm \
   --validate
 ```
