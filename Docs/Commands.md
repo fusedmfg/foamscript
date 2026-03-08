@@ -240,7 +240,7 @@ foamscript new-study --config study.json
 | Option | Short | Description | Default |
 |--------|-------|-------------|---------|
 | `--config` | `-c` | Path to JSON config file (replaces all CLI options) | - |
-| `--template` | `-t` | Template name or path | `external_disc_mrf_steady` |
+| `--template` | `-t` | Template name or path | `external_disc_rotatingwall_steady` |
 | `--velocity` | `-v` | Free stream velocity magnitude (m/s) | `20.0` |
 | `--rpm` | `-r` | Disc rotation speed (RPM) | `1000` |
 | `--input-units` | `-u` | Source file units: mm, cm, m, in, ft | `mm` |
@@ -373,7 +373,7 @@ An alternative to specifying all CLI options is to provide a JSON config file wi
 {
   "projectName": "MyStudy",
   "outputDir": "~/studies",
-  "templateName": "external_disc_mrf_steady",
+  "templateName": "external_disc_rotatingwall_steady",
   "modelSource": "~/my_disc.step",
   "angles": "-5,0,5,10",
   "velocity": 20.0,

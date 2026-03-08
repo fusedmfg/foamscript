@@ -249,7 +249,7 @@ namespace foamscript.Handlers
             // If null or empty, use default
             if (string.IsNullOrEmpty(templatePathOrName))
             {
-                return Path.Combine(templatesDir, "external_disc_mrf_steady");
+                return Path.Combine(templatesDir, "external_disc_rotatingwall_steady");
             }
 
             // If it's an absolute path or contains path separators, use as-is

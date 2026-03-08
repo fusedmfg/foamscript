@@ -30,7 +30,7 @@ namespace foamscript.Models
 
         // ── Optional study inputs (with sensible defaults) ────────────────────
 
-        [Option('t', "template", Required = false, HelpText = "Template name or path (defaults to external_disc_mrf_steady)")]
+        [Option('t', "template", Required = false, HelpText = "Template name or path (defaults to external_disc_rotatingwall_steady)")]
         public string? TemplatePath { get; set; }
 
         [Option('v', "velocity", Required = false, Default = 20.0, HelpText = "Free stream velocity magnitude (m/s, default: 20.0)")]
