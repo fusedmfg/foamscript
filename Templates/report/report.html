@@ -226,24 +226,18 @@
 <p style="font-size: 13px; color: #555; margin-bottom: 16px;">
   Contour plots on the y=0 symmetry plane through the disc center, extracted from the converged solution field.
 </p>
-<div class="chart-row">
-  {{ if pressure_slice_image != "" }}
-  <div class="chart-half">
-    <h3>Static Pressure</h3>
-    <div class="chart-container">
-      <img src="{{ pressure_slice_image }}" alt="Pressure contour on y=0 slice">
-    </div>
-  </div>
-  {{ end }}
-  {{ if velocity_slice_image != "" }}
-  <div class="chart-half">
-    <h3>Velocity Magnitude</h3>
-    <div class="chart-container">
-      <img src="{{ velocity_slice_image }}" alt="Velocity magnitude contour on y=0 slice">
-    </div>
-  </div>
-  {{ end }}
+{{ if pressure_slice_image != "" }}
+<h3>Static Pressure</h3>
+<div class="chart-container">
+  <img src="{{ pressure_slice_image }}" alt="Pressure contour on y=0 slice" style="width: 100%;">
 </div>
+{{ end }}
+{{ if velocity_slice_image != "" }}
+<h3>Velocity Magnitude</h3>
+<div class="chart-container">
+  <img src="{{ velocity_slice_image }}" alt="Velocity magnitude contour on y=0 slice" style="width: 100%;">
+</div>
+{{ end }}
 {{ end }}
 
 <div class="footer">

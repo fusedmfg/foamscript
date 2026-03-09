@@ -30,7 +30,7 @@ for field_name, field_data, cmap, title, unit in [
     ("umag", data["umag"], "viridis", "Velocity Magnitude", "m/s"),
 ]:
     values = np.array(field_data)
-    fig, ax = plt.subplots(1, 1, figsize=(14, 8))
+    fig, ax = plt.subplots(1, 1, figsize=(16, 9))
 
     # Use percentile-based levels to handle outliers near boundaries
     levels = np.linspace(np.percentile(values, 1), np.percentile(values, 99), 64)
@@ -48,6 +48,6 @@ for field_name, field_data, cmap, title, unit in [
 
     fig.tight_layout()
     out_path = os.path.join(output_dir, f"{field_name}_slice.png")
-    fig.savefig(out_path, dpi=150, bbox_inches="tight", facecolor="white")
+    fig.savefig(out_path, dpi=200, bbox_inches="tight", facecolor="white")
     plt.close(fig)
     print(f"Saved: {out_path}")

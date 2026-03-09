@@ -10,10 +10,10 @@ namespace foamscript.Services
     /// </summary>
     public class PdfReportGenerator
     {
-        private const double PageWidth = 612; // US Letter width in points
-        private const double PageHeight = 792; // US Letter height in points
+        private const double PageWidth = 792; // US Letter landscape width in points (11")
+        private const double PageHeight = 612; // US Letter landscape height in points (8.5")
         private const double Margin = 54; // 0.75 inch margins
-        private const double ContentWidth = PageWidth - 2 * Margin;
+        private const double ContentWidth = PageWidth - 2 * Margin; // 684 pts (9.5")
 
         private static readonly XFont TitleFont = new("Times New Roman", 20, XFontStyle.Bold);
         private static readonly XFont SubtitleFont = new("Times New Roman", 12, XFontStyle.Regular);
@@ -41,29 +41,36 @@ namespace foamscript.Services
             var page = AddPage(document);
             var gfx = XGraphics.FromPdfPage(page);
 
-            // Title page content
-            y = Margin + 60;
+            // --- Page 1: Title + Tables ---
+            y = Margin + 40;
             DrawCenteredText(gfx, data.StudyName, TitleFont, y);
-            y += 30;
+            y += 26;
             DrawCenteredText(gfx, "Aerodynamic Analysis Report", SubtitleFont, y);
-            y += 20;
+            y += 18;
             DrawCenteredText(gfx, $"Generated: {data.GenerationDate}  |  FoamScript {data.Version}", FooterFont, y);
-            y += 50;
+            y += 35;
 
             // Section 1: Physics Configuration
             y = DrawSectionHeading(gfx, "1. Physics & Solver Configuration", y);
             y = DrawConfigTable(gfx, data, y);
 
             // Section 2: Mesh Summary
-            y = CheckPageBreak(document, ref page, ref gfx, y, 200);
             y = DrawSectionHeading(gfx, "2. Mesh Summary", y);
             y = DrawMeshTable(gfx, data.MeshStats, y);
 
-            // Section 3: Aerodynamic Polars
-            y = CheckPageBreak(document, ref page, ref gfx, y, 300);
-            y = DrawSectionHeading(gfx, "3. Aerodynamic Coefficient Polars", y);
+            // Section 3: Coefficient Summary (tables grouped together)
+            y = DrawSectionHeading(gfx, "3. Coefficient Summary", y);
+            y = DrawCoeffTable(gfx, data.Cases, y);
+            DrawFooter(gfx, data.Version);
 
-            // Charts (2 per row, then drag polar full width)
+            // --- New page: Aerodynamic Polars (charts) ---
+            gfx.Dispose();
+            page = AddPage(document);
+            gfx = XGraphics.FromPdfPage(page);
+            y = Margin;
+            y = DrawSectionHeading(gfx, "4. Aerodynamic Coefficient Polars", y);
+
+            // 4 polar charts in 2×2 grid
             foreach (var chartPair in ChunkCharts(data.PolarCharts, 2))
             {
                 y = CheckPageBreak(document, ref page, ref gfx, y, 280);
@@ -73,52 +80,50 @@ namespace foamscript.Services
             if (data.DragPolarChart != null && data.DragPolarChart.Length > 0)
             {
                 y = CheckPageBreak(document, ref page, ref gfx, y, 280);
-                y = DrawChartCentered(gfx, data.DragPolarChart, y, ContentWidth * 0.7);
+                y = DrawChartCentered(gfx, data.DragPolarChart, y, ContentWidth * 0.6);
             }
+            DrawFooter(gfx, data.Version);
 
-            // Section 4: Coefficient Summary
-            y = CheckPageBreak(document, ref page, ref gfx, y, 200);
-            y = DrawSectionHeading(gfx, "4. Coefficient Summary", y);
-            y = DrawCoeffTable(gfx, data.Cases, y);
-
-            // Section 5: Convergence History
+            // --- New page per case: Convergence History ---
             foreach (var convergence in data.ConvergenceCharts)
             {
-                y = CheckPageBreak(document, ref page, ref gfx, y, 300);
+                gfx.Dispose();
+                page = AddPage(document);
+                gfx = XGraphics.FromPdfPage(page);
+                y = Margin;
+
                 if (convergence == data.ConvergenceCharts[0])
                     y = DrawSectionHeading(gfx, "5. Convergence History", y);
 
                 y = DrawSubheading(gfx, convergence.CaseName, y);
-                y = DrawChartCentered(gfx, convergence.ChartPng, y, ContentWidth * 0.85);
+                y = DrawChartCentered(gfx, convergence.ChartPng, y, ContentWidth);
+                DrawFooter(gfx, data.Version);
             }
 
-            // Section 6: Flow Visualization (if available)
-            if (data.PressureSlicePng != null || data.VelocitySlicePng != null)
+            // --- Dedicated full page per visualization ---
+            if (data.PressureSlicePng != null)
             {
-                y = CheckPageBreak(document, ref page, ref gfx, y, 300);
-                y = DrawSectionHeading(gfx, "6. Flow Field Visualization", y);
-
-                gfx.DrawString("Contour plots on the y=0 symmetry plane through the disc center.",
-                    BodyFont, new XSolidBrush(XColor.FromArgb(85, 85, 85)), Margin, y);
-                y += 18;
-
-                if (data.PressureSlicePng != null)
-                {
-                    y = CheckPageBreak(document, ref page, ref gfx, y, 300);
-                    y = DrawSubheading(gfx, "Static Pressure", y);
-                    y = DrawChartCentered(gfx, data.PressureSlicePng, y, ContentWidth * 0.85);
-                }
-
-                if (data.VelocitySlicePng != null)
-                {
-                    y = CheckPageBreak(document, ref page, ref gfx, y, 300);
-                    y = DrawSubheading(gfx, "Velocity Magnitude", y);
-                    y = DrawChartCentered(gfx, data.VelocitySlicePng, y, ContentWidth * 0.85);
-                }
+                gfx.Dispose();
+                page = AddPage(document);
+                gfx = XGraphics.FromPdfPage(page);
+                y = Margin;
+                y = DrawSectionHeading(gfx, "6. Flow Field Visualization — Static Pressure", y);
+                y = DrawChartCentered(gfx, data.PressureSlicePng, y, ContentWidth);
+                DrawFooter(gfx, data.Version);
             }
 
-            // Footer on last page
-            DrawFooter(gfx, data.Version);
+            if (data.VelocitySlicePng != null)
+            {
+                gfx.Dispose();
+                page = AddPage(document);
+                gfx = XGraphics.FromPdfPage(page);
+                y = Margin;
+                y = DrawSectionHeading(gfx, "6. Flow Field Visualization — Velocity Magnitude", y);
+                y = DrawChartCentered(gfx, data.VelocitySlicePng, y, ContentWidth);
+                DrawFooter(gfx, data.Version);
+            }
+
+            // Final footer already drawn on last page above
 
             Directory.CreateDirectory(Path.GetDirectoryName(outputPath)!);
             document.Save(outputPath);
