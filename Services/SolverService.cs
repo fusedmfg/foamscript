@@ -86,7 +86,7 @@ namespace foamscript.Services
                     Console.WriteLine($"Running {solverName} in parallel ({cores} cores)...");
                     var logPath = Path.Combine(caseDir, $"log.{solverName}");
                     var bashCmd = $"set -o pipefail; mpirun -np {cores} {solverName} -case {caseDir} -parallel 2>&1 | tee {logPath}";
-                    var solverResult = _processExecutor.Execute("bash", $"-c '{bashCmd}'");
+                    var solverResult = _processExecutor.Execute("bash", $"-c \"{bashCmd}\"");
 
                     if (solverResult.ExitCode != 0)
                     {
