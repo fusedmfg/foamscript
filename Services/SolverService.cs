@@ -79,13 +79,14 @@ namespace foamscript.Services
 
                     Console.WriteLine("✓ Domain decomposed successfully");
 
-                    // Run solver in parallel
+                    // Run solver in parallel with shell-level log capture.
+                    // mpirun doesn't reliably pipe child process stdout through .NET's
+                    // ProcessStartInfo redirection, so we use tee to write the log file
+                    // directly at the shell level.
                     Console.WriteLine($"Running {solverName} in parallel ({cores} cores)...");
-                    var solverArgs = $"-np {cores} {solverName} -case {caseDir} -parallel";
-                    var solverResult = _processExecutor.Execute("mpirun", solverArgs);
-
-                    // Persist solver log for report generation
-                    PersistSolverLog(caseDir, solverName, solverResult.Output);
+                    var logPath = Path.Combine(caseDir, $"log.{solverName}");
+                    var bashCmd = $"set -o pipefail; mpirun -np {cores} {solverName} -case {caseDir} -parallel 2>&1 | tee {logPath}";
+                    var solverResult = _processExecutor.Execute("bash", $"-c '{bashCmd}'");
 
                     if (solverResult.ExitCode != 0)
                     {

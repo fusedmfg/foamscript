@@ -34,6 +34,8 @@
 
   <ItemGroup>
     <Content Include="Templates\report\report.html" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="Templates\report\extract_slice.py" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="Templates\report\render_slice.py" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>

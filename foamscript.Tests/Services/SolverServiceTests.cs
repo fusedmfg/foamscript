@@ -67,8 +67,9 @@ namespace foamscript.Tests.Services
             _mockProcessExecutor
                 .Setup(x => x.Execute("decomposePar", $"-case {caseDir}"))
                 .Returns(new ProcessResult { ExitCode = 0 });
+            // Parallel solver runs via bash with tee for log capture
             _mockProcessExecutor
-                .Setup(x => x.Execute("mpirun", $"-np {cores} simpleFoam -case {caseDir} -parallel"))
+                .Setup(x => x.Execute("bash", It.Is<string>(a => a.Contains($"mpirun -np {cores} simpleFoam -case {caseDir} -parallel"))))
                 .Returns(new ProcessResult { ExitCode = 0 });
             _mockProcessExecutor
                 .Setup(x => x.Execute("reconstructPar", $"-case {caseDir}"))
@@ -160,7 +161,7 @@ namespace foamscript.Tests.Services
             _mockProcessExecutor.Verify(
                 x => x.Execute("decomposePar", $"-case {caseDir}"), Times.Once);
             _mockProcessExecutor.Verify(
-                x => x.Execute("mpirun", $"-np 4 simpleFoam -case {caseDir} -parallel"), Times.Once);
+                x => x.Execute("bash", It.Is<string>(a => a.Contains($"mpirun -np 4 simpleFoam -case {caseDir} -parallel"))), Times.Once);
             _mockProcessExecutor.Verify(
                 x => x.Execute("reconstructPar", $"-case {caseDir}"), Times.Once);
         }
@@ -187,7 +188,7 @@ namespace foamscript.Tests.Services
                 .Setup(x => x.Execute("decomposePar", $"-case {caseDir}"))
                 .Returns(new ProcessResult { ExitCode = 0 });
             _mockProcessExecutor
-                .Setup(x => x.Execute("mpirun", $"-np 4 simpleFoam -case {caseDir} -parallel"))
+                .Setup(x => x.Execute("bash", It.Is<string>(a => a.Contains($"mpirun -np 4 simpleFoam -case {caseDir} -parallel"))))
                 .Returns(new ProcessResult { ExitCode = 1 });
 
             var result = _service.SolveCase(caseDir, true, 4);
@@ -204,7 +205,7 @@ namespace foamscript.Tests.Services
                 .Setup(x => x.Execute("decomposePar", $"-case {caseDir}"))
                 .Returns(new ProcessResult { ExitCode = 0 });
             _mockProcessExecutor
-                .Setup(x => x.Execute("mpirun", $"-np 4 simpleFoam -case {caseDir} -parallel"))
+                .Setup(x => x.Execute("bash", It.Is<string>(a => a.Contains($"mpirun -np 4 simpleFoam -case {caseDir} -parallel"))))
                 .Returns(new ProcessResult { ExitCode = 0 });
             _mockProcessExecutor
                 .Setup(x => x.Execute("reconstructPar", $"-case {caseDir}"))

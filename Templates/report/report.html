@@ -71,8 +71,14 @@
   .chart-container {
     margin: 20px 0;
     text-align: center;
+    overflow: visible;
   }
   .chart-container svg {
+    max-width: 100%;
+    height: auto;
+    overflow: visible;
+  }
+  .chart-container img {
     max-width: 100%;
     height: auto;
   }
@@ -84,8 +90,13 @@
   }
   .chart-half {
     flex: 1;
-    min-width: 450px;
-    max-width: 550px;
+    min-width: 400px;
+    max-width: 600px;
+  }
+  .chart-full {
+    width: 100%;
+    max-width: 800px;
+    margin: 0 auto;
   }
   .status-ok { color: #2ca02c; font-weight: bold; }
   .status-fail { color: #d62728; font-weight: bold; }
@@ -100,6 +111,7 @@
   @media print {
     body { padding: 20px; }
     .chart-container svg { max-width: 90%; }
+    .chart-half { min-width: 300px; max-width: 48%; }
   }
 </style>
 </head>
@@ -206,6 +218,32 @@
 {{ for convergence in convergence_charts }}
 <h3>{{ convergence.case_name }}</h3>
 <div class="chart-container">{{ convergence.chart }}</div>
+{{ end }}
+
+{{ if has_visualization }}
+<!-- Section 6: Flow Visualization -->
+<h2>6. Flow Field Visualization</h2>
+<p style="font-size: 13px; color: #555; margin-bottom: 16px;">
+  Contour plots on the y=0 symmetry plane through the disc center, extracted from the converged solution field.
+</p>
+<div class="chart-row">
+  {{ if pressure_slice_image != "" }}
+  <div class="chart-half">
+    <h3>Static Pressure</h3>
+    <div class="chart-container">
+      <img src="{{ pressure_slice_image }}" alt="Pressure contour on y=0 slice">
+    </div>
+  </div>
+  {{ end }}
+  {{ if velocity_slice_image != "" }}
+  <div class="chart-half">
+    <h3>Velocity Magnitude</h3>
+    <div class="chart-container">
+      <img src="{{ velocity_slice_image }}" alt="Velocity magnitude contour on y=0 slice">
+    </div>
+  </div>
+  {{ end }}
+</div>
 {{ end }}
 
 <div class="footer">

@@ -201,6 +201,39 @@ namespace foamscript.Tests.Services
             svg.Should().NotBeNullOrEmpty();
         }
 
+        // ── SVG ViewBox ──────────────────────────────────────────────────────────
+
+        [Fact]
+        public void GeneratePolarChartSvg_ContainsViewBox()
+        {
+            var cases = new List<CaseResult>
+            {
+                new() { CaseName = "S_0.0", AngleOfAttack = 0.0, Cd = 0.057, Cl = 0.23, CmPitch = -0.05, Converged = true },
+            };
+
+            var svg = _generator.GeneratePolarChartSvg(cases, "Cl", "Lift Coefficient", "C\u2097");
+
+            svg.Should().Contain("viewBox=\"0 0 800 500\"");
+        }
+
+        [Fact]
+        public void EnsureSvgViewBox_AddsMissingViewBox()
+        {
+            var svg = "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"800\" height=\"500\"><rect/></svg>";
+            var result = ChartGenerator.EnsureSvgViewBox(svg);
+
+            result.Should().Contain("viewBox=\"0 0 800 500\"");
+        }
+
+        [Fact]
+        public void EnsureSvgViewBox_PreservesExistingViewBox()
+        {
+            var svg = "<svg width=\"800\" height=\"500\" viewBox=\"0 0 800 500\"><rect/></svg>";
+            var result = ChartGenerator.EnsureSvgViewBox(svg);
+
+            result.Should().Be(svg);
+        }
+
         [Fact]
         public void GenerateResidualChartSvg_ZeroResidual_ClampedToFloor()
         {

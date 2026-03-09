@@ -13,17 +13,20 @@ namespace foamscript.Services
         private readonly ChartGenerator _chartGenerator;
         private readonly HtmlReportGenerator _htmlGenerator;
         private readonly PdfReportGenerator _pdfGenerator;
+        private readonly VisualizationService _visualizationService;
 
         public ReportService(
             ResultsService resultsService,
             ChartGenerator chartGenerator,
             HtmlReportGenerator htmlGenerator,
-            PdfReportGenerator pdfGenerator)
+            PdfReportGenerator pdfGenerator,
+            VisualizationService visualizationService)
         {
             _resultsService = resultsService;
             _chartGenerator = chartGenerator;
             _htmlGenerator = htmlGenerator;
             _pdfGenerator = pdfGenerator;
+            _visualizationService = visualizationService;
         }
 
         /// <summary>
@@ -60,7 +63,25 @@ namespace foamscript.Services
             // Step 4: Read physics config
             var physicsConfig = ReadPhysicsConfig(studyDir);
 
-            // Step 5: Generate charts and render reports
+            // Step 5: Generate flow field visualizations (gracefully skipped if unavailable)
+            Console.WriteLine("Generating flow visualizations...");
+            SliceVisualizationResult? visualization = null;
+            var firstCaseDir = Path.Combine(studyDir, resultsSummary.Cases[0].CaseName);
+            var vizOutputDir = Path.Combine(outputDir, "viz");
+            try
+            {
+                visualization = _visualizationService.GenerateSliceVisualization(firstCaseDir, vizOutputDir);
+                if (visualization != null)
+                    Console.WriteLine("\u2713 Flow visualizations generated");
+                else
+                    Console.WriteLine("  Skipped (tools unavailable)");
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"  Warning: Flow visualization failed: {ex.Message}");
+            }
+
+            // Step 6: Generate charts and render reports
             Directory.CreateDirectory(outputDir);
 
             var generateHtml = format is "html" or "both";
@@ -69,7 +90,7 @@ namespace foamscript.Services
             if (generateHtml)
             {
                 Console.WriteLine("Generating HTML report...");
-                var htmlData = BuildHtmlReportData(studyName, resultsSummary, residualData, meshStats, physicsConfig);
+                var htmlData = BuildHtmlReportData(studyName, resultsSummary, residualData, meshStats, physicsConfig, visualization);
                 var htmlPath = Path.Combine(outputDir, $"{studyName}_report.html");
                 _htmlGenerator.WriteReport(htmlData, htmlPath);
                 result.HtmlPath = htmlPath;
@@ -79,7 +100,7 @@ namespace foamscript.Services
             if (generatePdf)
             {
                 Console.WriteLine("Generating PDF report...");
-                var pdfData = BuildPdfReportData(studyName, resultsSummary, residualData, meshStats, physicsConfig);
+                var pdfData = BuildPdfReportData(studyName, resultsSummary, residualData, meshStats, physicsConfig, visualization);
                 var pdfPath = Path.Combine(outputDir, $"{studyName}_report.pdf");
                 _pdfGenerator.WriteReport(pdfData, pdfPath);
                 result.PdfPath = pdfPath;
@@ -91,7 +112,8 @@ namespace foamscript.Services
         }
 
         private ReportData BuildHtmlReportData(string studyName, ResultsSummary summary,
-            List<CaseResidualData> residuals, List<MeshStatEntry> meshStats, PhysicsConfig config)
+            List<CaseResidualData> residuals, List<MeshStatEntry> meshStats, PhysicsConfig config,
+            SliceVisualizationResult? visualization)
         {
             var cases = summary.Cases;
             var data = new ReportData
@@ -132,11 +154,22 @@ namespace foamscript.Services
                 }).ToList()
             };
 
+            // Add visualization data (base64-encoded for HTML <img> embedding)
+            if (visualization != null)
+            {
+                data.HasVisualization = true;
+                if (visualization.PressureSlicePng != null)
+                    data.PressureSliceImage = "data:image/png;base64," + Convert.ToBase64String(visualization.PressureSlicePng);
+                if (visualization.VelocitySlicePng != null)
+                    data.VelocitySliceImage = "data:image/png;base64," + Convert.ToBase64String(visualization.VelocitySlicePng);
+            }
+
             return data;
         }
 
         private PdfReportData BuildPdfReportData(string studyName, ResultsSummary summary,
-            List<CaseResidualData> residuals, List<MeshStatEntry> meshStats, PhysicsConfig config)
+            List<CaseResidualData> residuals, List<MeshStatEntry> meshStats, PhysicsConfig config,
+            SliceVisualizationResult? visualization)
         {
             var cases = summary.Cases;
             return new PdfReportData
@@ -185,7 +218,10 @@ namespace foamscript.Services
                 {
                     CaseName = r.CaseName,
                     ChartPng = _chartGenerator.GenerateResidualChartPng(r)
-                }).ToList()
+                }).ToList(),
+
+                PressureSlicePng = visualization?.PressureSlicePng,
+                VelocitySlicePng = visualization?.VelocitySlicePng
             };
         }
 
@@ -207,6 +243,12 @@ namespace foamscript.Services
                 if (logFile != null)
                 {
                     data.Entries = ResidualParser.ParseLogFile(logFile);
+                    if (data.Entries.Count == 0)
+                        Console.Error.WriteLine($"  Warning: Solver log found at {logFile} but contains no residual data");
+                }
+                else
+                {
+                    Console.Error.WriteLine($"  Warning: No solver log found in {caseDir} — convergence chart will be empty");
                 }
 
                 residuals.Add(data);
@@ -285,7 +327,7 @@ namespace foamscript.Services
             return null;
         }
 
-        private static PhysicsConfig ReadPhysicsConfig(string studyDir)
+        internal static PhysicsConfig ReadPhysicsConfig(string studyDir)
         {
             var config = new PhysicsConfig();
 
@@ -340,7 +382,7 @@ namespace foamscript.Services
             if (File.Exists(uFile))
             {
                 var content = File.ReadAllText(uFile);
-                var omegaMatch = System.Text.RegularExpressions.Regex.Match(content, @"omega\s+([\d.eE+-]+)");
+                var omegaMatch = System.Text.RegularExpressions.Regex.Match(content, @"omega\s+(?:constant\s+)?([\d.eE+-]+)");
                 if (omegaMatch.Success && double.TryParse(omegaMatch.Groups[1].Value, out var omega))
                 {
                     var rpm = omega * 60.0 / (2.0 * Math.PI);

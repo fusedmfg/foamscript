@@ -55,7 +55,7 @@ namespace foamscript.Services
             plot.XLabel("Angle of Attack (\u00b0)");
             plot.YLabel(yLabel);
 
-            return plot.GetSvgXml(ChartWidth, ChartHeight);
+            return EnsureSvgViewBox(plot.GetSvgXml(ChartWidth, ChartHeight));
         }
 
         /// <summary>
@@ -134,7 +134,7 @@ namespace foamscript.Services
             plot.XLabel("Drag Coefficient, C\u2084");
             plot.YLabel("Lift Coefficient, C\u2097");
 
-            return plot.GetSvgXml(ChartWidth, ChartHeight);
+            return EnsureSvgViewBox(plot.GetSvgXml(ChartWidth, ChartHeight));
         }
 
         /// <summary>
@@ -182,7 +182,7 @@ namespace foamscript.Services
             PopulateResidualPlot(plot, byField);
             ConfigureResidualAxes(plot, residualData.CaseName);
 
-            return plot.GetSvgXml(ChartWidth, ChartHeight);
+            return EnsureSvgViewBox(plot.GetSvgXml(ChartWidth, ChartHeight));
         }
 
         /// <summary>
@@ -304,7 +304,7 @@ namespace foamscript.Services
             plot.Title(title);
             var annotation = plot.Add.Annotation(message);
             annotation.Alignment = Alignment.MiddleCenter;
-            return plot.GetSvgXml(ChartWidth, ChartHeight);
+            return EnsureSvgViewBox(plot.GetSvgXml(ChartWidth, ChartHeight));
         }
 
         private byte[] GenerateEmptyChartPng(string title, string message)
@@ -315,6 +315,22 @@ namespace foamscript.Services
             var annotation = plot.Add.Annotation(message);
             annotation.Alignment = Alignment.MiddleCenter;
             return plot.GetImageBytes(ChartWidth, ChartHeight, ImageFormat.Png);
+        }
+
+        /// <summary>
+        /// Ensures the SVG has a viewBox attribute for proper responsive scaling.
+        /// Without viewBox, browsers cannot scale SVG content when CSS constrains width/height.
+        /// </summary>
+        internal static string EnsureSvgViewBox(string svg)
+        {
+            if (string.IsNullOrEmpty(svg) || svg.Contains("viewBox"))
+                return svg;
+
+            // ScottPlot outputs: <svg xmlns="..." width="800" height="500">
+            // Insert viewBox after height attribute
+            var pattern = $"height=\"{ChartHeight}\"";
+            var replacement = $"height=\"{ChartHeight}\" viewBox=\"0 0 {ChartWidth} {ChartHeight}\"";
+            return svg.Replace(pattern, replacement);
         }
     }
 }

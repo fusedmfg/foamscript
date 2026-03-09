@@ -75,6 +75,7 @@ namespace foamscript
                 builder.Services.AddTransient<ChartGenerator>();
                 builder.Services.AddTransient<HtmlReportGenerator>();
                 builder.Services.AddTransient<PdfReportGenerator>();
+                builder.Services.AddTransient<VisualizationService>();
 
                 // Command handlers.
                 builder.Services.AddTransient<ValidateHandler>();

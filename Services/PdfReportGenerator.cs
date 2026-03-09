@@ -92,6 +92,31 @@ namespace foamscript.Services
                 y = DrawChartCentered(gfx, convergence.ChartPng, y, ContentWidth * 0.85);
             }
 
+            // Section 6: Flow Visualization (if available)
+            if (data.PressureSlicePng != null || data.VelocitySlicePng != null)
+            {
+                y = CheckPageBreak(document, ref page, ref gfx, y, 300);
+                y = DrawSectionHeading(gfx, "6. Flow Field Visualization", y);
+
+                gfx.DrawString("Contour plots on the y=0 symmetry plane through the disc center.",
+                    BodyFont, new XSolidBrush(XColor.FromArgb(85, 85, 85)), Margin, y);
+                y += 18;
+
+                if (data.PressureSlicePng != null)
+                {
+                    y = CheckPageBreak(document, ref page, ref gfx, y, 300);
+                    y = DrawSubheading(gfx, "Static Pressure", y);
+                    y = DrawChartCentered(gfx, data.PressureSlicePng, y, ContentWidth * 0.85);
+                }
+
+                if (data.VelocitySlicePng != null)
+                {
+                    y = CheckPageBreak(document, ref page, ref gfx, y, 300);
+                    y = DrawSubheading(gfx, "Velocity Magnitude", y);
+                    y = DrawChartCentered(gfx, data.VelocitySlicePng, y, ContentWidth * 0.85);
+                }
+            }
+
             // Footer on last page
             DrawFooter(gfx, data.Version);
 
@@ -339,6 +364,10 @@ namespace foamscript.Services
         public byte[]? DragPolarChart { get; set; }
         public List<CaseResultEntry> Cases { get; set; } = new();
         public List<PdfConvergenceEntry> ConvergenceCharts { get; set; } = new();
+
+        // Flow visualization (raw PNG bytes)
+        public byte[]? PressureSlicePng { get; set; }
+        public byte[]? VelocitySlicePng { get; set; }
     }
 
     public class PdfMeshStatEntry

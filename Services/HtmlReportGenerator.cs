@@ -112,6 +112,11 @@ namespace foamscript.Services
 
         // Convergence charts (one per case)
         public List<ConvergenceChartEntry> ConvergenceCharts { get; set; } = new();
+
+        // Flow visualization (base64-encoded PNG for <img> embedding)
+        public string PressureSliceImage { get; set; } = string.Empty;
+        public string VelocitySliceImage { get; set; } = string.Empty;
+        public bool HasVisualization { get; set; }
     }
 
     public class MeshStatEntry
