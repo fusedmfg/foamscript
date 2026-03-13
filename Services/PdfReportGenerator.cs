@@ -63,26 +63,30 @@ namespace foamscript.Services
             y = DrawCoeffTable(gfx, data.Cases, y);
             DrawFooter(gfx, data.Version);
 
-            // --- New page: Aerodynamic Polars (charts) ---
-            gfx.Dispose();
-            page = AddPage(document);
-            gfx = XGraphics.FromPdfPage(page);
-            y = Margin;
-            y = DrawSectionHeading(gfx, "4. Aerodynamic Coefficient Polars", y);
-
-            // 4 polar charts in 2×2 grid
-            foreach (var chartPair in ChunkCharts(data.PolarCharts, 2))
+            // --- Dedicated page per polar chart (full-width) ---
+            for (int i = 0; i < data.PolarCharts.Count; i++)
             {
-                y = CheckPageBreak(document, ref page, ref gfx, y, 280);
-                y = DrawChartRow(gfx, chartPair, y);
+                gfx.Dispose();
+                page = AddPage(document);
+                gfx = XGraphics.FromPdfPage(page);
+                y = Margin;
+
+                if (i == 0)
+                    y = DrawSectionHeading(gfx, "4. Aerodynamic Coefficient Polars", y);
+
+                y = DrawChartCentered(gfx, data.PolarCharts[i], y, ContentWidth);
+                DrawFooter(gfx, data.Version);
             }
 
             if (data.DragPolarChart != null && data.DragPolarChart.Length > 0)
             {
-                y = CheckPageBreak(document, ref page, ref gfx, y, 280);
-                y = DrawChartCentered(gfx, data.DragPolarChart, y, ContentWidth * 0.6);
+                gfx.Dispose();
+                page = AddPage(document);
+                gfx = XGraphics.FromPdfPage(page);
+                y = Margin;
+                y = DrawChartCentered(gfx, data.DragPolarChart, y, ContentWidth);
+                DrawFooter(gfx, data.Version);
             }
-            DrawFooter(gfx, data.Version);
 
             // --- New page per case: Convergence History ---
             foreach (var convergence in data.ConvergenceCharts)
@@ -295,21 +299,6 @@ namespace foamscript.Services
             return y;
         }
 
-        private static double DrawChartRow(XGraphics gfx, List<byte[]> charts, double y)
-        {
-            double chartWidth = (ContentWidth - 10) / 2;
-            double chartHeight = chartWidth * 0.625;
-
-            for (int i = 0; i < charts.Count; i++)
-            {
-                double x = Margin + i * (chartWidth + 10);
-                DrawChartImage(gfx, charts[i], x, y, chartWidth, chartHeight);
-            }
-
-            y += chartWidth * 0.625 + 10;
-            return y;
-        }
-
         private static double DrawChartCentered(XGraphics gfx, byte[] chartPng, double y, double width)
         {
             double height = width * 0.625;
@@ -336,13 +325,6 @@ namespace foamscript.Services
                 (PageWidth - size.Width) / 2, PageHeight - 30);
         }
 
-        private static List<List<byte[]>> ChunkCharts(List<byte[]> charts, int chunkSize)
-        {
-            var result = new List<List<byte[]>>();
-            for (int i = 0; i < charts.Count; i += chunkSize)
-                result.Add(charts.Skip(i).Take(chunkSize).ToList());
-            return result;
-        }
     }
 
     /// <summary>

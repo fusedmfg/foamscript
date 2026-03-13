@@ -25,6 +25,12 @@ triang = mtri.Triangulation(x, z)
 mask = mtri.TriAnalyzer(triang).get_flat_tri_mask(min_circle_ratio=0.01)
 triang.set_mask(mask)
 
+# Auto-zoom: refined mesh clusters points near the disc, so percentile
+# bounds capture the interesting region without needing disc dimensions.
+x_lo, x_hi = np.percentile(x, 5), np.percentile(x, 95)
+z_lo, z_hi = np.percentile(z, 5), np.percentile(z, 95)
+pad = 0.1 * max(x_hi - x_lo, z_hi - z_lo)
+
 for field_name, field_data, cmap, title, unit in [
     ("p", data["p"], "RdBu_r", "Static Pressure", "Pa"),
     ("umag", data["umag"], "viridis", "Velocity Magnitude", "m/s"),
@@ -40,6 +46,8 @@ for field_name, field_data, cmap, title, unit in [
     cb.set_label(f"{title} ({unit})", fontsize=12)
     cb.ax.tick_params(labelsize=10)
 
+    ax.set_xlim(x_lo - pad, x_hi + pad)
+    ax.set_ylim(z_lo - pad, z_hi + pad)
     ax.set_xlabel("x (m)", fontsize=12)
     ax.set_ylabel("z (m)", fontsize=12)
     ax.set_title(f"{title} \u2014 y=0 Slice", fontsize=14, fontweight="bold")

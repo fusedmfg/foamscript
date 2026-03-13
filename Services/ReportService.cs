@@ -431,7 +431,7 @@ namespace foamscript.Services
         public string TurbulenceIntensity { get; set; } = "N/A";
         public string Nu { get; set; } = "N/A";
         public string SolverName { get; set; } = "simpleFoam";
-        public string MaxIterations { get; set; } = "1000";
+        public string MaxIterations { get; set; } = "500";
         public string RefinementMin { get; set; } = "N/A";
         public string RefinementMax { get; set; } = "N/A";
     }

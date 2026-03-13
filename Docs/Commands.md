@@ -248,7 +248,7 @@ foamscript new-study --config study.json
 |--------|-------------|---------|
 | `--nu` | Kinematic viscosity (m²/s) — air at ~20°C sea level | `1.5e-5` |
 | `--turbulence-intensity` | Freestream turbulence intensity (fraction, e.g. 0.01 = 1%) | `0.01` |
-| `--max-iterations` | Maximum solver iterations (steady-state) | `1000` |
+| `--max-iterations` | Maximum solver iterations (steady-state) | `500` |
 | `--write-interval` | Write results every N iterations | `100` |
 | `--end-time` | Simulation end time — transient only (seconds) | `1.0` |
 | `--outer-correctors` | PIMPLE outer corrector iterations — transient only | `3` |

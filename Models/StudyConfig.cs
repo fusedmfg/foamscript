@@ -38,8 +38,8 @@ namespace foamscript.Models
         /// <summary>PIMPLE outer corrector iterations. Default: 3.</summary>
         public int NOuterCorrectors { get; set; } = 3;
 
-        /// <summary>Maximum solver iterations for steady-state (simpleFoam). Default: 1000.</summary>
-        public int MaxIterations { get; set; } = 1000;
+        /// <summary>Maximum solver iterations for steady-state (simpleFoam). Default: 500.</summary>
+        public int MaxIterations { get; set; } = 500;
 
         /// <summary>Write interval for steady-state output (every N iterations). Default: 100.</summary>
         public int WriteInterval { get; set; } = 100;

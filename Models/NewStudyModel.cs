@@ -65,8 +65,8 @@ namespace foamscript.Models
         [Option("outer-correctors", Required = false, Default = 3, HelpText = "PIMPLE outer corrector iterations (default: 3)")]
         public int NOuterCorrectors { get; set; } = 3;
 
-        [Option("max-iterations", Required = false, Default = 1000, HelpText = "Maximum solver iterations for steady-state simpleFoam (default: 1000)")]
-        public int MaxIterations { get; set; } = 1000;
+        [Option("max-iterations", Required = false, Default = 500, HelpText = "Maximum solver iterations for steady-state simpleFoam (default: 500)")]
+        public int MaxIterations { get; set; } = 500;
 
         [Option("write-interval", Required = false, Default = 100, HelpText = "Write results every N iterations (default: 100)")]
         public int WriteInterval { get; set; } = 100;
