@@ -1,7 +1,7 @@
 # FoamScript Executive Summary
 
-**Last Updated:** March 13, 2026
-**Version:** 0.4.0 (AIAA Reports + Geometry-Referenced Visualizations)
+**Last Updated:** March 14, 2026
+**Version:** 0.4.1 (Clean Build + Security Hardening)
 **Repository:** [fusedmfg/foamscript](https://github.com/fusedmfg/foamscript) (private)
 
 *This is a living document revised alongside development. It serves two purposes: (1) document what FoamScript is and how it solves OpenFOAM complexity, and (2) provide an honest narrative on developing this application using a human/AI pair-coding approach.*
@@ -161,17 +161,17 @@ FoamScript was built using **Claude Code** (Anthropic's AI coding agent) as the 
 ┌─────────────────────────────────────────────────┐
 │           PROJECT STATISTICS AT A GLANCE         │
 ├─────────────────────────────────────────────────┤
-│  Development Period    27 days (Feb 15-Mar 13)   │
-│  Active Days           11                        │
-│  Total Commits         101                       │
-│  AI Co-Authored        87 / 101 (86.1%)          │
-│  Total C# Lines        10,901                    │
-│  Production Code       6,243 lines               │
+│  Development Period    28 days (Feb 15-Mar 14)   │
+│  Active Days           12                        │
+│  Total Commits         105                       │
+│  AI Co-Authored        91 / 105 (86.7%)          │
+│  Total C# Lines        10,976                    │
+│  Production Code       6,318 lines               │
 │  Test Code             4,658 lines               │
-│  Test/Production Ratio 74.6%                     │
+│  Test/Production Ratio 73.7%                     │
 │  Passing Tests         200                       │
 │  Template Files        42                        │
-│  GitHub Issues         30 (25 closed, 5 open)    │
+│  GitHub Issues         31 (26 closed, 5 open)    │
 └─────────────────────────────────────────────────┘
 ```
 
@@ -179,11 +179,11 @@ FoamScript was built using **Claude Code** (Anthropic's AI coding agent) as the 
 
 | Model | Commits | Share |
 |-------|---------|-------|
-| Claude Opus 4.6 | 44 | 50.6% |
-| Claude Sonnet 4.5 | 32 | 36.8% |
-| Claude Sonnet 4.6 | 11 | 12.6% |
-| **Total AI** | **87** | **86.1%** |
-| Human-only | 14 | 13.9% |
+| Claude Opus 4.6 | 48 | 52.7% |
+| Claude Sonnet 4.5 | 32 | 35.2% |
+| Claude Sonnet 4.6 | 11 | 12.1% |
+| **Total AI** | **91** | **86.7%** |
+| Human-only | 14 | 13.3% |
 
 ### Development Timeline
 
@@ -204,8 +204,9 @@ Mar 6-7        2     Audit remediation, template rename, v2512 test fixtures
 Mar 8 (Sa)     9     Report command, auto-parallel, documentation audit
 Mar 9-12       0     (No development)
 Mar 13 (Th)    7     Landscape PDF, full-page polars, geometry-referenced visualizations
+Mar 14 (Fr)    4     PdfSharpCore→PDFsharp 6.2.4 migration, vulnerability fix, clean build
 ──────────  ───────  ─────────────────────────────────────────
-Total        101     Full pipeline with AIAA reports + flow visualization
+Total        105     Full pipeline with AIAA reports + flow visualization
 ```
 
 ### Code Distribution
@@ -216,7 +217,7 @@ Production Code by Component (6,014 lines):
   MeshService          472 ██████████████████        7.8%
   SolverService        412 ████████████████          6.9%
   ReportService        407 ███████████████           6.8%
-  PdfReportGenerator   359 █████████████             6.0%
+  PdfReportGenerator   434 ████████████████          6.9%
   DomainService        355 █████████████             5.9%
   StlConversionService 341 ████████████              5.7%
   CaseService          335 ████████████              5.6%
@@ -418,12 +419,12 @@ Based on the development history, approximately **70-75% of AI compute was produ
 
 | Metric | Value | Assessment |
 |--------|-------|------------|
-| Production LOC | 6,243 | Substantial for CLI tool scope |
+| Production LOC | 6,318 | Substantial for CLI tool scope |
 | Test LOC | 4,658 | Strong investment |
-| Test/Prod Ratio | 74.6% | Above industry average (~40-60% typical) |
+| Test/Prod Ratio | 73.7% | Above industry average (~40-60% typical) |
 | Passing Tests | 200 | Zero failures |
 | Template Files | 42 | Comprehensive OpenFOAM coverage |
-| GitHub Issues | 30 total (25 closed, 5 open) | Comprehensive tracking |
+| GitHub Issues | 31 total (26 closed, 5 open) | Comprehensive tracking |
 | Build Status | Clean | Zero warnings |
 | Pipeline Validated | Yes | SimFlow match + grid convergence |
 
@@ -431,11 +432,11 @@ Based on the development history, approximately **70-75% of AI compute was produ
 
 | Metric | Value |
 |--------|-------|
-| Avg commits/active day | 9.2 |
+| Avg commits/active day | 8.8 |
 | Peak day (Feb 16) | 30 commits |
-| Lines per active day | 991 |
-| Tests per active day | 18.2 |
-| Issues closed per active day | 2.3 |
+| Lines per active day | 915 |
+| Tests per active day | 16.7 |
+| Issues closed per active day | 2.2 |
 
 ---
 
@@ -445,7 +446,7 @@ Based on the development history, approximately **70-75% of AI compute was produ
 
 This project requires dual expertise that is uncommon in a single contractor:
 
-1. **Senior .NET software architecture** — dependency injection, CLI design, Scriban templating, charting (ScottPlot 5.x), PDF generation (PdfSharpCore), xUnit/Moq testing, cross-platform deployment
+1. **Senior .NET software architecture** — dependency injection, CLI design, Scriban templating, charting (ScottPlot 5.x), PDF generation (PDFsharp 6.x), xUnit/Moq testing, cross-platform deployment
 2. **CFD/OpenFOAM domain knowledge** — meshing pipelines (blockMesh/snappyHexMesh), turbulence models (kOmegaSST), force coefficient conventions (AIAA standards), solver tuning, grid convergence analysis
 
 Market rates for each discipline independently:
@@ -586,6 +587,6 @@ The largest cost-optimization opportunity is eliminating rate-limit downtime. Up
 
 ---
 
-*Last updated: March 13, 2026.*
+*Last updated: March 14, 2026.*
 *This is a living document revised alongside development.*
 *AI assistance provided by Anthropic Claude (Sonnet 4.5, Sonnet 4.6, Opus 4.6) via Claude Code.*
