@@ -1,11 +1,11 @@
-using PdfSharpCore.Drawing;
-using PdfSharpCore.Pdf;
+using PdfSharp.Drawing;
+using PdfSharp.Pdf;
 using foamscript.Models;
 
 namespace foamscript.Services
 {
     /// <summary>
-    /// Generates AIAA-quality PDF analysis reports using PdfSharpCore.
+    /// Generates AIAA-quality PDF analysis reports using PdfSharp.
     /// Embeds ScottPlot chart images and renders tables programmatically.
     /// </summary>
     public class PdfReportGenerator
@@ -15,14 +15,14 @@ namespace foamscript.Services
         private const double Margin = 54; // 0.75 inch margins
         private const double ContentWidth = PageWidth - 2 * Margin; // 684 pts (9.5")
 
-        private static readonly XFont TitleFont = new("Times New Roman", 20, XFontStyle.Bold);
-        private static readonly XFont SubtitleFont = new("Times New Roman", 12, XFontStyle.Regular);
-        private static readonly XFont HeadingFont = new("Times New Roman", 14, XFontStyle.Bold);
-        private static readonly XFont SubheadingFont = new("Times New Roman", 11, XFontStyle.Bold);
-        private static readonly XFont BodyFont = new("Times New Roman", 10, XFontStyle.Regular);
-        private static readonly XFont TableHeaderFont = new("Times New Roman", 9, XFontStyle.Bold);
-        private static readonly XFont TableCellFont = new("Courier New", 9, XFontStyle.Regular);
-        private static readonly XFont FooterFont = new("Times New Roman", 8, XFontStyle.Regular);
+        private static readonly XFont TitleFont = new("Times New Roman", 20, XFontStyleEx.Bold);
+        private static readonly XFont SubtitleFont = new("Times New Roman", 12, XFontStyleEx.Regular);
+        private static readonly XFont HeadingFont = new("Times New Roman", 14, XFontStyleEx.Bold);
+        private static readonly XFont SubheadingFont = new("Times New Roman", 11, XFontStyleEx.Bold);
+        private static readonly XFont BodyFont = new("Times New Roman", 10, XFontStyleEx.Regular);
+        private static readonly XFont TableHeaderFont = new("Times New Roman", 9, XFontStyleEx.Bold);
+        private static readonly XFont TableCellFont = new("Courier New", 9, XFontStyleEx.Regular);
+        private static readonly XFont FooterFont = new("Times New Roman", 8, XFontStyleEx.Regular);
 
         private static readonly XColor HeaderBg = XColor.FromArgb(245, 245, 245);
         private static readonly XColor BorderColor = XColor.FromArgb(200, 200, 200);
@@ -136,8 +136,8 @@ namespace foamscript.Services
         private static PdfPage AddPage(PdfDocument document)
         {
             var page = document.AddPage();
-            page.Width = PageWidth;
-            page.Height = PageHeight;
+            page.Width = new XUnitPt(PageWidth);
+            page.Height = new XUnitPt(PageHeight);
             return page;
         }
 
@@ -199,7 +199,6 @@ namespace foamscript.Services
             (string, string)[] rows, double y)
         {
             double col1Width = ContentWidth * 0.45;
-            double col2Width = ContentWidth * 0.55;
             double rowHeight = 18;
 
             // Header
@@ -313,7 +312,7 @@ namespace foamscript.Services
             if (pngData == null || pngData.Length == 0) return;
 
             using var stream = new MemoryStream(pngData);
-            var image = XImage.FromStream(() => new MemoryStream(pngData));
+            var image = XImage.FromStream(stream);
             gfx.DrawImage(image, x, y, width, height);
         }
 
