@@ -1,7 +1,7 @@
 # FoamScript Executive Summary
 
-**Last Updated:** March 8, 2026
-**Version:** 0.3.0 (AIAA Reports + Auto-Parallel)
+**Last Updated:** March 13, 2026
+**Version:** 0.4.0 (AIAA Reports + Geometry-Referenced Visualizations)
 **Repository:** [fusedmfg/foamscript](https://github.com/fusedmfg/foamscript) (private)
 
 *This is a living document revised alongside development. It serves two purposes: (1) document what FoamScript is and how it solves OpenFOAM complexity, and (2) provide an honest narrative on developing this application using a human/AI pair-coding approach.*
@@ -50,7 +50,8 @@ foamscript report -d ./DiscStudy
 | **Parametric Studies** | Generate and process multiple angle-of-attack cases automatically |
 | **Auto-Detection** | Single `-d` flag intelligently detects case vs. study directories |
 | **Auto-Parallel** | CPU cores auto-detected; `--cores N` to override, `FOAMSCRIPT_MAX_CORES` env var to cap |
-| **AIAA-Quality Reports** | Publication-standard HTML + PDF reports with aerodynamic polars, convergence history, mesh statistics, and coefficient tables |
+| **AIAA-Quality Reports** | Publication-standard HTML + PDF reports with aerodynamic polars, convergence history, mesh statistics, coefficient tables, and geometry-referenced flow visualizations |
+| **Flow Visualization** | Pressure and velocity contour slices via ParaView (pvpython) + matplotlib, with AIAA-standard geometry-referenced framing |
 | **Environment Validation** | Pre-flight checks for OpenFOAM, gmsh, and system dependencies |
 
 ### Validation Status
@@ -160,15 +161,15 @@ FoamScript was built using **Claude Code** (Anthropic's AI coding agent) as the 
 ┌─────────────────────────────────────────────────┐
 │           PROJECT STATISTICS AT A GLANCE         │
 ├─────────────────────────────────────────────────┤
-│  Development Period    22 days (Feb 15-Mar 8)    │
-│  Active Days           10                        │
-│  Total Commits         94                        │
-│  AI Co-Authored        80 / 94 (85.1%)           │
-│  Total C# Lines        10,491                    │
-│  Production Code       6,014 lines               │
-│  Test Code             4,477 lines               │
-│  Test/Production Ratio 74.5%                     │
-│  Passing Tests         192                       │
+│  Development Period    27 days (Feb 15-Mar 13)   │
+│  Active Days           11                        │
+│  Total Commits         101                       │
+│  AI Co-Authored        87 / 101 (86.1%)          │
+│  Total C# Lines        10,901                    │
+│  Production Code       6,243 lines               │
+│  Test Code             4,658 lines               │
+│  Test/Production Ratio 74.6%                     │
+│  Passing Tests         200                       │
 │  Template Files        42                        │
 │  GitHub Issues         30 (25 closed, 5 open)    │
 └─────────────────────────────────────────────────┘
@@ -178,11 +179,11 @@ FoamScript was built using **Claude Code** (Anthropic's AI coding agent) as the 
 
 | Model | Commits | Share |
 |-------|---------|-------|
-| Claude Opus 4.6 | 37 | 46.3% |
-| Claude Sonnet 4.5 | 32 | 40.0% |
-| Claude Sonnet 4.6 | 11 | 13.8% |
-| **Total AI** | **80** | **85.1%** |
-| Human-only | 14 | 14.9% |
+| Claude Opus 4.6 | 44 | 50.6% |
+| Claude Sonnet 4.5 | 32 | 36.8% |
+| Claude Sonnet 4.6 | 11 | 12.6% |
+| **Total AI** | **87** | **86.1%** |
+| Human-only | 14 | 13.9% |
 
 ### Development Timeline
 
@@ -201,8 +202,10 @@ Feb 26-Mar 4   0     BLOCKED — usage limit hit (see §8.3)
 Mar 5 (We)     5     Coefficient parsing, template upgrade, grid convergence
 Mar 6-7        2     Audit remediation, template rename, v2512 test fixtures
 Mar 8 (Sa)     9     Report command, auto-parallel, documentation audit
+Mar 9-12       0     (No development)
+Mar 13 (Th)    7     Landscape PDF, full-page polars, geometry-referenced visualizations
 ──────────  ───────  ─────────────────────────────────────────
-Total         94     Full pipeline with AIAA reports + auto-parallel
+Total        101     Full pipeline with AIAA reports + flow visualization
 ```
 
 ### Code Distribution
@@ -415,10 +418,10 @@ Based on the development history, approximately **70-75% of AI compute was produ
 
 | Metric | Value | Assessment |
 |--------|-------|------------|
-| Production LOC | 6,014 | Substantial for CLI tool scope |
-| Test LOC | 4,477 | Strong investment |
-| Test/Prod Ratio | 74.5% | Above industry average (~40-60% typical) |
-| Passing Tests | 192 | Zero failures |
+| Production LOC | 6,243 | Substantial for CLI tool scope |
+| Test LOC | 4,658 | Strong investment |
+| Test/Prod Ratio | 74.6% | Above industry average (~40-60% typical) |
+| Passing Tests | 200 | Zero failures |
 | Template Files | 42 | Comprehensive OpenFOAM coverage |
 | GitHub Issues | 30 total (25 closed, 5 open) | Comprehensive tracking |
 | Build Status | Clean | Zero warnings |
@@ -428,11 +431,11 @@ Based on the development history, approximately **70-75% of AI compute was produ
 
 | Metric | Value |
 |--------|-------|
-| Avg commits/active day | 9.4 |
+| Avg commits/active day | 9.2 |
 | Peak day (Feb 16) | 30 commits |
-| Lines per active day | 1,049 |
-| Tests per active day | 19.2 |
-| Issues closed per active day | 2.5 |
+| Lines per active day | 991 |
+| Tests per active day | 18.2 |
+| Issues closed per active day | 2.3 |
 
 ---
 
@@ -587,6 +590,6 @@ The largest cost-optimization opportunity is not the AI subscription tier — it
 
 ---
 
-*Last updated: March 8, 2026.*
+*Last updated: March 13, 2026.*
 *This is a living document revised alongside development.*
 *AI assistance provided by Anthropic Claude (Sonnet 4.5, Sonnet 4.6, Opus 4.6) via Claude Code.*
