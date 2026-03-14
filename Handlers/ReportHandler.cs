@@ -28,7 +28,7 @@ namespace foamscript.Handlers
             _loggingService.LogInformation($"Generating report for {dir}");
 
             var studyName = Path.GetFileName(dir);
-            var outputDir = model.OutputDir ?? Path.Combine(dir, "report");
+            var outputDir = Path.Combine(dir, "report");
             var format = model.Format.ToLowerInvariant();
 
             if (format is not "html" and not "pdf" and not "both")

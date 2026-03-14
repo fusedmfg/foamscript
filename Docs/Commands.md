@@ -543,7 +543,6 @@ foamscript report [OPTIONS]
 |--------|-------|-------------|---------|
 | `--dir` | `-d` | Path to case or study directory (required) | - |
 | `--format` | `-f` | Output format: `html`, `pdf`, or `both` | `both` |
-| `--output` | `-o` | Output directory | `{study_dir}/report/` |
 | `--average-window` | | Fraction of simulation to average over (0.1 = last 10%) | `0.1` |
 
 ### Report Contents
@@ -566,11 +565,6 @@ foamscript report -d ~/studies/MyStudy
 **HTML only:**
 ```bash
 foamscript report -d ~/studies/MyStudy --format html
-```
-
-**Custom output directory:**
-```bash
-foamscript report -d ~/studies/MyStudy -o ~/reports
 ```
 
 **Average over last 20% of simulation:**
