@@ -463,73 +463,70 @@ Market rates for each discipline independently:
 
 This project used Claude Code's **Pro plan ($20/month)**, the base subscription that most developers would use. The subscription is non-refundable — it cannot be prorated.
 
-**Scenario A — No extra usage enabled (what happened in this project):**
+**What actually happened (Pro plan + $20 extra usage):**
 
 | Cost Category | Amount | Notes |
 |---------------|--------|-------|
 | Claude Code Pro subscription | $20 | Non-refundable monthly subscription |
-| Human engineer productive time | $8,438 | 37.5 hrs × $225/hr |
-| Rate-limit downtime penalty | $9,000 | 40 hrs × $225/hr (see §8.3) |
+| Extra usage purchased | $20 | Consumed in ~2 hours on Mar 8 |
+| Human engineer productive time | $9,900 | 44 hrs × $225/hr (11 active days × 4 hrs avg) |
+| Rate-limit downtime penalty | $16,200 | 72 hrs × $225/hr (see §8.3) |
 | Linux workstation (existing) | $0 | Already owned, no incremental cost |
 | OpenFOAM / gmsh licenses | $0 | Open-source software |
-| **Total AI-assisted cost** | **~$17,458** | |
+| **Total AI-assisted cost** | **~$26,140** | |
 
-**Scenario B — Extra usage enabled (pay overage in $20 increments):**
+**Key insight:** The $40 total subscription spend is economically irrelevant. The real costs are:
+1. **Human engineer time: $9,900** — irreducible, regardless of AI capability (domain expertise, architecture, review)
+2. **Rate-limit downtime: $16,200** — the dominant cost, representing 62% of total project cost
 
-| Cost Category | Amount | Notes |
-|---------------|--------|-------|
-| Claude Code Pro subscription | $20 | Non-refundable base |
-| Extra usage increments | ~$60-$100 | 3-5 additional $20 increments (non-refundable, paid when limit hit) |
-| Human engineer productive time | $8,438 | 37.5 hrs × $225/hr (irreducible) |
-| Reduced downtime penalty | ~$1,500-$3,000 | Context breaks still cause some idle time |
-| **Total AI-assisted cost (Scenario B)** | **~$10,000-$11,500** | |
-
-**Key insight:** The $20 subscription cost is economically irrelevant. The real costs are:
-1. **Human engineer time: $8,438** — irreducible, regardless of AI capability (domain expertise, architecture, review)
-2. **Rate-limit downtime: $9,000** — reducible with higher-tier plan or extra usage enabled
-
-**Cost per deliverable (Scenario A — $17,458 total):**
+**Cost per deliverable ($26,140 total):**
 
 | Metric | Value |
 |--------|-------|
-| Cost per line of C# code | $1.66 |
-| Cost per test | $90.93 |
-| Cost per commit | $185.72 |
-| Cost per GitHub issue resolved | $698.32 |
+| Cost per line of C# code | $2.40 |
+| Cost per test | $130.70 |
+| Cost per commit | $258.81 |
+| Cost per GitHub issue resolved | $1,045.60 |
 
 ### 8.3 Rate Limiting Impact (The Dominant Hidden Cost)
 
-The Pro plan's usage limit caused a **complete development stoppage from February 26 through March 2** — nearly a full week. The engineer was blocked from using Claude Code entirely, waiting for the weekly limit to reset. This was not a minor throttle; it was a hard stop.
+The Pro plan's usage limit caused **two complete development stoppages** totaling 72 hours of blocked engineering time:
 
-| Factor | Initially Reported (Feb 25) | Actual Experience (Mar 8) |
+1. **Feb 26 – Mar 4 (7 days, ~40 hrs):** Weekly limit hit; hard stop until reset.
+2. **Mar 9 – Mar 12 (4 days, ~32 hrs):** After an intensive Mar 8 session (landscape PDF, flow viz, report refinements), the limit hit again. $20 extra usage was purchased but consumed in approximately 2 hours, providing no meaningful buffer.
+
+| Factor | Initially Reported (Feb 25) | Final Experience (Mar 13) |
 |--------|---------------------------|--------------------------|
-| Rate limit hits | ~8-12 occurrences | ~15-20 occurrences + 1 full week blocked |
-| Average wait time | ~15-30 minutes | **5-7 full days** for weekly reset |
-| Total idle time | ~3-5 hours | **~40+ hours** (full work week) |
-| Context window exhaustions | ~4-5 continuations | ~8-10 continuations |
-| Engineering cost of idle time | ~$300-$500 | **$9,000** at $225/hr |
+| Rate limit hits | ~8-12 occurrences | ~20-25 occurrences + 11 days blocked total |
+| Average wait time | ~15-30 minutes | **4-7 full days** per block |
+| Total idle time | ~3-5 hours | **~72 hours** (9 business days) |
+| Context window exhaustions | ~4-5 continuations | ~10-12 continuations |
+| Extra usage purchased | — | $20 (consumed in ~2 hours) |
+| Engineering cost of idle time | ~$300-$500 | **$16,200** at $225/hr |
 
-**The rate limiting didn't just convert compute savings into idle time — it destroyed project momentum.** Critical bugs (coefficient parsing, surfaceOrient argument order) went undetected for a week because the engineer couldn't run validation. The weekly reset schedule meant that hitting the limit on a Tuesday effectively killed the entire week.
+**The $20 extra usage experiment proved that small increments are economically irrational.** At $225/hr engineer time, $20 of extra usage needs to prevent only 5.3 minutes of downtime to break even. The $20 increment bought ~2 hours of productivity before exhaustion, after which 4 full days of downtime followed. The extra usage model needs either much larger increments or automatic scaling to be useful for intensive development.
 
-**Economic impact:** At $225/hr, 40 hours of blocked engineering time represents **$9,000** in lost productivity — **450x** the $20 subscription cost. The rate-limit downtime is the single largest cost component of AI-assisted development on the Pro plan.
+**Contributing factor — AI context inefficiency:** A portion of the rapid token consumption is attributable to the AI agent itself. Re-reading files already documented in project memory, verbose exploration of code already understood, and redundant tool calls all consume tokens without producing value. Each wasted token accelerates hitting the rate limit, compounding the downtime penalty. Improving the agent's memory utilization (checking MEMORY.md and NeuroVault before exploring) would stretch the same token budget further.
+
+**Economic impact:** At $225/hr, 72 hours of blocked engineering time represents **$16,200** in lost productivity — **405x** the $40 total subscription spend. Rate-limit downtime is **62% of total project cost** and the single largest line item.
 
 ### 8.4 Plan Tier Comparison
 
-Anthropic offers multiple Claude Code subscription tiers. The table below estimates the economic impact of each:
+Anthropic offers multiple Claude Code subscription tiers. The table below estimates the economic impact based on actual project experience:
 
 | Plan | Monthly Cost | Rate Limits | Downtime Penalty | Est. Total Project Cost |
 |------|-------------|-------------|------------------|------------------------|
-| **Pro (actual)** | $20 | Standard | $9,000 (40 hrs blocked) | ~$17,458 |
-| **Pro + extra usage** | $20 + ~$80 | Extended | ~$2,250 (10 hrs blocked) | ~$10,788 |
-| **Max (5x)** | $100 | 5x Pro | ~$1,125 (5 hrs blocked) | ~$9,583 |
-| **Max (20x)** | $200 | 20x Pro | ~$225 (1 hr blocked) | ~$8,883 |
+| **Pro + $20 extra (actual)** | $40 | Standard + 2 hrs | $16,200 (72 hrs blocked) | ~$26,140 |
+| **Pro + continuous extra** | $20 + ~$200 | Extended | ~$4,500 (20 hrs blocked) | ~$14,620 |
+| **Max (5x)** | $100 | 5x Pro | ~$2,250 (10 hrs blocked) | ~$12,250 |
+| **Max (20x)** | $200 | 20x Pro | ~$450 (2 hrs blocked) | ~$10,550 |
 
-**ROI of upgrading Pro → Max ($100/month):**
-- Additional subscription cost: $80
-- Downtime savings: ~$7,875 (35 hours reclaimed × $225/hr)
-- **Return: 98x on the $80 investment**
+**ROI of upgrading Pro → Max ($200/month):**
+- Additional subscription cost: $160
+- Downtime savings: ~$15,750 (70 hours reclaimed × $225/hr)
+- **Return: 98x on the $160 investment**
 
-Each $20 extra usage increment buys back hours of developer idle time at $225/hr. Even reclaiming 6 minutes of idle time makes the $20 increment ROI-positive. For intensive development projects, running on the base Pro plan without extra usage is the most expensive option despite having the lowest subscription cost.
+The Pro plan with ad-hoc $20 increments is the worst of both worlds: it costs more than Pro alone (due to the $20 spend) while providing negligible relief (~2 hours before re-blocking). For intensive development, the Max plan is the only tier that approaches continuous availability. The $200/month cost is less than 1 hour of the engineer time it protects.
 
 ### 8.5 Traditional Development Cost Estimate
 
@@ -556,37 +553,36 @@ The traditional cost estimate must reflect the dual-expertise requirement discus
 ### 8.6 Cost Comparison
 
 ```
-                         AI-Assisted (A)   Traditional       Savings
+                         AI-Assisted       Traditional       Savings
                          ───────────────   ───────────       ───────
-Total cost                 $17,458         $63K-$95K         72-82%
-Calendar time              22 days         8-12 weeks        3-4x faster
-Active engineer hours      37.5 hrs        280-420 hrs       85-91% fewer
-Cost per LOC               $1.66           $6.00-$9.01       63-82% less
+Total cost                 $26,140         $63K-$95K         59-72%
+Calendar time              27 days         8-12 weeks        2-3x faster
+Active engineer hours      44 hrs          280-420 hrs       85-90% fewer
+Cost per LOC               $2.40           $6.00-$9.01       60-73% less
 ```
 
 **Important caveats:**
 
 1. **AI-assisted development requires an experienced engineer.** The cost savings assume the human has both software architecture expertise and CFD domain knowledge. Without domain expertise, the AI produces syntactically correct but physically invalid simulations (see §5.4). The $225/hr rate reflects this rare skillset — cheaper engineers would spend longer, potentially negating the savings.
 
-2. **The downtime penalty is the swing factor.** Scenario A ($17,458 with 40 hrs blocked) vs. Scenario B (~$10,500 with extra usage) shows that **enabling extra usage reduces total project cost by ~40%** despite increasing subscription spend. The Pro plan without extra usage is a false economy.
+2. **The downtime penalty is the dominant cost.** At $16,200 (62% of total), rate-limit downtime dwarfs both subscription costs ($40) and productive engineer time ($9,900). On the Max plan, the same project would cost ~$10,550 — **60% less** — because most downtime is eliminated.
 
-3. **Active engineer involvement is dramatically reduced.** AI-assisted development required 37.5 hours of active human involvement vs. 280-420 hours traditionally — an **85-91% reduction**. The engineer's role shifts from writing code to directing, reviewing, and validating.
+3. **Active engineer involvement is dramatically reduced.** AI-assisted development required 44 hours of active human involvement vs. 280-420 hours traditionally — an **85-90% reduction**. The engineer's role shifts from writing code to directing, reviewing, and validating.
 
-4. **Traditional cost assumes a single project.** The AI subscription covers all projects for the month. Multiple concurrent projects would further amortize the subscription cost, though the human time cost scales linearly per project.
+4. **AI context inefficiency amplifies rate-limit costs.** Redundant file reads, verbose exploration, and failure to leverage project memory accelerate token consumption. If the AI agent used stored context more aggressively (MEMORY.md, NeuroVault), the same token budget would stretch further, reducing how often the rate limit is hit.
 
 ### 8.7 ROI Summary
 
 | Scenario | Total Cost | Time to Deliver | Cost vs. Traditional |
 |----------|-----------|-----------------|---------------------|
-| **AI-assisted — Pro, no extra usage (actual)** | ~$17,458 | 22 days | **77% savings** |
-| **AI-assisted — Pro, extra usage enabled** | ~$10,500 | ~15 days | **86% savings** |
-| **AI-assisted — Max plan** | ~$9,500 | ~12 days | **88% savings** |
+| **AI-assisted — Pro + $20 extra (actual)** | ~$26,140 | 27 days | **65% savings** |
+| **AI-assisted — Max plan (projected)** | ~$10,550 | ~15 days | **86% savings** |
 | Traditional (single contractor, $225/hr) | ~$78,750 | 8-12 weeks | Baseline |
 | Traditional (two specialists) | ~$71,300 | 8-12 weeks | Baseline |
 
-**Bottom line:** Even with the most conservative AI-assisted scenario (Pro plan, no extra usage, full downtime penalty), the project cost 77% less and was delivered 3-4x faster than traditional development. The story is compelling without cherry-picking: the honest numbers show that AI pair-coding delivers roughly **4x faster at one-quarter the cost**, with the bulk of savings coming from reduced active engineering hours rather than from cheap subscriptions.
+**Bottom line:** Even in the worst-case scenario — Pro plan with $20 extra usage, 72 hours of rate-limit downtime, and honest accounting of idle engineer time — the project cost 65% less and was delivered 2-3x faster than traditional development. However, the story reveals that **rate-limit downtime is the dominant cost driver**, representing 62% of total project cost ($16,200 of $26,140). The productive work itself (44 hours of engineering + $40 in subscriptions) costs only ~$9,940 — a **87% savings** over traditional development.
 
-The largest cost-optimization opportunity is not the AI subscription tier — it's eliminating rate-limit downtime. Upgrading from Pro ($20/month) to Max ($100/month) costs $80 but saves ~$7,875 in blocked engineer time, making it the highest-ROI investment in the entire project.
+The largest cost-optimization opportunity is eliminating rate-limit downtime. Upgrading from Pro ($40 actual) to Max ($200/month) costs an additional $160 but saves ~$15,750 in blocked engineer time — a **98x return** on the subscription upgrade. On the Max plan, total project cost drops to ~$10,550, achieving the 86% savings that the core productivity gains actually deliver.
 
 ---
 
