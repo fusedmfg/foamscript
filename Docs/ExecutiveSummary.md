@@ -32,7 +32,7 @@ Each step involves hand-editing OpenFOAM dictionary files, running shell command
 FoamScript collapses this entire workflow into four commands:
 
 ```
-foamscript new-study --model-source disc.step --angles 0,5,10 --velocity 30 --rpm 5000
+foamscript new-study --model-source disc.step --angles 0,5,10 --velocity 27 --rpm 925
 foamscript mesh -d ./DiscStudy
 foamscript solve -d ./DiscStudy
 foamscript report -d ./DiscStudy
@@ -52,6 +52,7 @@ foamscript report -d ./DiscStudy
 | **Auto-Parallel** | CPU cores auto-detected; `--cores N` to override, `FOAMSCRIPT_MAX_CORES` env var to cap |
 | **AIAA-Quality Reports** | Publication-standard HTML + PDF reports with aerodynamic polars, convergence history, mesh statistics, coefficient tables, and geometry-referenced flow visualizations |
 | **Flow Visualization** | Pressure and velocity contour slices via ParaView (pvpython) + matplotlib, with AIAA-standard geometry-referenced framing |
+| **AIAA CSV Data Export** | Machine-readable coefficient data with reference conditions header, always generated alongside reports |
 | **Environment Validation** | Pre-flight checks for OpenFOAM, gmsh, and system dependencies |
 
 ### Validation Status
@@ -107,7 +108,7 @@ Cl/Cd ratio converged to <0.3% across all levels. Default set to Medium (5,6).
 ### For Product Development Teams
 
 - **Parametric sweeps:** Test dozens of design variants with a single command
-- **Structured output:** JSON/CSV export for integration with design databases
+- **Structured output:** AIAA-standard CSV coefficient data export for integration with design databases and post-processing tools
 - **Consistency:** Same mesh settings, solver parameters, and quality checks every run
 - **Auto-parallel:** CPU cores detected automatically; no manual configuration needed
 
@@ -162,16 +163,16 @@ FoamScript was built using **Claude Code** (Anthropic's AI coding agent) as the 
 │           PROJECT STATISTICS AT A GLANCE         │
 ├─────────────────────────────────────────────────┤
 │  Development Period    28 days (Feb 15-Mar 14)   │
-│  Active Days           12                        │
-│  Total Commits         105                       │
-│  AI Co-Authored        91 / 105 (86.7%)          │
+│  Active Days           13                        │
+│  Total Commits         109                       │
+│  AI Co-Authored        95 / 109 (87.2%)          │
 │  Total C# Lines        10,976                    │
 │  Production Code       6,318 lines               │
 │  Test Code             4,658 lines               │
 │  Test/Production Ratio 73.7%                     │
-│  Passing Tests         200                       │
+│  Passing Tests         201                       │
 │  Template Files        42                        │
-│  GitHub Issues         31 (26 closed, 5 open)    │
+│  GitHub Issues         32 (27 closed, 5 open)    │
 └─────────────────────────────────────────────────┘
 ```
 
@@ -179,11 +180,11 @@ FoamScript was built using **Claude Code** (Anthropic's AI coding agent) as the 
 
 | Model | Commits | Share |
 |-------|---------|-------|
-| Claude Opus 4.6 | 48 | 52.7% |
-| Claude Sonnet 4.5 | 32 | 35.2% |
-| Claude Sonnet 4.6 | 11 | 12.1% |
-| **Total AI** | **91** | **86.7%** |
-| Human-only | 14 | 13.3% |
+| Claude Opus 4.6 | 52 | 54.7% |
+| Claude Sonnet 4.5 | 32 | 33.7% |
+| Claude Sonnet 4.6 | 11 | 11.6% |
+| **Total AI** | **95** | **87.2%** |
+| Human-only | 14 | 12.8% |
 
 ### Development Timeline
 
@@ -204,9 +205,9 @@ Mar 6-7        2     Audit remediation, template rename, v2512 test fixtures
 Mar 8 (Sa)     9     Report command, auto-parallel, documentation audit
 Mar 9-12       0     (No development)
 Mar 13 (Th)    7     Landscape PDF, full-page polars, geometry-referenced visualizations
-Mar 14 (Fr)    4     PdfSharpCore→PDFsharp 6.2.4 migration, vulnerability fix, clean build
+Mar 14 (Fr)    8     PDFsharp migration, clean build, CSV data export, elite amateur defaults, Apogee E2E validation
 ──────────  ───────  ─────────────────────────────────────────
-Total        105     Full pipeline with AIAA reports + flow visualization
+Total        109     Full pipeline with AIAA reports, CSV export + flow visualization
 ```
 
 ### Code Distribution
@@ -422,9 +423,9 @@ Based on the development history, approximately **70-75% of AI compute was produ
 | Production LOC | 6,318 | Substantial for CLI tool scope |
 | Test LOC | 4,658 | Strong investment |
 | Test/Prod Ratio | 73.7% | Above industry average (~40-60% typical) |
-| Passing Tests | 200 | Zero failures |
+| Passing Tests | 201 | Zero failures |
 | Template Files | 42 | Comprehensive OpenFOAM coverage |
-| GitHub Issues | 31 total (26 closed, 5 open) | Comprehensive tracking |
+| GitHub Issues | 32 total (27 closed, 5 open) | Comprehensive tracking |
 | Build Status | Clean | Zero warnings |
 | Pipeline Validated | Yes | SimFlow match + grid convergence |
 
@@ -432,7 +433,7 @@ Based on the development history, approximately **70-75% of AI compute was produ
 
 | Metric | Value |
 |--------|-------|
-| Avg commits/active day | 8.8 |
+| Avg commits/active day | 8.4 |
 | Peak day (Feb 16) | 30 commits |
 | Lines per active day | 915 |
 | Tests per active day | 16.7 |

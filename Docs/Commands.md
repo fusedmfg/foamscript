@@ -235,12 +235,12 @@ foamscript new-study --config study.json
 |--------|-------|-------------|---------|
 | `--config` | `-c` | Path to JSON config file (replaces all CLI options) | - |
 | `--template` | `-t` | Template name or path | `external_disc_rotatingwall_steady` |
-| `--velocity` | `-v` | Free stream velocity magnitude (m/s) | `20.0` |
-| `--rpm` | `-r` | Disc rotation speed (RPM) | `1000` |
+| `--velocity` | `-v` | Free stream velocity magnitude (m/s) | `27.0` |
+| `--rpm` | `-r` | Disc rotation speed (RPM) | `925` |
 | `--input-units` | `-u` | Source file units: mm, cm, m, in, ft | `mm` |
 | `--mesh-size` | `-m` | STL mesh size factor for STEP/IGES conversion | `0.05` |
 | `--feature-angle` | | Feature angle for edge preservation (degrees) | - |
-| `--cores` | | Number of CPU cores for parallel execution | `4` |
+| `--cores` | | Number of CPU cores (0 = auto-detect all available) | `0` |
 
 ### Physics Parameters
 
@@ -370,12 +370,12 @@ An alternative to specifying all CLI options is to provide a JSON config file wi
   "templateName": "external_disc_rotatingwall_steady",
   "modelSource": "~/my_disc.step",
   "angles": "-5,0,5,10",
-  "velocity": 20.0,
-  "rpm": 1000.0,
+  "velocity": 27.0,
+  "rpm": 925.0,
   "inputUnits": "mm",
   "meshSize": 0.05,
   "featureAngle": null,
-  "cores": 4,
+  "cores": 0,
   "physics": {
     "nu": 1.5e-5,
     "turbulenceIntensity": 0.01,
@@ -554,6 +554,7 @@ foamscript report [OPTIONS]
 - **Mesh statistics**: Cell counts per case
 - **Physics configuration**: Velocity, RPM, turbulence intensity, viscosity, solver, refinement levels
 - **Coefficient table**: Time-averaged Cd, Cl, CmPitch, Cl/Cd for all angles
+- **AIAA CSV data export**: Machine-readable coefficient data with reference conditions header (always generated alongside reports)
 
 ### Examples
 
@@ -582,6 +583,7 @@ foamscript report -d ~/studies/MyStudy --average-window 0.2
 Reports are saved to `{study_dir}/report/` by default:
 - `{StudyName}_report.html` — self-contained HTML with inline CSS and embedded SVG charts
 - `{StudyName}_report.pdf` — publication-quality PDF with embedded PNG charts
+- `{StudyName}_coefficients.csv` — AIAA-standard coefficient data with reference conditions header (always generated)
 
 ### Notes
 
@@ -622,8 +624,8 @@ foamscript new-study \
   -o ~/studies \
   -s ~/my_disc.step \
   -a -10,-5,-2.5,0,2.5,5,10 \
-  --velocity 20 \
-  --rpm 1000 \
+  --velocity 27 \
+  --rpm 925 \
   --input-units mm \
   --cores 8
 
@@ -647,8 +649,8 @@ cat > ~/studies/disc_study.json << 'EOF'
   "outputDir": "~/studies",
   "modelSource": "~/my_disc.step",
   "angles": "-10,-5,-2.5,0,2.5,5,10",
-  "velocity": 20.0,
-  "rpm": 1000.0,
+  "velocity": 27.0,
+  "rpm": 925.0,
   "inputUnits": "mm",
   "cores": 8
 }
