@@ -164,15 +164,15 @@ FoamScript was built using **Claude Code** (Anthropic's AI coding agent) as the 
 ├─────────────────────────────────────────────────┤
 │  Development Period    28 days (Feb 15-Mar 14)   │
 │  Active Days           13                        │
-│  Total Commits         109                       │
-│  AI Co-Authored        95 / 109 (87.2%)          │
+│  Total Commits         112                       │
+│  AI Co-Authored        98 / 112 (87.5%)          │
 │  Total C# Lines        10,976                    │
 │  Production Code       6,318 lines               │
 │  Test Code             4,658 lines               │
 │  Test/Production Ratio 73.7%                     │
 │  Passing Tests         201                       │
 │  Template Files        42                        │
-│  GitHub Issues         32 (27 closed, 5 open)    │
+│  GitHub Issues         33 (28 closed, 5 open)    │
 └─────────────────────────────────────────────────┘
 ```
 
@@ -180,11 +180,11 @@ FoamScript was built using **Claude Code** (Anthropic's AI coding agent) as the 
 
 | Model | Commits | Share |
 |-------|---------|-------|
-| Claude Opus 4.6 | 52 | 54.7% |
-| Claude Sonnet 4.5 | 32 | 33.7% |
-| Claude Sonnet 4.6 | 11 | 11.6% |
-| **Total AI** | **95** | **87.2%** |
-| Human-only | 14 | 12.8% |
+| Claude Opus 4.6 | 55 | 56.1% |
+| Claude Sonnet 4.5 | 32 | 32.7% |
+| Claude Sonnet 4.6 | 11 | 11.2% |
+| **Total AI** | **98** | **87.5%** |
+| Human-only | 14 | 12.5% |
 
 ### Development Timeline
 
@@ -205,9 +205,9 @@ Mar 6-7        2     Audit remediation, template rename, v2512 test fixtures
 Mar 8 (Sa)     9     Report command, auto-parallel, documentation audit
 Mar 9-12       0     (No development)
 Mar 13 (Th)    7     Landscape PDF, full-page polars, geometry-referenced visualizations
-Mar 14 (Fr)    8     PDFsharp migration, clean build, CSV data export, elite amateur defaults, Apogee E2E validation
+Mar 14 (Fr)   11     PDFsharp migration, clean build, CSV data export, elite amateur defaults, Apogee E2E validation, report -o flag removal, PDF page break fix
 ──────────  ───────  ─────────────────────────────────────────
-Total        109     Full pipeline with AIAA reports, CSV export + flow visualization
+Total        112     Full pipeline with AIAA reports, CSV export + flow visualization
 ```
 
 ### Code Distribution
@@ -425,7 +425,7 @@ Based on the development history, approximately **70-75% of AI compute was produ
 | Test/Prod Ratio | 73.7% | Above industry average (~40-60% typical) |
 | Passing Tests | 201 | Zero failures |
 | Template Files | 42 | Comprehensive OpenFOAM coverage |
-| GitHub Issues | 32 total (27 closed, 5 open) | Comprehensive tracking |
+| GitHub Issues | 33 total (28 closed, 5 open) | Comprehensive tracking |
 | Build Status | Clean | Zero warnings |
 | Pipeline Validated | Yes | SimFlow match + grid convergence |
 
@@ -433,7 +433,7 @@ Based on the development history, approximately **70-75% of AI compute was produ
 
 | Metric | Value |
 |--------|-------|
-| Avg commits/active day | 8.4 |
+| Avg commits/active day | 8.6 |
 | Peak day (Feb 16) | 30 commits |
 | Lines per active day | 915 |
 | Tests per active day | 16.7 |
@@ -487,8 +487,8 @@ This project used Claude Code's **Pro plan ($20/month)**, the base subscription 
 |--------|-------|
 | Cost per line of C# code | $2.40 |
 | Cost per test | $130.70 |
-| Cost per commit | $258.81 |
-| Cost per GitHub issue resolved | $1,045.60 |
+| Cost per commit | $233.39 |
+| Cost per GitHub issue resolved | $933.57 |
 
 ### 8.3 Rate Limiting Impact (The Dominant Hidden Cost)
 

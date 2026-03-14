@@ -574,7 +574,7 @@ foamscript report -d ~/studies/MyStudy --average-window 0.2
 
 ### Output
 
-Reports are saved to `{study_dir}/report/` by default:
+Reports are saved to `{study_dir}/report/`:
 - `{StudyName}_report.html` — self-contained HTML with inline CSS and embedded SVG charts
 - `{StudyName}_report.pdf` — publication-quality PDF with embedded PNG charts
 - `{StudyName}_coefficients.csv` — AIAA-standard coefficient data with reference conditions header (always generated)
