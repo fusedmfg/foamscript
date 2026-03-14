@@ -134,7 +134,9 @@ namespace foamscript.Services
             y = DrawSectionHeading(gfx, "2. Mesh Summary", y);
             y = DrawMeshTable(gfx, data.MeshStats, y);
 
-            // Section 3: Coefficient Summary (tables grouped together)
+            // Section 3: Coefficient Summary — check if table fits on current page
+            double coeffTableHeight = 32 + 18 + data.Cases.Count * 18 + 10;
+            y = CheckPageBreak(document, ref page, ref gfx, y, coeffTableHeight);
             y = DrawSectionHeading(gfx, "3. Coefficient Summary", y);
             y = DrawCoeffTable(gfx, data.Cases, y);
             DrawFooter(gfx, data.Version);
