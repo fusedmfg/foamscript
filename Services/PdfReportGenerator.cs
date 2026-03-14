@@ -1,9 +1,70 @@
 using PdfSharp.Drawing;
+using PdfSharp.Fonts;
 using PdfSharp.Pdf;
 using foamscript.Models;
 
 namespace foamscript.Services
 {
+    /// <summary>
+    /// Cross-platform font resolver for PDFsharp 6.x.
+    /// Maps Times New Roman → Liberation Serif and Courier New → Liberation Mono on Linux.
+    /// </summary>
+    internal class CrossPlatformFontResolver : IFontResolver
+    {
+        private static readonly Dictionary<string, string> FontPaths = BuildFontPaths();
+
+        private static Dictionary<string, string> BuildFontPaths()
+        {
+            var paths = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            if (!OperatingSystem.IsLinux()) return paths;
+
+            var mappings = new (string face, string path)[]
+            {
+                ("Liberation Serif", "/usr/share/fonts/truetype/liberation/LiberationSerif-Regular.ttf"),
+                ("Liberation Serif Bold", "/usr/share/fonts/truetype/liberation/LiberationSerif-Bold.ttf"),
+                ("Liberation Serif Italic", "/usr/share/fonts/truetype/liberation/LiberationSerif-Italic.ttf"),
+                ("Liberation Serif BoldItalic", "/usr/share/fonts/truetype/liberation/LiberationSerif-BoldItalic.ttf"),
+                ("Liberation Mono", "/usr/share/fonts/truetype/liberation/LiberationMono-Regular.ttf"),
+                ("Liberation Mono Bold", "/usr/share/fonts/truetype/liberation/LiberationMono-Bold.ttf"),
+                ("Liberation Mono Italic", "/usr/share/fonts/truetype/liberation/LiberationMono-Italic.ttf"),
+                ("Liberation Mono BoldItalic", "/usr/share/fonts/truetype/liberation/LiberationMono-BoldItalic.ttf"),
+            };
+
+            foreach (var (face, path) in mappings)
+            {
+                if (File.Exists(path))
+                    paths[face] = path;
+            }
+            return paths;
+        }
+
+        public FontResolverInfo? ResolveTypeface(string familyName, bool bold, bool italic)
+        {
+            string baseName = familyName switch
+            {
+                "Times New Roman" => "Liberation Serif",
+                "Courier New" => "Liberation Mono",
+                _ => familyName
+            };
+
+            string suffix = (bold, italic) switch
+            {
+                (true, true) => " BoldItalic",
+                (true, false) => " Bold",
+                (false, true) => " Italic",
+                _ => ""
+            };
+
+            string faceName = baseName + suffix;
+            return FontPaths.ContainsKey(faceName) ? new FontResolverInfo(faceName) : null;
+        }
+
+        public byte[]? GetFont(string faceName)
+        {
+            return FontPaths.TryGetValue(faceName, out var path) ? File.ReadAllBytes(path) : null;
+        }
+    }
+
     /// <summary>
     /// Generates AIAA-quality PDF analysis reports using PdfSharp.
     /// Embeds ScottPlot chart images and renders tables programmatically.
@@ -15,14 +76,29 @@ namespace foamscript.Services
         private const double Margin = 54; // 0.75 inch margins
         private const double ContentWidth = PageWidth - 2 * Margin; // 684 pts (9.5")
 
-        private static readonly XFont TitleFont = new("Times New Roman", 20, XFontStyleEx.Bold);
-        private static readonly XFont SubtitleFont = new("Times New Roman", 12, XFontStyleEx.Regular);
-        private static readonly XFont HeadingFont = new("Times New Roman", 14, XFontStyleEx.Bold);
-        private static readonly XFont SubheadingFont = new("Times New Roman", 11, XFontStyleEx.Bold);
-        private static readonly XFont BodyFont = new("Times New Roman", 10, XFontStyleEx.Regular);
-        private static readonly XFont TableHeaderFont = new("Times New Roman", 9, XFontStyleEx.Bold);
-        private static readonly XFont TableCellFont = new("Courier New", 9, XFontStyleEx.Regular);
-        private static readonly XFont FooterFont = new("Times New Roman", 8, XFontStyleEx.Regular);
+        private static readonly XFont TitleFont;
+        private static readonly XFont SubtitleFont;
+        private static readonly XFont HeadingFont;
+        private static readonly XFont SubheadingFont;
+        private static readonly XFont BodyFont;
+        private static readonly XFont TableHeaderFont;
+        private static readonly XFont TableCellFont;
+        private static readonly XFont FooterFont;
+
+        static PdfReportGenerator()
+        {
+            if (OperatingSystem.IsLinux())
+                GlobalFontSettings.FontResolver = new CrossPlatformFontResolver();
+
+            TitleFont = new XFont("Times New Roman", 20, XFontStyleEx.Bold);
+            SubtitleFont = new XFont("Times New Roman", 12, XFontStyleEx.Regular);
+            HeadingFont = new XFont("Times New Roman", 14, XFontStyleEx.Bold);
+            SubheadingFont = new XFont("Times New Roman", 11, XFontStyleEx.Bold);
+            BodyFont = new XFont("Times New Roman", 10, XFontStyleEx.Regular);
+            TableHeaderFont = new XFont("Times New Roman", 9, XFontStyleEx.Bold);
+            TableCellFont = new XFont("Courier New", 9, XFontStyleEx.Regular);
+            FooterFont = new XFont("Times New Roman", 8, XFontStyleEx.Regular);
+        }
 
         private static readonly XColor HeaderBg = XColor.FromArgb(245, 245, 245);
         private static readonly XColor BorderColor = XColor.FromArgb(200, 200, 200);
