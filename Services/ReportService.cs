@@ -81,8 +81,15 @@ namespace foamscript.Services
                 Console.Error.WriteLine($"  Warning: Flow visualization failed: {ex.Message}");
             }
 
-            // Step 6: Generate charts and render reports
+            // Step 6: Generate charts, data exports, and render reports
             Directory.CreateDirectory(outputDir);
+
+            // Always export AIAA-standard CSV data artifact
+            Console.WriteLine("Exporting coefficient data...");
+            var csvPath = Path.Combine(outputDir, $"{studyName}_coefficients.csv");
+            WriteCoefficientCsv(csvPath, studyName, resultsSummary, physicsConfig);
+            result.CsvPath = csvPath;
+            Console.WriteLine($"\u2713 CSV data: {csvPath}");
 
             var generateHtml = format is "html" or "both";
             var generatePdf = format is "pdf" or "both";
@@ -327,6 +334,46 @@ namespace foamscript.Services
             return null;
         }
 
+        /// <summary>
+        /// Writes an AIAA-standard CSV data file with coefficient summary and reference conditions.
+        /// This is the primary machine-readable data artifact from the report command.
+        /// </summary>
+        internal static void WriteCoefficientCsv(string csvPath, string studyName,
+            ResultsSummary summary, PhysicsConfig config)
+        {
+            using var writer = new System.IO.StreamWriter(csvPath);
+
+            // Header block with reference conditions (prefixed with # for parsers to skip)
+            writer.WriteLine($"# AIAA Aerodynamic Coefficient Data — {studyName}");
+            writer.WriteLine($"# Generated: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
+            writer.WriteLine($"# Solver: {config.SolverName}");
+            writer.WriteLine($"# Velocity: {config.Velocity} m/s");
+            writer.WriteLine($"# RPM: {config.Rpm}");
+            writer.WriteLine($"# Nu: {config.Nu} m^2/s");
+            writer.WriteLine($"# Turbulence Intensity: {config.TurbulenceIntensity}%");
+            writer.WriteLine($"# Refinement: {config.RefinementMin}-{config.RefinementMax}");
+            writer.WriteLine($"# Max Iterations: {config.MaxIterations}");
+            writer.WriteLine("#");
+
+            // Column headers
+            writer.WriteLine("AoA_deg,Cd,Cl,CmPitch,L_over_D,Converged");
+
+            // Data rows
+            foreach (var c in summary.Cases)
+            {
+                var ld = (c.Cl.HasValue && c.Cd.HasValue && c.Cd.Value != 0)
+                    ? $"{c.Cl.Value / c.Cd.Value:F6}"
+                    : "";
+                writer.WriteLine(string.Join(",",
+                    $"{c.AngleOfAttack:F1}",
+                    c.Cd?.ToString("F6") ?? "",
+                    c.Cl?.ToString("F6") ?? "",
+                    c.CmPitch?.ToString("F6") ?? "",
+                    ld,
+                    c.Converged));
+            }
+        }
+
         internal static PhysicsConfig ReadPhysicsConfig(string studyDir)
         {
             var config = new PhysicsConfig();
@@ -445,5 +492,6 @@ namespace foamscript.Services
         public string? ErrorMessage { get; set; }
         public string? HtmlPath { get; set; }
         public string? PdfPath { get; set; }
+        public string? CsvPath { get; set; }
     }
 }

@@ -1,5 +1,6 @@
 using Xunit;
 using FluentAssertions;
+using foamscript.Models;
 using foamscript.Services;
 
 namespace foamscript.Tests.Services
@@ -125,6 +126,67 @@ boundaryField
 
             config.Rpm.Should().NotBe("N/A");
             double.Parse(config.Rpm).Should().BeApproximately(0, 1);
+        }
+
+        // ── CSV Export ────────────────────────────────────────────────────────────
+
+        [Fact]
+        public void WriteCoefficientCsv_ProducesValidCsvWithHeaderAndData()
+        {
+            var csvPath = Path.Combine(Path.GetTempPath(), $"foamscript-test-csv-{Guid.NewGuid()}.csv");
+
+            var summary = new ResultsSummary
+            {
+                StudyDir = "/tmp/test",
+                IsSuccess = true,
+                Cases = new List<CaseResult>
+                {
+                    new() { CaseName = "AoA_-5.0", AngleOfAttack = -5.0, Cd = 0.065, Cl = 0.189, CmPitch = -0.071, Converged = true },
+                    new() { CaseName = "AoA_0.0", AngleOfAttack = 0.0, Cd = 0.062, Cl = 0.237, CmPitch = -0.060, Converged = true },
+                    new() { CaseName = "AoA_5.0", AngleOfAttack = 5.0, Cd = 0.061, Cl = 0.285, CmPitch = -0.049, Converged = true }
+                }
+            };
+
+            var config = new PhysicsConfig
+            {
+                Velocity = "27.0",
+                Rpm = "925",
+                Nu = "1.5E-05",
+                SolverName = "simpleFoam",
+                MaxIterations = "500",
+                RefinementMin = "5",
+                RefinementMax = "6",
+                TurbulenceIntensity = "1.0"
+            };
+
+            try
+            {
+                ReportService.WriteCoefficientCsv(csvPath, "TestStudy", summary, config);
+
+                File.Exists(csvPath).Should().BeTrue();
+                var lines = File.ReadAllLines(csvPath);
+
+                // Should have comment header lines + column header + 3 data rows
+                var commentLines = lines.Where(l => l.StartsWith("#")).ToList();
+                commentLines.Should().HaveCountGreaterThan(5);
+                commentLines.Should().Contain(l => l.Contains("Velocity: 27.0 m/s"));
+                commentLines.Should().Contain(l => l.Contains("RPM: 925"));
+
+                var dataLines = lines.Where(l => !l.StartsWith("#")).ToList();
+                dataLines[0].Should().Be("AoA_deg,Cd,Cl,CmPitch,L_over_D,Converged");
+                dataLines.Should().HaveCount(4); // header + 3 data rows
+
+                // Verify first data row
+                var fields = dataLines[1].Split(',');
+                fields[0].Should().Be("-5.0");
+                double.Parse(fields[1]).Should().BeApproximately(0.065, 0.001);
+                double.Parse(fields[2]).Should().BeApproximately(0.189, 0.001);
+                fields[5].Should().Be("True");
+            }
+            finally
+            {
+                if (File.Exists(csvPath)) File.Delete(csvPath);
+            }
         }
 
         // ── Velocity Extraction ─────────────────────────────────────────────────

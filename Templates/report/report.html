@@ -188,8 +188,8 @@
   {{ drag_polar_chart }}
 </div>
 
-<!-- Section 4: Coefficient Summary -->
-<h2>4. Coefficient Summary</h2>
+<!-- Section 4: Coefficient Data -->
+<h2>4. Aerodynamic Coefficient Data</h2>
 <table>
   <tr>
     <th>AoA (&deg;)</th>
@@ -212,6 +212,9 @@
   </tr>
   {{ end }}
 </table>
+<p style="font-size: 12px; color: #666; margin-top: 8px;">
+  Coefficients averaged over the final 10% of solver iterations. Data exported to CSV: <code>{{ study_name }}_coefficients.csv</code>
+</p>
 
 <!-- Section 5: Convergence History -->
 <h2>5. Convergence History</h2>

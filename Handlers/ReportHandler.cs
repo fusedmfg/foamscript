@@ -53,6 +53,8 @@ namespace foamscript.Handlers
                 Console.WriteLine();
                 Console.WriteLine("=== Report Generation Complete ===");
                 Console.WriteLine();
+                if (result.CsvPath != null)
+                    Console.WriteLine($"  CSV:  {result.CsvPath}");
                 if (result.HtmlPath != null)
                     Console.WriteLine($"  HTML: {result.HtmlPath}");
                 if (result.PdfPath != null)

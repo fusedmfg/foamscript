@@ -33,11 +33,11 @@ namespace foamscript.Models
         [Option('t', "template", Required = false, HelpText = "Template name or path (defaults to external_disc_rotatingwall_steady)")]
         public string? TemplatePath { get; set; }
 
-        [Option('v', "velocity", Required = false, Default = 20.0, HelpText = "Free stream velocity magnitude (m/s, default: 20.0)")]
-        public double Velocity { get; set; } = 20.0;
+        [Option('v', "velocity", Required = false, Default = 27.0, HelpText = "Free stream velocity magnitude (m/s, default: 27.0 — elite amateur throw speed)")]
+        public double Velocity { get; set; } = 27.0;
 
-        [Option('r', "rpm", Required = false, Default = 1000.0, HelpText = "Disc rotation speed (RPM, default: 1000)")]
-        public double Rpm { get; set; } = 1000.0;
+        [Option('r', "rpm", Required = false, Default = 925.0, HelpText = "Disc rotation speed (RPM, default: 925 — elite amateur spin rate)")]
+        public double Rpm { get; set; } = 925.0;
 
         [Option('u', "input-units", Required = false, Default = "mm", HelpText = "Source file units (mm, cm, m, in, ft). Only used for STEP/IGES conversion. Default: mm")]
         public string InputUnits { get; set; } = "mm";
