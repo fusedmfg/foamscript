@@ -416,8 +416,9 @@ FodyWeavers.xsd
 *.msix
 *.msm
 *.msp
-<<<<<<< HEAD
-=======
+
+# FoamScript generated output
+report_output/
 
 # FoamScript deployment configuration (contains credentials)
 deploy.config.ps1
@@ -428,10 +429,5 @@ deploy.config.ps1
 # Gemini
 .gemini/
 
-# VS Code
-.vscode/
-
 # Claude
 .claude/
-
->>>>>>> develop
