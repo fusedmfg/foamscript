@@ -25,13 +25,24 @@ triang = mtri.Triangulation(x, z)
 mask = mtri.TriAnalyzer(triang).get_flat_tri_mask(min_circle_ratio=0.01)
 triang.set_mask(mask)
 
-# Auto-zoom: use IQR to find the disc region, then frame at 2× IQR
-# centered on the median. Refined mesh clusters points near the disc,
-# so the median/IQR naturally track the geometry.
-x_med, z_med = np.median(x), np.median(z)
-x_iqr = np.percentile(x, 75) - np.percentile(x, 25)
-z_iqr = np.percentile(z, 75) - np.percentile(z, 25)
-extent = max(x_iqr, z_iqr) * 2.0
+# AIAA-standard view framing: geometry-referenced bounds.
+# Shows 1.5 characteristic lengths upstream, 3 downstream (wake), 2 vertically.
+# Falls back to IQR-based zoom if STL bounds unavailable.
+if "geometry_bounds" in data:
+    gb = data["geometry_bounds"]
+    char_len = max(gb["xmax"] - gb["xmin"], gb["zmax"] - gb["zmin"])
+    x_center = (gb["xmin"] + gb["xmax"]) / 2
+    z_center = (gb["zmin"] + gb["zmax"]) / 2
+    view_xlim = (x_center - 1.5 * char_len, x_center + 3.0 * char_len)
+    view_zlim = (z_center - 2.0 * char_len, z_center + 2.0 * char_len)
+else:
+    x_med, z_med = np.median(x), np.median(z)
+    extent = max(
+        np.percentile(x, 75) - np.percentile(x, 25),
+        np.percentile(z, 75) - np.percentile(z, 25),
+    ) * 2.0
+    view_xlim = (x_med - extent, x_med + extent)
+    view_zlim = (z_med - extent * 9/16, z_med + extent * 9/16)
 
 for field_name, field_data, cmap, title, unit in [
     ("p", data["p"], "RdBu_r", "Static Pressure", "Pa"),
@@ -48,8 +59,8 @@ for field_name, field_data, cmap, title, unit in [
     cb.set_label(f"{title} ({unit})", fontsize=12)
     cb.ax.tick_params(labelsize=10)
 
-    ax.set_xlim(x_med - extent, x_med + extent)
-    ax.set_ylim(z_med - extent * 9/16, z_med + extent * 9/16)
+    ax.set_xlim(*view_xlim)
+    ax.set_ylim(*view_zlim)
     ax.set_xlabel("x (m)", fontsize=12)
     ax.set_ylabel("z (m)", fontsize=12)
     ax.set_title(f"{title} \u2014 y=0 Slice", fontsize=14, fontweight="bold")

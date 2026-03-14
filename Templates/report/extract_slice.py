@@ -50,6 +50,20 @@ p_vals = [p_array.GetValue(i) for i in range(n_points)]
 umag_vals = [u_array.GetValue(i) for i in range(n_points)]
 
 result = {"x": x, "z": z, "p": p_vals, "umag": umag_vals}
+
+# Extract geometry bounding box from STL for AIAA-standard view framing
+stl_path = os.path.join(case_dir, "constant", "triSurface", "disc.stl")
+if os.path.exists(stl_path):
+    stl_reader = STLReader(FileNames=[stl_path])
+    stl_reader.UpdatePipeline()
+    stl_data = servermanager.Fetch(stl_reader)
+    bounds = stl_data.GetBounds()  # (xmin, xmax, ymin, ymax, zmin, zmax)
+    result["geometry_bounds"] = {
+        "xmin": bounds[0], "xmax": bounds[1],
+        "zmin": bounds[4], "zmax": bounds[5],
+    }
+    print(f"Geometry bounds: x=[{bounds[0]:.4f}, {bounds[1]:.4f}] z=[{bounds[4]:.4f}, {bounds[5]:.4f}]")
+
 with open(output_json, "w") as f:
     json.dump(result, f)
 print(f"Extracted {n_points} points")
