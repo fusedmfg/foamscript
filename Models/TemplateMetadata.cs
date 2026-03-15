@@ -133,6 +133,9 @@ namespace foamscript.Models
 
         [JsonPropertyName("optional")]
         public bool Optional { get; set; }
+
+        [JsonPropertyName("parallelOnly")]
+        public bool ParallelOnly { get; set; }
     }
 
     public class ResultsConfig

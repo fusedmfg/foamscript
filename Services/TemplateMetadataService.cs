@@ -16,7 +16,7 @@ namespace foamscript.Services
         /// Throws FileNotFoundException if the file is missing.
         /// Throws JsonException if the file contains invalid JSON.
         /// </summary>
-        public TemplateMetadata LoadMetadata(string templatePath)
+        public virtual TemplateMetadata LoadMetadata(string templatePath)
         {
             var jsonPath = Path.Combine(templatePath, MetadataFileName);
 

@@ -38,9 +38,9 @@
     { "command": "blockMesh", "args": "-case {caseDir}" },
     { "command": "surfaceOrient", "args": "{geometryStlPath} \"({outsidePoint})\" {geometryStlPath}", "optional": true },
     { "command": "surfaceFeatureExtract", "args": "-case {caseDir}" },
-    { "command": "decomposePar", "args": "-case {caseDir}" },
+    { "command": "decomposePar", "args": "-case {caseDir}", "parallelOnly": true },
     { "command": "snappyHexMesh", "args": "-case {caseDir} -overwrite", "parallel": true },
-    { "command": "reconstructParMesh", "args": "-case {caseDir} -constant" },
+    { "command": "reconstructParMesh", "args": "-case {caseDir} -constant", "parallelOnly": true },
     { "command": "checkMesh", "args": "-case {caseDir}" }
   ],
   "solvePipeline": [
