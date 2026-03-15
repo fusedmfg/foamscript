@@ -18,7 +18,7 @@ FoamFile
 dimensions      [0 1 -1 0 0 0 0];
 
 // Parameterized: Initialize to freestream velocity (prevents adaptive timestep FPE)
-internalField   uniform ({{ ux }} {{ uy }} 0);
+internalField   uniform ({{ ux }} 0 {{ uz }});
 
 boundaryField
 {
@@ -26,8 +26,8 @@ boundaryField
     {
         type            fixedValue;
 
-        // Scriban parameters: ux, uy
-        value           uniform ({{ ux }} {{ uy }} 0);
+        // Scriban parameters: ux, uz
+        value           uniform ({{ ux }} 0 {{ uz }});
     }
 
     outlet
@@ -49,8 +49,8 @@ boundaryField
     {
         type            cyclicAMI;
 
-        // Scriban parameters: ux, uy
-        value           uniform ({{ ux }} {{ uy }} 0);
+        // Scriban parameters: ux, uz
+        value           uniform ({{ ux }} 0 {{ uz }});
     }
 }
 

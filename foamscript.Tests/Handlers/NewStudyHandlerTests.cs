@@ -23,7 +23,9 @@ namespace foamscript.Tests.Handlers
             _mockProcessExecutor = new Mock<IProcessExecutor>();
 
             // CaseService requires (IProcessExecutor, GeometryService, TemplateService) — build the chain
-            var geometryService = new GeometryService(_mockProcessExecutor.Object, _mockLoggingService.Object);
+            var geometryService = new GeometryService(
+                new StlConversionService(_mockProcessExecutor.Object, _mockLoggingService.Object),
+                new DomainService(_mockProcessExecutor.Object, _mockLoggingService.Object));
             var templateService = new TemplateService(_mockLoggingService.Object);
             _mockCaseService = new Mock<CaseService>(
                 _mockProcessExecutor.Object,
@@ -128,9 +130,9 @@ namespace foamscript.Tests.Handlers
                     StudyDir = Path.Combine(Path.GetTempPath(), "TestProject"),
                     Cases = new List<CaseInfo>
                     {
-                        new CaseInfo { AngleOfAttack = 0, CaseDir = "case_aoa_0", Ux = 20, Uy = 0, Omega = 104.72 },
-                        new CaseInfo { AngleOfAttack = 5, CaseDir = "case_aoa_5", Ux = 19.92, Uy = 1.74, Omega = 104.72 },
-                        new CaseInfo { AngleOfAttack = 10, CaseDir = "case_aoa_10", Ux = 19.70, Uy = 3.47, Omega = 104.72 }
+                        new CaseInfo { AngleOfAttack = 0, CaseDir = "case_aoa_0", Ux = 20, Uz = 0, Omega = 104.72 },
+                        new CaseInfo { AngleOfAttack = 5, CaseDir = "case_aoa_5", Ux = 19.92, Uz = 1.74, Omega = 104.72 },
+                        new CaseInfo { AngleOfAttack = 10, CaseDir = "case_aoa_10", Ux = 19.70, Uz = 3.47, Omega = 104.72 }
                     }
                 });
 

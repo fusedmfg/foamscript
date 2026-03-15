@@ -18,9 +18,10 @@ namespace foamscript.Services
         }
 
         /// <summary>
-        /// Runs the solver (pimpleFoam) on a single meshed case.
+        /// Runs the OpenFOAM solver on a single meshed case.
+        /// Automatically detects the solver (simpleFoam, pimpleFoam, etc.) from controlDict.
         /// </summary>
-        public SolveResult SolveCase(string caseDir, bool parallel, int cores)
+        public virtual SolveResult SolveCase(string caseDir, bool parallel, int cores)
         {
             var result = new SolveResult { CaseDir = caseDir };
 
@@ -52,14 +53,21 @@ namespace foamscript.Services
                     return result;
                 }
 
+                // Detect solver from controlDict (simpleFoam, pimpleFoam, etc.)
+                var solverName = DetectSolver(caseDir);
+                var isTransient = solverName == "pimpleFoam";
+
                 if (parallel)
                 {
                     // Clean old processor directories if present
                     CleanProcessorDirs(caseDir);
 
-                    // Decompose (WITH fields — different from mesh workflow)
+                    // Decompose — transient solvers use -force (time-varying fields)
                     Console.WriteLine($"Decomposing case for {cores} processors...");
-                    var decomposeResult = _processExecutor.Execute("decomposePar", $"-case {caseDir} -force");
+                    var decomposeArgs = isTransient
+                        ? $"-case {caseDir} -force"
+                        : $"-case {caseDir}";
+                    var decomposeResult = _processExecutor.Execute("decomposePar", decomposeArgs);
 
                     if (decomposeResult.ExitCode != 0)
                     {
@@ -71,20 +79,24 @@ namespace foamscript.Services
 
                     Console.WriteLine("✓ Domain decomposed successfully");
 
-                    // Run solver in parallel
-                    Console.WriteLine($"Running pimpleFoam in parallel ({cores} cores)...");
-                    var solverArgs = $"-np {cores} pimpleFoam -case {caseDir} -parallel";
-                    var solverResult = _processExecutor.Execute("mpirun", solverArgs);
+                    // Run solver in parallel with shell-level log capture.
+                    // mpirun doesn't reliably pipe child process stdout through .NET's
+                    // ProcessStartInfo redirection, so we use tee to write the log file
+                    // directly at the shell level.
+                    Console.WriteLine($"Running {solverName} in parallel ({cores} cores)...");
+                    var logPath = Path.Combine(caseDir, $"log.{solverName}");
+                    var bashCmd = $"set -o pipefail; mpirun -np {cores} {solverName} -case {caseDir} -parallel 2>&1 | tee {logPath}";
+                    var solverResult = _processExecutor.Execute("bash", $"-c \"{bashCmd}\"");
 
                     if (solverResult.ExitCode != 0)
                     {
                         result.IsSuccess = false;
-                        result.ErrorMessage = $"pimpleFoam (parallel) failed with exit code {solverResult.ExitCode}";
-                        LogToolError("pimpleFoam (parallel)", solverResult);
+                        result.ErrorMessage = $"{solverName} (parallel) failed with exit code {solverResult.ExitCode}";
+                        LogToolError($"{solverName} (parallel)", solverResult);
                         return result;
                     }
 
-                    Console.WriteLine("✓ pimpleFoam completed successfully");
+                    Console.WriteLine($"✓ {solverName} completed successfully");
 
                     // Reconstruct
                     Console.WriteLine("Reconstructing fields...");
@@ -102,18 +114,21 @@ namespace foamscript.Services
                 else
                 {
                     // Run solver in serial
-                    Console.WriteLine("Running pimpleFoam...");
-                    var solverResult = _processExecutor.Execute("pimpleFoam", $"-case {caseDir}");
+                    Console.WriteLine($"Running {solverName}...");
+                    var solverResult = _processExecutor.Execute(solverName, $"-case {caseDir}");
+
+                    // Persist solver log for report generation
+                    PersistSolverLog(caseDir, solverName, solverResult.Output);
 
                     if (solverResult.ExitCode != 0)
                     {
                         result.IsSuccess = false;
-                        result.ErrorMessage = $"pimpleFoam failed with exit code {solverResult.ExitCode}";
-                        LogToolError("pimpleFoam", solverResult);
+                        result.ErrorMessage = $"{solverName} failed with exit code {solverResult.ExitCode}";
+                        LogToolError(solverName, solverResult);
                         return result;
                     }
 
-                    Console.WriteLine("✓ pimpleFoam completed successfully");
+                    Console.WriteLine($"✓ {solverName} completed successfully");
                 }
 
                 // Try to extract force coefficients from postProcessing
@@ -141,7 +156,7 @@ namespace foamscript.Services
         /// <summary>
         /// Runs the solver on all cases in an OpenFOAM study.
         /// </summary>
-        public StudySolveResult SolveStudy(string studyDir, bool parallel, int cores, bool continueOnError)
+        public virtual StudySolveResult SolveStudy(string studyDir, bool parallel, int cores, bool continueOnError)
         {
             var result = new StudySolveResult { StudyDir = studyDir };
 
@@ -246,7 +261,9 @@ namespace foamscript.Services
 
         /// <summary>
         /// Parses a forceCoeffs coefficient.dat file.
-        /// Format: Time Cd Cs Cl CmRoll CmPitch CmYaw Cd(f) Cd(r) Cs(f) Cs(r) Cl(f) Cl(r)
+        /// Reads the header line to determine column indices dynamically,
+        /// supporting both legacy and v2512+ formats.
+        /// v2512 format: Time Cd Cd(f) Cd(r) Cl Cl(f) Cl(r) CmPitch CmRoll CmYaw Cs Cs(f) Cs(r)
         /// </summary>
         internal static (double Cd, double Cl, double CmPitch, double LastTime)? ParseForceCoeffsFile(string filePath, double averageWindow = 0.1)
         {
@@ -255,18 +272,47 @@ namespace foamscript.Services
                 var lines = File.ReadAllLines(filePath);
                 var dataLines = new List<(double Time, double Cd, double Cl, double CmPitch)>();
 
+                // Parse header to find column indices dynamically
+                int cdCol = -1, clCol = -1, cmPitchCol = -1;
+                foreach (var line in lines)
+                {
+                    if (line.TrimStart().StartsWith("# Time"))
+                    {
+                        var headers = line.Split(new[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries);
+                        // headers[0] = "#", headers[1] = "Time", headers[2+] = column names
+                        // Data line: parts[0] = Time, parts[1+] = data columns
+                        // So data index = header index - 1
+                        for (int i = 2; i < headers.Length; i++)
+                        {
+                            switch (headers[i])
+                            {
+                                case "Cd": cdCol = i - 1; break;
+                                case "Cl": clCol = i - 1; break;
+                                case "CmPitch": cmPitchCol = i - 1; break;
+                            }
+                        }
+                        break;
+                    }
+                }
+
+                // Fallback to v2512 indices if header parsing fails
+                if (cdCol < 0) cdCol = 1;
+                if (clCol < 0) clCol = 4;
+                if (cmPitchCol < 0) cmPitchCol = 7;
+
+                var minCols = Math.Max(Math.Max(cdCol, clCol), cmPitchCol) + 1;
+
                 foreach (var line in lines)
                 {
                     if (line.StartsWith("#") || string.IsNullOrWhiteSpace(line))
                         continue;
 
                     var parts = line.Split(new[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries);
-                    // Expected columns: Time(0) Cd(1) Cs(2) Cl(3) CmRoll(4) CmPitch(5) CmYaw(6) ...
-                    if (parts.Length >= 6 &&
+                    if (parts.Length >= minCols &&
                         double.TryParse(parts[0], out var time) &&
-                        double.TryParse(parts[1], out var cd) &&
-                        double.TryParse(parts[3], out var cl) &&
-                        double.TryParse(parts[5], out var cmPitch))
+                        double.TryParse(parts[cdCol], out var cd) &&
+                        double.TryParse(parts[clCol], out var cl) &&
+                        double.TryParse(parts[cmPitchCol], out var cmPitch))
                     {
                         dataLines.Add((time, cd, cl, cmPitch));
                     }
@@ -289,10 +335,37 @@ namespace foamscript.Services
 
                 return (avgCd, avgCl, avgCm, dataLines[^1].Time);
             }
-            catch
+            catch (Exception ex)
             {
+                Console.Error.WriteLine($"Failed to parse force coefficients: {ex.Message}");
                 return null;
             }
+        }
+
+        /// <summary>
+        /// Detects the solver application from the case's controlDict file.
+        /// Falls back to "simpleFoam" if the application line cannot be parsed.
+        /// </summary>
+        internal static string DetectSolver(string caseDir)
+        {
+            var controlDictPath = Path.Combine(caseDir, "system", "controlDict");
+            if (!File.Exists(controlDictPath))
+                return "simpleFoam";
+
+            var lines = File.ReadAllLines(controlDictPath);
+            foreach (var line in lines)
+            {
+                var trimmed = line.Trim();
+                if (trimmed.StartsWith("application"))
+                {
+                    // Parse "application     simpleFoam;" → "simpleFoam"
+                    var match = Regex.Match(trimmed, @"application\s+(\w+)\s*;");
+                    if (match.Success)
+                        return match.Groups[1].Value;
+                }
+            }
+
+            return "simpleFoam";
         }
 
         /// <summary>
@@ -304,6 +377,26 @@ namespace foamscript.Services
             foreach (var dir in processorDirs)
             {
                 Directory.Delete(dir, recursive: true);
+            }
+        }
+
+        /// <summary>
+        /// Saves solver stdout to a log file in the case directory (e.g., log.simpleFoam).
+        /// This is standard OpenFOAM practice and provides residual data for report generation.
+        /// </summary>
+        private static void PersistSolverLog(string caseDir, string solverName, string? output)
+        {
+            if (string.IsNullOrEmpty(output))
+                return;
+
+            try
+            {
+                var logPath = Path.Combine(caseDir, $"log.{solverName}");
+                File.WriteAllText(logPath, output);
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"Failed to write solver log: {ex.Message}");
             }
         }
 

@@ -68,6 +68,8 @@ namespace foamscript.Handlers
                         TurbulenceIntensity = model.TurbulenceIntensity,
                         EndTime = model.EndTime,
                         NOuterCorrectors = model.NOuterCorrectors,
+                        MaxIterations = model.MaxIterations,
+                        WriteInterval = model.WriteInterval,
                         RefinementLevelMin = model.RefinementLevelMin,
                         RefinementLevelMax = model.RefinementLevelMax
                     },
@@ -81,6 +83,23 @@ namespace foamscript.Handlers
                         MeshResolution = model.MeshResolution
                     }
                 };
+            }
+
+            // Validate physics parameters
+            var validationErrors = new List<string>();
+            if (config.Velocity <= 0) validationErrors.Add($"Velocity must be positive (got {config.Velocity})");
+            if (config.Physics.Nu <= 0) validationErrors.Add($"Kinematic viscosity (nu) must be positive (got {config.Physics.Nu})");
+            if (config.Physics.RefinementLevelMin > config.Physics.RefinementLevelMax)
+                validationErrors.Add($"Refinement min ({config.Physics.RefinementLevelMin}) cannot exceed max ({config.Physics.RefinementLevelMax})");
+            if (config.Rpm < 0) validationErrors.Add($"RPM must be non-negative (got {config.Rpm})");
+
+            if (validationErrors.Count > 0)
+            {
+                Console.WriteLine("✗ Invalid parameter values:");
+                foreach (var err in validationErrors)
+                    Console.WriteLine($"    {err}");
+                Console.WriteLine();
+                return -1;
             }
 
             // Resolve template path
@@ -159,7 +178,7 @@ namespace foamscript.Handlers
                 {
                     Console.WriteLine($"  • {Path.GetFileName(caseInfo.CaseDir)}");
                     Console.WriteLine($"      AoA: {caseInfo.AngleOfAttack}°");
-                    Console.WriteLine($"      Velocity: Ux={caseInfo.Ux:F3} m/s, Uy={caseInfo.Uy:F3} m/s");
+                    Console.WriteLine($"      Velocity: Ux={caseInfo.Ux:F3} m/s, Uz={caseInfo.Uz:F3} m/s");
                     Console.WriteLine($"      Omega: {caseInfo.Omega:F3} rad/s ({config.Rpm} RPM)");
                 }
 
@@ -230,7 +249,7 @@ namespace foamscript.Handlers
             // If null or empty, use default
             if (string.IsNullOrEmpty(templatePathOrName))
             {
-                return Path.Combine(templatesDir, "external_disc_rotating-ami_transient");
+                return Path.Combine(templatesDir, "external_disc_rotatingwall_steady");
             }
 
             // If it's an absolute path or contains path separators, use as-is

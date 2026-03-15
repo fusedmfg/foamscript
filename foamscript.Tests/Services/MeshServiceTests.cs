@@ -48,6 +48,11 @@ namespace foamscript.Tests.Services
                 .Setup(x => x.Execute("blockMesh", $"-case {caseDir}"))
                 .Returns(new ProcessResult { ExitCode = 0, Output = "" });
 
+        private void SetupSurfaceOrientSuccess() =>
+            _mockProcessExecutor
+                .Setup(x => x.Execute("surfaceOrient", It.IsAny<string>()))
+                .Returns(new ProcessResult { ExitCode = 0, Output = "" });
+
         private void SetupFeatureExtractSuccess(string caseDir) =>
             _mockProcessExecutor
                 .Setup(x => x.Execute("surfaceFeatureExtract", $"-case {caseDir}"))
@@ -119,6 +124,7 @@ namespace foamscript.Tests.Services
         {
             var caseDir = CreateValidCaseDir();
             SetupBlockMeshSuccess(caseDir);
+            SetupSurfaceOrientSuccess();
             SetupFeatureExtractSuccess(caseDir);
             SetupSerialSnappySuccess(caseDir);
 
@@ -146,6 +152,7 @@ namespace foamscript.Tests.Services
         {
             var caseDir = CreateValidCaseDir();
             SetupBlockMeshSuccess(caseDir);
+            SetupSurfaceOrientSuccess();
             SetupFeatureExtractSuccess(caseDir);
             SetupSerialSnappySuccess(caseDir);
 
@@ -159,6 +166,7 @@ namespace foamscript.Tests.Services
         {
             var caseDir = CreateValidCaseDir();
             SetupBlockMeshSuccess(caseDir);
+            SetupSurfaceOrientSuccess();
             SetupFeatureExtractSuccess(caseDir);
             SetupSerialSnappySuccess(caseDir, overwrite: true);
 
@@ -173,6 +181,7 @@ namespace foamscript.Tests.Services
         {
             var caseDir = CreateValidCaseDir();
             SetupBlockMeshSuccess(caseDir);
+            SetupSurfaceOrientSuccess();
             SetupFeatureExtractSuccess(caseDir);
             _mockProcessExecutor
                 .Setup(x => x.Execute("snappyHexMesh", It.IsAny<string>()))
@@ -189,6 +198,7 @@ namespace foamscript.Tests.Services
         {
             var caseDir = CreateValidCaseDir();
             SetupBlockMeshSuccess(caseDir);
+            SetupSurfaceOrientSuccess();
             SetupFeatureExtractSuccess(caseDir);
             SetupSerialSnappySuccess(caseDir);
 
@@ -205,6 +215,7 @@ namespace foamscript.Tests.Services
         {
             var caseDir = CreateValidCaseDir();
             SetupBlockMeshSuccess(caseDir);
+            SetupSurfaceOrientSuccess();
             SetupFeatureExtractSuccess(caseDir);
             SetupParallelWorkflowSuccess(caseDir);
 
@@ -218,6 +229,7 @@ namespace foamscript.Tests.Services
         {
             var caseDir = CreateValidCaseDir();
             SetupBlockMeshSuccess(caseDir);
+            SetupSurfaceOrientSuccess();
             SetupFeatureExtractSuccess(caseDir);
             _mockProcessExecutor
                 .Setup(x => x.Execute("decomposePar", It.IsAny<string>()))
@@ -235,6 +247,7 @@ namespace foamscript.Tests.Services
             var caseDir = CreateValidCaseDir();
             int cores = 4;
             SetupBlockMeshSuccess(caseDir);
+            SetupSurfaceOrientSuccess();
             SetupFeatureExtractSuccess(caseDir);
             SetupParallelWorkflowSuccess(caseDir, cores);
 
@@ -252,6 +265,7 @@ namespace foamscript.Tests.Services
         {
             var caseDir = CreateValidCaseDir();
             SetupBlockMeshSuccess(caseDir);
+            SetupSurfaceOrientSuccess();
             SetupFeatureExtractSuccess(caseDir);
             _mockProcessExecutor
                 .Setup(x => x.Execute("decomposePar", It.IsAny<string>()))
@@ -274,6 +288,7 @@ namespace foamscript.Tests.Services
         {
             var caseDir = CreateValidCaseDir();
             SetupBlockMeshSuccess(caseDir);
+            SetupSurfaceOrientSuccess();
             SetupFeatureExtractSuccess(caseDir);
             _mockProcessExecutor
                 .Setup(x => x.Execute("decomposePar", It.IsAny<string>()))
@@ -293,6 +308,7 @@ namespace foamscript.Tests.Services
         {
             var caseDir = CreateValidCaseDir();
             SetupBlockMeshSuccess(caseDir);
+            SetupSurfaceOrientSuccess();
             SetupFeatureExtractSuccess(caseDir);
             SetupParallelWorkflowSuccess(caseDir);
 
@@ -306,6 +322,7 @@ namespace foamscript.Tests.Services
         {
             var caseDir = CreateValidCaseDir();
             SetupBlockMeshSuccess(caseDir);
+            SetupSurfaceOrientSuccess();
             SetupFeatureExtractSuccess(caseDir);
             _mockProcessExecutor
                 .Setup(x => x.Execute("decomposePar", It.IsAny<string>()))
@@ -329,6 +346,7 @@ namespace foamscript.Tests.Services
         {
             var caseDir = CreateValidCaseDir();
             SetupBlockMeshSuccess(caseDir);
+            SetupSurfaceOrientSuccess();
             SetupFeatureExtractSuccess(caseDir);
             SetupParallelWorkflowSuccess(caseDir);
 
@@ -344,6 +362,7 @@ namespace foamscript.Tests.Services
         {
             var caseDir = CreateValidCaseDir();
             SetupBlockMeshSuccess(caseDir);
+            SetupSurfaceOrientSuccess();
             SetupFeatureExtractSuccess(caseDir);
             SetupSerialSnappySuccess(caseDir);
             _mockProcessExecutor
@@ -360,6 +379,7 @@ namespace foamscript.Tests.Services
         {
             var caseDir = CreateValidCaseDir();
             SetupBlockMeshSuccess(caseDir);
+            SetupSurfaceOrientSuccess();
             SetupFeatureExtractSuccess(caseDir);
             SetupSerialSnappySuccess(caseDir);
 
@@ -373,6 +393,7 @@ namespace foamscript.Tests.Services
         {
             var caseDir = CreateValidCaseDir();
             SetupBlockMeshSuccess(caseDir);
+            SetupSurfaceOrientSuccess();
             SetupFeatureExtractSuccess(caseDir);
             SetupSerialSnappySuccess(caseDir);
             _mockProcessExecutor
@@ -389,6 +410,7 @@ namespace foamscript.Tests.Services
         {
             var caseDir = CreateValidCaseDir();
             SetupBlockMeshSuccess(caseDir);
+            SetupSurfaceOrientSuccess();
             SetupFeatureExtractSuccess(caseDir);
             SetupSerialSnappySuccess(caseDir);
             _mockProcessExecutor
@@ -412,6 +434,7 @@ namespace foamscript.Tests.Services
         {
             var caseDir = CreateValidCaseDir();
             SetupBlockMeshSuccess(caseDir);
+            SetupSurfaceOrientSuccess();
             SetupFeatureExtractSuccess(caseDir);
             SetupSerialSnappySuccess(caseDir);
             _mockProcessExecutor
@@ -428,6 +451,7 @@ namespace foamscript.Tests.Services
         {
             var caseDir = CreateValidCaseDir();
             SetupBlockMeshSuccess(caseDir);
+            SetupSurfaceOrientSuccess();
             SetupFeatureExtractSuccess(caseDir);
             SetupSerialSnappySuccess(caseDir);
             _mockProcessExecutor
@@ -444,6 +468,7 @@ namespace foamscript.Tests.Services
         {
             var caseDir = CreateValidCaseDir();
             SetupBlockMeshSuccess(caseDir);
+            SetupSurfaceOrientSuccess();
             SetupFeatureExtractSuccess(caseDir);
             SetupSerialSnappySuccess(caseDir);
             _mockProcessExecutor
@@ -460,6 +485,7 @@ namespace foamscript.Tests.Services
         {
             var caseDir = CreateValidCaseDir();
             SetupBlockMeshSuccess(caseDir);
+            SetupSurfaceOrientSuccess();
             SetupFeatureExtractSuccess(caseDir);
             SetupSerialSnappySuccess(caseDir);
             _mockProcessExecutor
@@ -563,6 +589,7 @@ namespace foamscript.Tests.Services
             _mockProcessExecutor
                 .Setup(x => x.Execute("blockMesh", It.IsAny<string>()))
                 .Returns(new ProcessResult { ExitCode = 0 });
+            SetupSurfaceOrientSuccess();
             _mockProcessExecutor
                 .Setup(x => x.Execute("surfaceFeatureExtract", It.IsAny<string>()))
                 .Returns(new ProcessResult { ExitCode = 0 });
@@ -593,6 +620,7 @@ namespace foamscript.Tests.Services
             _mockProcessExecutor
                 .Setup(x => x.Execute("blockMesh", It.IsAny<string>()))
                 .Returns(new ProcessResult { ExitCode = 0 });
+            SetupSurfaceOrientSuccess();
             _mockProcessExecutor
                 .Setup(x => x.Execute("surfaceFeatureExtract", It.IsAny<string>()))
                 .Returns(new ProcessResult { ExitCode = 0 });

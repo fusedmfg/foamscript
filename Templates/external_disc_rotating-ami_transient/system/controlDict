@@ -22,7 +22,8 @@ stopAt          endTime;
 // Dial: Controlled by C#
 endTime         {{ end_time }};
 
-deltaT          0.0002;
+// Dial: Computed by C# for Co ≈ 0.5 at finest mesh level
+deltaT          {{ delta_t }};
 writeControl    adjustable;
 writeInterval   0.02;
 purgeWrite      0;
@@ -34,7 +35,7 @@ timePrecision   6;
 runTimeModifiable yes;
 adjustTimeStep  yes;
 maxCo           1;
-maxDeltaT       1;
+maxDeltaT       {{ max_delta_t }};
 
 functions
 {
@@ -56,8 +57,8 @@ functions
 
         // Direction vectors (Standard wind tunnel orientation)
         dragDir         (1 0 0);
-        liftDir         (0 1 0);
-        pitchAxis       (0 0 1);
+        liftDir         (0 0 1);
+        pitchAxis       (0 1 0);
         CofR            (0 0 0); // Center of Rotation at CAD origin
     }
 }

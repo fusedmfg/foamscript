@@ -7,6 +7,15 @@ namespace foamscript.Services
     public static class CaseDiscovery
     {
         /// <summary>
+        /// Returns true if the directory is a valid OpenFOAM case (has constant/ and system/).
+        /// </summary>
+        public static bool IsCase(string dir)
+        {
+            return Directory.Exists(Path.Combine(dir, "constant"))
+                && Directory.Exists(Path.Combine(dir, "system"));
+        }
+
+        /// <summary>
         /// Discovers all valid OpenFOAM case directories within a study directory.
         /// Skips geometry/, dot-directories, and directories without constant/ + system/.
         /// Returns results sorted alphabetically.

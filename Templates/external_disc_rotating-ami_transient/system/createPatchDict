@@ -23,7 +23,8 @@ patches
         patchInfo
         {
             type            cyclicAMI;
-            matchTolerance  0.0001;
+            matchTolerance  0.5;
+            lowWeightCorrection 0.2;
             neighbourPatch  rotor_slave;
             transform       noOrdering;
         }
@@ -36,7 +37,8 @@ patches
         patchInfo
         {
             type            cyclicAMI;
-            matchTolerance  0.0001;
+            matchTolerance  0.5;
+            lowWeightCorrection 0.2;
             neighbourPatch  rotor;
             transform       noOrdering;
         }

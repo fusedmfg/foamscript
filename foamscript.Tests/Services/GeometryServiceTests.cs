@@ -16,7 +16,9 @@ namespace foamscript.Tests.Services
         {
             _mockProcessExecutor = new Mock<IProcessExecutor>();
             _mockLoggingService = new Mock<LoggingService>(Mock.Of<Microsoft.Extensions.Logging.ILogger<LoggingService>>());
-            _service = new GeometryService(_mockProcessExecutor.Object, _mockLoggingService.Object);
+            _service = new GeometryService(
+                new StlConversionService(_mockProcessExecutor.Object, _mockLoggingService.Object),
+                new DomainService(_mockProcessExecutor.Object, _mockLoggingService.Object));
         }
 
         [Fact]
@@ -228,7 +230,8 @@ namespace foamscript.Tests.Services
             // Arrange
             var stlFile = "/path/to/model.stl";
             var surfaceCheckOutput = @"
-Surface has 0 illegal triangles.
+Surface has no illegal triangles.
+Surface is closed. All edges connected to two faces.
 Number of unconnected parts : 1
 Number of zones (connected area with consistent normal) : 1
 Surface is not self-intersecting
@@ -308,7 +311,7 @@ Number of zones (connected area with consistent normal) : 1
             // Arrange
             var stlFile = "/path/to/model.stl";
             var surfaceCheckOutput = @"
-Surface has 0 illegal triangles.
+Surface has no illegal triangles.
 Number of edges                         : 15000
 Number of edges connected to one face   : 120
 Number of edges connected to >2 faces   : 0
@@ -340,7 +343,7 @@ Number of zones (connected area with consistent normal) : 1
             // Arrange
             var stlFile = "/path/to/model.stl";
             var surfaceCheckOutput = @"
-Surface has 0 illegal triangles.
+Surface has no illegal triangles.
 Number of edges                         : 15000
 Number of edges connected to one face   : 0
 Number of edges connected to >2 faces   : 15
@@ -372,7 +375,7 @@ Number of zones (connected area with consistent normal) : 1
             // Arrange
             var stlFile = "/path/to/model.stl";
             var surfaceCheckOutput = @"
-Surface has 0 illegal triangles.
+Surface has no illegal triangles.
 Number of unconnected parts : 1
 Number of zones (connected area with consistent normal) : 1
 Surface is self-intersecting at 42 locations
@@ -402,7 +405,7 @@ Surface is self-intersecting at 42 locations
             // Arrange
             var stlFile = "/path/to/model.stl";
             var surfaceCheckOutput = @"
-Surface has 0 illegal triangles.
+Surface has no illegal triangles.
 Number of unconnected parts : 3
 Number of zones (connected area with consistent normal) : 1
 ";
@@ -430,7 +433,7 @@ Number of zones (connected area with consistent normal) : 1
             // Arrange
             var stlFile = "/path/to/model.stl";
             var surfaceCheckOutput = @"
-Surface has 0 illegal triangles.
+Surface has no illegal triangles.
 Number of unconnected parts : 1
 Number of zones (connected area with consistent normal) : 5
 ";

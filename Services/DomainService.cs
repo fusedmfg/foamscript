@@ -160,8 +160,9 @@ namespace foamscript.Services
                     MaxZ = maxZ
                 };
             }
-            catch
+            catch (Exception ex)
             {
+                Console.Error.WriteLine($"Failed to calculate bounding box: {ex.Message}");
                 return null;
             }
         }

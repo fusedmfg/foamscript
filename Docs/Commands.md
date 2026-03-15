@@ -8,11 +8,9 @@ Complete reference for all FoamScript commands with explanations and examples.
 - [convert](#convert) - Convert STEP/IGES geometry to STL
 - [generate-domain](#generate-domain) - Generate rotor and tunnel domains
 - [new-study](#new-study) - Create OpenFOAM study with angle of attack sweep
-- [mesh](#mesh) - Mesh a single OpenFOAM case
-- [mesh-study](#mesh-study) - Mesh all cases in a study
-- [solve](#solve) - Run solver on a single case
-- [solve-study](#solve-study) - Run solver on all cases in a study
-- [results](#results) - Extract force coefficients from a completed study
+- [mesh](#mesh) - Mesh a case or study directory
+- [solve](#solve) - Run solver on a case or study directory
+- [report](#report) - Generate AIAA-quality analysis report (HTML + PDF)
 - [list-templates](#list-templates) - List available templates
 
 ---
@@ -74,19 +72,20 @@ Converts STEP or IGES CAD geometry files to STL format with unit conversion and 
 ### Usage
 
 ```bash
-foamscript convert [OPTIONS]
+foamscript convert <input> <output> [OPTIONS]
 ```
 
 ### Options
 
 | Option | Short | Description | Default |
 |--------|-------|-------------|---------|
-| `--input` | `-i` | Input STEP/IGES file path (required) | - |
-| `--output` | `-o` | Output STL file path (required) | - |
-| `--input-units` | `-u` | Input file units: mm, cm, m, in, ft | `mm` |
-| `--mesh-size` | `-m` | Mesh size scaling factor (lower = finer mesh) | `0.05` |
-| `--feature-angle` | | Feature angle for edge preservation (degrees) | - |
+| `<input>` | | Input STEP/IGES file path (positional, required) | - |
+| `<output>` | | Output STL file path (positional, required) | - |
+| `--input-units` | `-u` | Input file units: mm, cm, m, in, ft | `m` |
+| `--mesh-size` | `-s` | Mesh size scaling factor (lower = finer mesh) | `1.0` |
+| `--feature-angle` | `-a` | Feature angle for edge preservation (degrees) | - |
 | `--validate` | | Run surfaceCheck validation after conversion | `false` |
+| `--verbose` | `-v` | Show detailed gmsh output | `false` |
 
 ### How It Works
 
@@ -98,18 +97,13 @@ foamscript convert [OPTIONS]
 
 **Convert disc from millimeters to meters:**
 ```bash
-foamscript convert \
-  --input disc.step \
-  --output disc.stl \
-  --input-units mm \
-  --mesh-size 0.05
+foamscript convert disc.step disc.stl \
+  --input-units mm
 ```
 
-**Convert with edge preservation:**
+**Convert with edge preservation and finer mesh:**
 ```bash
-foamscript convert \
-  --input disc.step \
-  --output disc.stl \
+foamscript convert disc.step disc.stl \
   --input-units mm \
   --mesh-size 0.05 \
   --feature-angle 30
@@ -117,9 +111,7 @@ foamscript convert \
 
 **Convert and validate:**
 ```bash
-foamscript convert \
-  --input disc.step \
-  --output disc.stl \
+foamscript convert disc.step disc.stl \
   --input-units mm \
   --validate
 ```
@@ -242,24 +234,26 @@ foamscript new-study --config study.json
 | Option | Short | Description | Default |
 |--------|-------|-------------|---------|
 | `--config` | `-c` | Path to JSON config file (replaces all CLI options) | - |
-| `--template` | `-t` | Template name or path | `external_disc_rotating-ami_transient` |
-| `--velocity` | `-v` | Free stream velocity magnitude (m/s) | `20.0` |
-| `--rpm` | `-r` | Disc rotation speed (RPM) | `1000` |
+| `--template` | `-t` | Template name or path | `external_disc_rotatingwall_steady` |
+| `--velocity` | `-v` | Free stream velocity magnitude (m/s) | `27.0` |
+| `--rpm` | `-r` | Disc rotation speed (RPM) | `925` |
 | `--input-units` | `-u` | Source file units: mm, cm, m, in, ft | `mm` |
 | `--mesh-size` | `-m` | STL mesh size factor for STEP/IGES conversion | `0.05` |
 | `--feature-angle` | | Feature angle for edge preservation (degrees) | - |
-| `--cores` | | Number of CPU cores for parallel execution | `4` |
+| `--cores` | | Number of CPU cores (0 = auto-detect all available) | `0` |
 
 ### Physics Parameters
 
 | Option | Description | Default |
 |--------|-------------|---------|
 | `--nu` | Kinematic viscosity (m²/s) — air at ~20°C sea level | `1.5e-5` |
-| `--turbulence-intensity` | Freestream turbulence intensity (fraction, e.g. 0.05 = 5%) | `0.05` |
-| `--end-time` | Simulation end time (seconds) | `1.0` |
-| `--outer-correctors` | PIMPLE outer corrector iterations | `3` |
-| `--refinement-min` | snappyHexMesh minimum refinement level | `3` |
-| `--refinement-max` | snappyHexMesh maximum refinement level | `4` |
+| `--turbulence-intensity` | Freestream turbulence intensity (fraction, e.g. 0.01 = 1%) | `0.01` |
+| `--max-iterations` | Maximum solver iterations (steady-state) | `500` |
+| `--write-interval` | Write results every N iterations | `100` |
+| `--end-time` | Simulation end time — transient only (seconds) | `1.0` |
+| `--outer-correctors` | PIMPLE outer corrector iterations — transient only | `3` |
+| `--refinement-min` | snappyHexMesh minimum refinement level | `5` |
+| `--refinement-max` | snappyHexMesh maximum refinement level | `6` |
 
 ### Domain Geometry Parameters
 
@@ -280,7 +274,7 @@ All scales are relative to the detected disc diameter.
 2. **Processes geometry** (convert STEP/IGES → STL, scale to meters, validate)
 3. **Generates domain** (`rotor.stl` AMI rotating region, `tunnel.stl` stationary far-field)
 4. **For each angle of attack:**
-   - Calculates `Ux = V·cos(α)`, `Uy = V·sin(α)`, `ω = RPM × 2π/60`
+   - Calculates `Ux = V·cos(α)`, `Uz = V·sin(α)`, `ω = RPM × 2π/60`
    - Derives turbulence parameters (`k`, `ω_turb`) from physics config
    - Renders Scriban template files with all parameters
    - Copies geometry STL files to `constant/triSurface/`
@@ -373,22 +367,22 @@ An alternative to specifying all CLI options is to provide a JSON config file wi
 {
   "projectName": "MyStudy",
   "outputDir": "~/studies",
-  "templateName": "external_disc_rotating-ami_transient",
+  "templateName": "external_disc_rotatingwall_steady",
   "modelSource": "~/my_disc.step",
   "angles": "-5,0,5,10",
-  "velocity": 20.0,
-  "rpm": 1000.0,
+  "velocity": 27.0,
+  "rpm": 925.0,
   "inputUnits": "mm",
   "meshSize": 0.05,
   "featureAngle": null,
-  "cores": 4,
+  "cores": 0,
   "physics": {
     "nu": 1.5e-5,
-    "turbulenceIntensity": 0.05,
+    "turbulenceIntensity": 0.01,
     "endTime": 1.0,
     "nOuterCorrectors": 3,
-    "refinementLevelMin": 3,
-    "refinementLevelMax": 4
+    "refinementLevelMin": 5,
+    "refinementLevelMax": 6
   },
   "domain": {
     "rotorRadiusScale": 1.25,
@@ -413,7 +407,7 @@ An alternative to specifying all CLI options is to provide a JSON config file wi
 
 ## mesh
 
-Generates the computational mesh for a single OpenFOAM case using blockMesh and snappyHexMesh.
+Generates the computational mesh for an OpenFOAM case or all cases in a study directory. Auto-detects whether the path is a single case (has `constant/` + `system/`) or a study directory containing multiple cases.
 
 ### Usage
 
@@ -425,95 +419,57 @@ foamscript mesh [OPTIONS]
 
 | Option | Short | Description | Default |
 |--------|-------|-------------|---------|
-| `--case-dir` | `-c` | Path to case directory (required) | - |
-| `--parallel` | `-p` | Run snappyHexMesh in parallel with MPI | `false` |
-| `--cores` | | Number of CPU cores for parallel execution | `4` |
+| `--dir` | `-d` | Path to case or study directory (required) | - |
+| `--cores` | | Number of CPU cores (0 = auto-detect all available) | `0` |
 | `--check-quality` | | Run checkMesh after meshing | `true` |
 | `--overwrite` | | Overwrite existing mesh | `true` |
 
+Parallel mode is enabled automatically when cores > 1. Set `FOAMSCRIPT_MAX_CORES` environment variable to cap auto-detected core count.
+
 ### Workflow
 
-**Serial:**
+**Serial (1 core):**
 1. `blockMesh` — background hex mesh
 2. `surfaceFeatureExtract` — extract edge features for snapping
 3. `snappyHexMesh -overwrite` — hex-dominant mesh with refinement
 
-**Parallel:**
+**Parallel (2+ cores):**
 1. `blockMesh` — background hex mesh
 2. `surfaceFeatureExtract` — extract edge features
 3. `decomposePar -no-fields` — decompose mesh (no field data)
 4. Distribute `triSurface/` files to processor directories
 5. `mpirun -np <cores> snappyHexMesh -parallel -overwrite`
 6. `reconstructParMesh -constant` — reassemble mesh
-7. Patch boundary file for cyclicAMI (rotor/rotor_slave)
 
 Optional: `checkMesh` for quality validation.
 
 ### Examples
 
-**Mesh a single case in serial:**
+**Mesh a study (auto-detects all CPU cores):**
 ```bash
-foamscript mesh -c ~/studies/MyStudy/MyStudy_0.0
+foamscript mesh -d ~/studies/MyStudy
 ```
 
-**Mesh in parallel with 8 cores:**
+**Mesh with explicit core count:**
 ```bash
-foamscript mesh -c ~/studies/MyStudy/MyStudy_0.0 --parallel --cores 8
+foamscript mesh -d ~/studies/MyStudy --cores 8
 ```
 
-**Skip quality check for faster iteration:**
+**Force serial for debugging:**
 ```bash
-foamscript mesh -c ~/studies/MyStudy/MyStudy_0.0 --parallel --cores 4 --check-quality false
-```
-
-### Output
-
-Displays mesh statistics (cell/point/face counts), quality check results, and any warnings.
-
----
-
-## mesh-study
-
-Generates meshes for all cases in a study directory.
-
-### Usage
-
-```bash
-foamscript mesh-study [OPTIONS]
-```
-
-### Options
-
-| Option | Short | Description | Default |
-|--------|-------|-------------|---------|
-| `--study-dir` | `-s` | Path to study directory (required) | - |
-| `--parallel` | `-p` | Run snappyHexMesh in parallel per case | `false` |
-| `--cores` | | Number of CPU cores per case | `4` |
-| `--check-quality` | | Run checkMesh after each case | `true` |
-| `--overwrite` | | Overwrite existing meshes | `true` |
-| `--continue-on-error` | | Continue meshing if a case fails | `true` |
-
-### Examples
-
-**Mesh entire study in parallel:**
-```bash
-foamscript mesh-study -s ~/studies/MyStudy --parallel --cores 8
-```
-
-**Mesh with strict error handling:**
-```bash
-foamscript mesh-study -s ~/studies/MyStudy --parallel --cores 4 --continue-on-error false
+foamscript mesh -d ~/studies/MyStudy/MyStudy_0.0 --cores 1 --check-quality false
 ```
 
 ### Output
 
-Displays a summary table showing each case name, status, cell count, and mesh quality result.
+- **Single case**: Displays mesh statistics (cell/point/face counts), quality check results, and any warnings.
+- **Study**: Displays a summary table showing each case name, status, cell count, and mesh quality result. All cases are always processed; any failures are reported in the summary.
 
 ---
 
 ## solve
 
-Runs the OpenFOAM solver (pimpleFoam) on a single meshed case.
+Runs the OpenFOAM solver on a meshed case or all cases in a study directory. The solver is auto-detected from `system/controlDict` (e.g., simpleFoam for steady-state MRF, pimpleFoam for transient AMI).
 
 ### Usage
 
@@ -525,144 +481,110 @@ foamscript solve [OPTIONS]
 
 | Option | Short | Description | Default |
 |--------|-------|-------------|---------|
-| `--case-dir` | `-c` | Path to meshed case directory (required) | - |
-| `--parallel` | `-p` | Run solver in parallel with MPI | `false` |
-| `--cores` | | Number of CPU cores for parallel execution | `4` |
+| `--dir` | `-d` | Path to meshed case or study directory (required) | - |
+| `--cores` | | Number of CPU cores (0 = auto-detect all available) | `0` |
+
+Parallel mode is enabled automatically when cores > 1. Set `FOAMSCRIPT_MAX_CORES` environment variable to cap auto-detected core count.
 
 ### Workflow
 
-**Serial:**
-1. `pimpleFoam -case <dir>` — run solver
+**Serial (1 core):**
+1. `<solver> -case <dir>` — run detected solver
 
-**Parallel:**
-1. `decomposePar -force -case <dir>` — decompose with fields
-2. `mpirun -np <cores> pimpleFoam -case <dir> -parallel` — run solver
+**Parallel (2+ cores):**
+1. `decomposePar -case <dir>` — decompose with fields
+2. `mpirun -np <cores> <solver> -case <dir> -parallel` — run solver
 3. `reconstructPar -case <dir>` — reassemble time directories
 
 After solving, force coefficients (Cd, Cl, CmPitch) are extracted from `postProcessing/forces/0/coefficient.dat` using time-window averaging.
 
 ### Examples
 
-**Solve a single case in serial:**
+**Solve a study (auto-detects all CPU cores):**
 ```bash
-foamscript solve -c ~/studies/MyStudy/MyStudy_0.0
+foamscript solve -d ~/studies/MyStudy
 ```
 
-**Solve in parallel with 8 cores:**
+**Solve with explicit core count:**
 ```bash
-foamscript solve -c ~/studies/MyStudy/MyStudy_0.0 --parallel --cores 8
+foamscript solve -d ~/studies/MyStudy --cores 8
+```
+
+**Force serial for debugging:**
+```bash
+foamscript solve -d ~/studies/MyStudy/MyStudy_0.0 --cores 1
 ```
 
 ### Output
 
-Displays simulation time, time-averaged force coefficients (Cd, Cl, Cm), and any warnings.
+- **Single case**: Displays simulation time, time-averaged force coefficients (Cd, Cl, Cm), and any warnings.
+- **Study**: Displays a summary table showing each case name, status, and force coefficients. All cases are always processed; any failures are reported in the summary.
 
 ### Notes
 
-- The case must be meshed before solving (run `mesh` or `mesh-study` first)
-- Solver uses `decomposePar -force` (WITH fields), unlike mesh which uses `-no-fields`
+- The case must be meshed before solving (run `mesh` first)
 - Force coefficients are computed by the `forceCoeffs` function object in `controlDict`
 
 ---
 
-## solve-study
+## report
 
-Runs the solver on all cases in a study directory.
+Generates publication-quality analysis reports from a completed case or study. Produces HTML (self-contained with embedded SVG charts) and/or PDF reports with aerodynamic polar charts, drag polar, convergence history, mesh statistics, physics configuration, and coefficient tables.
 
 ### Usage
 
 ```bash
-foamscript solve-study [OPTIONS]
+foamscript report [OPTIONS]
 ```
 
 ### Options
 
 | Option | Short | Description | Default |
 |--------|-------|-------------|---------|
-| `--study-dir` | `-d` | Path to study directory (required) | - |
-| `--parallel` | `-p` | Run solver in parallel per case | `false` |
-| `--cores` | | Number of CPU cores per case | `4` |
-| `--continue-on-error` | | Continue solving if a case fails | `false` |
-
-### Examples
-
-**Solve entire study in parallel:**
-```bash
-foamscript solve-study -d ~/studies/MyStudy --parallel --cores 8
-```
-
-**Solve with error tolerance:**
-```bash
-foamscript solve-study -d ~/studies/MyStudy --parallel --cores 4 --continue-on-error
-```
-
-### Output
-
-Displays a summary table showing each case name, status, and force coefficients (Cd, Cl, Cm).
-
----
-
-## results
-
-Extracts and summarizes force coefficients from a completed study. Reads `postProcessing/forces/0/coefficient.dat` from each case and computes time-averaged Cd, Cl, CmPitch, and Cl/Cd ratio.
-
-### Usage
-
-```bash
-foamscript results [OPTIONS]
-```
-
-### Options
-
-| Option | Short | Description | Default |
-|--------|-------|-------------|---------|
-| `--study-dir` | `-d` | Path to study directory (required) | - |
-| `--format` | `-f` | Output format: `table`, `csv`, `json` | `table` |
+| `--dir` | `-d` | Path to case or study directory (required) | - |
+| `--format` | `-f` | Output format: `html`, `pdf`, or `both` | `both` |
 | `--average-window` | | Fraction of simulation to average over (0.1 = last 10%) | `0.1` |
 
+### Report Contents
+
+- **Aerodynamic polars**: Cl, Cd, CmPitch, and L/D vs angle of attack
+- **Drag polar**: Cl vs Cd
+- **Convergence history**: Residual plots from solver logs (Ux, Uy, Uz, p, k, omega)
+- **Mesh statistics**: Cell counts per case
+- **Physics configuration**: Velocity, RPM, turbulence intensity, viscosity, solver, refinement levels
+- **Coefficient table**: Time-averaged Cd, Cl, CmPitch, Cl/Cd for all angles
+- **AIAA CSV data export**: Machine-readable coefficient data with reference conditions header (always generated alongside reports)
+
 ### Examples
 
-**Table output (default):**
+**Generate both HTML and PDF (default):**
 ```bash
-foamscript results -d ~/studies/MyStudy
+foamscript report -d ~/studies/MyStudy
 ```
 
-**CSV export for spreadsheet analysis:**
+**HTML only:**
 ```bash
-foamscript results -d ~/studies/MyStudy --format csv > results.csv
-```
-
-**JSON export for programmatic use:**
-```bash
-foamscript results -d ~/studies/MyStudy --format json > results.json
+foamscript report -d ~/studies/MyStudy --format html
 ```
 
 **Average over last 20% of simulation:**
 ```bash
-foamscript results -d ~/studies/MyStudy --average-window 0.2
+foamscript report -d ~/studies/MyStudy --average-window 0.2
 ```
 
-### Output Formats
+### Output
 
-**Table:**
-```
-AoA (°)   Cd         Cl         Cl/Cd      CmPitch
--------   ------     ------     ------     --------
--5.0      0.045123   -0.123456  -2.7361    0.012345
- 0.0      0.042000    0.001234   0.0294    0.000123
- 5.0      0.046789    0.125678   2.6862    -0.011234
-10.0      0.055432    0.248901   4.4903    -0.023456
-```
-
-**CSV:** Comma-separated with header row, suitable for Excel/Sheets import.
-
-**JSON:** Array of objects with `angle`, `cd`, `cl`, `clCdRatio`, `cmPitch` fields.
+Reports are saved to `{study_dir}/report/`:
+- `{StudyName}_report.html` — self-contained HTML with inline CSS and embedded SVG charts
+- `{StudyName}_report.pdf` — publication-quality PDF with embedded PNG charts
+- `{StudyName}_coefficients.csv` — AIAA-standard coefficient data with reference conditions header (always generated)
 
 ### Notes
 
-- Cases must be solved before extracting results
-- The `--average-window` controls what fraction of the simulation time is used for averaging (e.g., 0.1 = last 10% of timesteps)
-- Failed or incomplete cases are reported with warnings
+- Cases must be solved before generating reports
+- Convergence plots require solver log files (`log.simpleFoam`, etc.) in each case directory
+- The `--average-window` controls what fraction of the simulation time is used for averaging coefficients
+- Single-case and multi-case studies are both supported
 
 ---
 
@@ -696,27 +618,19 @@ foamscript new-study \
   -o ~/studies \
   -s ~/my_disc.step \
   -a -10,-5,-2.5,0,2.5,5,10 \
-  --velocity 20 \
-  --rpm 1000 \
+  --velocity 27 \
+  --rpm 925 \
   --input-units mm \
   --cores 8
 
-# 3. Mesh all cases in parallel
-foamscript mesh-study \
-  -s ~/studies/DiscAnalysis \
-  --parallel \
-  --cores 8 \
-  --check-quality
+# 3. Mesh all cases (auto-detects cores, runs parallel)
+foamscript mesh -d ~/studies/DiscAnalysis
 
 # 4. Solve all cases
-foamscript solve-study \
-  -d ~/studies/DiscAnalysis \
-  --parallel \
-  --cores 8
+foamscript solve -d ~/studies/DiscAnalysis
 
-# 5. Extract results
-foamscript results -d ~/studies/DiscAnalysis --format table
-foamscript results -d ~/studies/DiscAnalysis --format csv > results.csv
+# 5. Generate report
+foamscript report -d ~/studies/DiscAnalysis
 ```
 
 ### Using a Config File for Repeatable Studies
@@ -729,8 +643,8 @@ cat > ~/studies/disc_study.json << 'EOF'
   "outputDir": "~/studies",
   "modelSource": "~/my_disc.step",
   "angles": "-10,-5,-2.5,0,2.5,5,10",
-  "velocity": 20.0,
-  "rpm": 1000.0,
+  "velocity": 27.0,
+  "rpm": 925.0,
   "inputUnits": "mm",
   "cores": 8
 }
@@ -739,10 +653,10 @@ EOF
 # Run study from config
 foamscript new-study --config ~/studies/disc_study.json
 
-# Mesh, solve, results
-foamscript mesh-study -s ~/studies/DiscAnalysis --parallel --cores 8
-foamscript solve-study -d ~/studies/DiscAnalysis --parallel --cores 8
-foamscript results -d ~/studies/DiscAnalysis
+# Mesh, solve, report
+foamscript mesh -d ~/studies/DiscAnalysis
+foamscript solve -d ~/studies/DiscAnalysis
+foamscript report -d ~/studies/DiscAnalysis
 ```
 
 ### Standalone Geometry Processing
@@ -832,7 +746,7 @@ Check that:
 
 ### Solver doesn't start
 
-- Ensure the case is meshed first (`foamscript mesh` or `mesh-study`)
+- Ensure the case is meshed first (`foamscript mesh -d <dir>`)
 - Check that `constant/polyMesh/` exists in the case directory
 - Verify OpenFOAM environment is sourced
 
@@ -840,5 +754,5 @@ Check that:
 
 - Check that the simulation ran to completion (look at log output)
 - Increase `--end-time` if the simulation needs more time to develop
-- Try a larger `--average-window` (e.g., 0.2) if results are noisy
+- Try a larger `--average-window` (e.g., 0.2) if coefficients are noisy
 - Verify the `forceCoeffs` function object is present in `system/controlDict`

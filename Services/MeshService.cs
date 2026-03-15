@@ -20,7 +20,7 @@ namespace foamscript.Services
         /// <summary>
         /// Meshes an OpenFOAM case using blockMesh and snappyHexMesh.
         /// </summary>
-        public MeshResult MeshCase(string caseDir, bool parallel, int cores, bool checkQuality, bool overwrite)
+        public virtual MeshResult MeshCase(string caseDir, bool parallel, int cores, bool checkQuality, bool overwrite)
         {
             var result = new MeshResult
             {
@@ -69,6 +69,27 @@ namespace foamscript.Services
                 }
 
                 Console.WriteLine("✓ blockMesh completed successfully");
+
+                // Step 1.5: Orient disc STL normals outward.
+                // gmsh preserves BREP face orientation from STEP files. Shapr3D's Parasolid
+                // kernel may produce inward-facing normals, which causes snappyHexMesh to
+                // create boundary faces with reversed area vectors → all force coefficient
+                // signs flip. surfaceOrient uses a known-outside point (0,0,-1) — below
+                // the disc — to determine outward direction, then reorients all normals.
+                Console.WriteLine("Orienting disc surface normals...");
+                var discStl = Path.Combine(caseDir, "constant", "triSurface", "disc.stl");
+                var orientResult = _processExecutor.Execute("surfaceOrient",
+                    $"{discStl} \"(0 0 -1)\" {discStl}");
+
+                if (orientResult.ExitCode != 0)
+                {
+                    result.Warnings.Add("surfaceOrient failed — disc normals may be incorrect");
+                    _loggingService.LogError($"surfaceOrient failed: {orientResult.Output}");
+                }
+                else
+                {
+                    Console.WriteLine("✓ Disc surface normals oriented outward");
+                }
 
                 // Step 2: Extract surface features (generates .eMesh files for snappyHexMesh)
                 Console.WriteLine("Extracting surface features...");
@@ -185,8 +206,12 @@ namespace foamscript.Services
                     Console.WriteLine("✓ snappyHexMesh completed successfully");
                 }
 
-                // Step: Convert rotor wall patches to cyclicAMI (required for AMI rotation)
-                PatchBoundaryForAMI(caseDir);
+                // Step: Convert rotor wall patches to cyclicAMI (only for AMI templates)
+                var createPatchPath = Path.Combine(caseDir, "system", "createPatchDict");
+                if (File.Exists(createPatchPath))
+                {
+                    PatchBoundaryForAMI(caseDir);
+                }
 
 
                 // Step 3: Check mesh quality (optional)
@@ -224,7 +249,7 @@ namespace foamscript.Services
         /// <summary>
         /// Meshes all cases in an OpenFOAM study.
         /// </summary>
-        public StudyMeshResult MeshStudy(string studyDir, bool parallel, int cores, bool checkQuality, bool overwrite, bool continueOnError)
+        public virtual StudyMeshResult MeshStudy(string studyDir, bool parallel, int cores, bool checkQuality, bool overwrite, bool continueOnError)
         {
             var result = new StudyMeshResult
             {

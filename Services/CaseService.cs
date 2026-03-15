@@ -29,7 +29,13 @@ namespace foamscript.Services
             try
             {
                 result.StudyName = config.ProjectName;
-                result.StudyDir = Path.GetFullPath(Path.Combine(config.OutputDir, config.ProjectName));
+
+                // Avoid double nesting when output dir already ends with project name
+                // e.g., --output-dir /run/MyStudy --project-name MyStudy → /run/MyStudy (not /run/MyStudy/MyStudy)
+                var outputDirName = Path.GetFileName(Path.GetFullPath(config.OutputDir));
+                result.StudyDir = string.Equals(outputDirName, config.ProjectName, StringComparison.OrdinalIgnoreCase)
+                    ? Path.GetFullPath(config.OutputDir)
+                    : Path.GetFullPath(Path.Combine(config.OutputDir, config.ProjectName));
 
                 // Validate template exists
                 if (!Directory.Exists(templatePath))
@@ -193,10 +199,10 @@ namespace foamscript.Services
             // Calculate velocity components for this angle
             var angleRad = angle * Math.PI / 180.0;
             caseInfo.Ux = velocity * Math.Cos(angleRad);
-            caseInfo.Uy = velocity * Math.Sin(angleRad);
+            caseInfo.Uz = velocity * Math.Sin(angleRad);
 
             // Calculate all template parameters
-            var context = CalculateTemplateContext(caseInfo.Ux, caseInfo.Uy, omega, cores, discDiameter, physics, domain);
+            var context = CalculateTemplateContext(caseInfo.Ux, caseInfo.Uz, omega, cores, discDiameter, physics, domain);
 
             // Process template with Scriban
             _templateService.ProcessTemplate(templatePath, caseDir, context);
@@ -210,12 +216,12 @@ namespace foamscript.Services
         /// <summary>
         /// Calculates all template context parameters for Scriban rendering.
         /// </summary>
-        private static object CalculateTemplateContext(double ux, double uy, double omegaRotation,
+        private static object CalculateTemplateContext(double ux, double uz, double omegaRotation,
             int cores, double discDiameter, StudyPhysicsConfig physics, StudyDomainConfig domain)
         {
             const double cmu = 0.09; // Standard k-omega SST turbulence model constant
 
-            var velocityMagnitude = Math.Sqrt(ux * ux + uy * uy);
+            var velocityMagnitude = Math.Sqrt(ux * ux + uz * uz);
             var k = 1.5 * Math.Pow(velocityMagnitude * physics.TurbulenceIntensity, 2);
             var mixingLength = 0.07 * discDiameter;
             var omegaTurbulence = Math.Sqrt(k) / (Math.Pow(cmu, 0.25) * mixingLength);
@@ -229,10 +235,28 @@ namespace foamscript.Services
             var domainDownstream = domain.TunnelDownstream * discDiameter * margin;
             var domainRadial = domain.TunnelRadial * discDiameter * margin;
 
+            // Compute safe initial deltaT targeting Co ≈ 0.125 at finest refinement level
+            // (4× safety factor — snappyHexMesh creates smaller cells than theoretical estimate)
+            var domainLength = domainUpstream + domainDownstream;
+            var nxCells = Math.Ceiling(domainLength / discDiameter * 4);
+            var baseCellSize = domainLength / nxCells;
+            var fineCellSize = baseCellSize / Math.Pow(2, physics.RefinementLevelMax);
+            var deltaT = 0.125 * fineCellSize / Math.Max(velocityMagnitude, 1.0);
+
+            // Cap maxDeltaT: constrained by both flow time and mesh motion Courant number
+            // Mesh motion velocity at rotor boundary (rotor radius ≈ 1.5× disc radius)
+            var rotorRadius = discDiameter * 0.75;
+            var meshMotionVelocity = Math.Abs(omegaRotation) * rotorRadius;
+            var maxDeltaTFlow = physics.EndTime / 100.0;
+            var maxDeltaTMeshMotion = meshMotionVelocity > 0
+                ? 0.5 * fineCellSize / meshMotionVelocity
+                : maxDeltaTFlow;
+            var maxDeltaT = Math.Min(maxDeltaTFlow, maxDeltaTMeshMotion);
+
             return new
             {
                 ux = ux,
-                uy = uy,
+                uz = uz,
                 p = 0,
                 turbulence_intensity = physics.TurbulenceIntensity,
                 k = k,
@@ -252,7 +276,11 @@ namespace foamscript.Services
                 aref = aref,
                 domain_upstream = domainUpstream,
                 domain_downstream = domainDownstream,
-                domain_radial = domainRadial
+                domain_radial = domainRadial,
+                delta_t = deltaT,
+                max_delta_t = maxDeltaT,
+                max_iterations = physics.MaxIterations,
+                write_interval = physics.WriteInterval
             };
         }
 
@@ -264,7 +292,7 @@ namespace foamscript.Services
             var triSurfaceDir = Path.Combine(caseDir, "constant", "triSurface");
             Directory.CreateDirectory(triSurfaceDir);
 
-            var stlFiles = new[] { "disc.stl", "rotor.stl", "tunnel.stl" };
+            var stlFiles = new[] { "disc.stl", "tunnel.stl" };
 
             foreach (var stlFile in stlFiles)
             {
@@ -289,8 +317,9 @@ namespace foamscript.Services
                     .Select(s => double.Parse(s.Trim()))
                     .ToArray();
             }
-            catch
+            catch (Exception ex)
             {
+                Console.Error.WriteLine($"Failed to parse angles '{anglesString}': {ex.Message}");
                 return Array.Empty<double>();
             }
         }

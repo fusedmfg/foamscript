@@ -57,6 +57,11 @@ public class TemplateService
         foreach (var sourceSubDir in Directory.GetDirectories(sourceDir))
         {
             var subDirName = Path.GetFileName(sourceSubDir);
+
+            // Skip reference-only directories (not part of the OpenFOAM case)
+            if (subDirName == "0.orig")
+                continue;
+
             var targetSubDir = Path.Combine(targetDir, subDirName);
 
             ProcessDirectory(sourceSubDir, targetSubDir, context);

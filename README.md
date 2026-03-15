@@ -19,14 +19,14 @@ foamscript new-study \
   -a -5,0,5,10 \
   --velocity 20 --rpm 1000 --input-units mm --cores 4
 
-# Mesh all cases in parallel
-foamscript mesh-study -d ~/OpenFOAM/$USER-v2512/run/DiscAnalysis --parallel --cores 4
+# Mesh all cases (auto-detects CPU cores, runs parallel)
+foamscript mesh -d ~/OpenFOAM/$USER-v2512/run/DiscAnalysis
 
 # Solve all cases
-foamscript solve-study -d ~/OpenFOAM/$USER-v2512/run/DiscAnalysis --parallel --cores 4
+foamscript solve -d ~/OpenFOAM/$USER-v2512/run/DiscAnalysis
 
-# Extract results
-foamscript results -d ~/OpenFOAM/$USER-v2512/run/DiscAnalysis --format table
+# Generate AIAA-quality analysis report (HTML + PDF)
+foamscript report -d ~/OpenFOAM/$USER-v2512/run/DiscAnalysis
 
 # Or use a JSON config file
 foamscript new-study --config study.json
@@ -34,13 +34,14 @@ foamscript new-study --config study.json
 
 ## Features
 
-- **Full Pipeline**: STEP/IGES → STL → domain generation → Scriban-templated case creation → meshing → solving → results extraction
-- **Configurable Physics**: Turbulence intensity, viscosity, end time, refinement levels — all via CLI or JSON
+- **Full Pipeline**: STEP/IGES → STL → domain generation → Scriban-templated case creation → meshing → solving → report generation
+- **AIAA-Quality Reports**: Publication-standard HTML + PDF reports with aerodynamic polars, drag polar, convergence history, mesh statistics, and coefficient tables
+- **Configurable Physics**: Turbulence intensity, viscosity, end time, refinement levels — all via CLI or JSON (AIAA defaults: TI 1%, PBiCGStab+DILU, refinement 5/6, 8 boundary layers)
 - **Configurable Domain**: Tunnel sizing, rotor scaling, mesh resolution — defaults follow CFD convention (5D upstream, 10D downstream, 5D radial)
+- **Auto-Parallel**: Detects CPU cores automatically; `--cores N` to override, `FOAMSCRIPT_MAX_CORES` env var to cap
 - **Parallel Meshing**: blockMesh → surfaceFeatureExtract → decomposePar → snappyHexMesh (MPI) → reconstructParMesh
-- **Parallel Solving**: decomposePar → pimpleFoam (MPI) → reconstructPar
+- **Parallel Solving**: decomposePar → simpleFoam (MPI) → reconstructPar
 - **Post-Processing**: Force coefficient extraction (Cd, Cl, CmPitch) with time-window averaging and Cl/Cd ratio
-- **Output Formats**: Table, CSV, and JSON for results export
 - **Parametric Studies**: Angle of attack sweeps with automatic velocity decomposition and turbulence parameter calculation
 - **Template System**: Scriban-rendered OpenFOAM case files; template naming: `{domain}_{feature}_{motion}_{solver-type}`
 
@@ -52,11 +53,9 @@ foamscript new-study --config study.json
 | `convert` | Convert STEP/IGES → STL via gmsh with unit scaling |
 | `generate-domain` | Generate rotor cylinder + tunnel box STL from disc geometry |
 | `new-study` | Full pipeline: geometry → domain → templated cases for AoA sweep |
-| `mesh` | Run blockMesh + snappyHexMesh on a single case (serial or parallel) |
-| `mesh-study` | Batch mesh all cases in a study directory |
-| `solve` | Run pimpleFoam solver on a single meshed case (serial or parallel) |
-| `solve-study` | Batch solve all cases in a study directory |
-| `results` | Extract force coefficients (Cd, Cl, Cl/Cd) from a completed study |
+| `mesh` | Mesh a case or study directory (auto-detects cores, parallel by default) |
+| `solve` | Solve a case or study directory (auto-detects cores, parallel by default) |
+| `report` | Generate AIAA-quality HTML + PDF analysis report from a completed study |
 | `list-templates` | List available OpenFOAM case templates |
 
 See **[Commands.md](Docs/Commands.md)** for full reference with all options, JSON config format, and examples.
@@ -73,7 +72,7 @@ See **[Commands.md](Docs/Commands.md)** for full reference with all options, JSO
 
 ```bash
 dotnet build
-dotnet test    # 117 tests
+dotnet test    # 192 tests
 ```
 
 ### Deploy to Linux
@@ -95,27 +94,32 @@ foamscript/
 │   ├── GenerateDomainHandler.cs
 │   ├── NewStudyHandler.cs
 │   ├── MeshHandler.cs
-│   ├── MeshStudyHandler.cs
 │   ├── SolveHandler.cs
-│   ├── SolveStudyHandler.cs
-│   ├── ResultsHandler.cs
+│   ├── ReportHandler.cs
 │   └── ListTemplatesHandler.cs
 ├── Models/              # CLI models (CommandLineParser) + result/config POCOs
 ├── Services/            # Business logic
-│   ├── AppService.cs         # CLI verb routing (thin dispatcher)
-│   ├── CaseService.cs        # Study creation, template context calculation
+│   ├── AppService.cs            # CLI verb routing (thin dispatcher)
+│   ├── CaseService.cs           # Study creation, template context calculation
 │   ├── StlConversionService.cs  # STEP→STL conversion, validation, scaling
-│   ├── DomainService.cs      # Domain generation (rotor/tunnel STL)
-│   ├── GeometryService.cs    # Facade over StlConversion + Domain services
-│   ├── MeshService.cs        # blockMesh, snappyHexMesh, parallel workflow
-│   ├── SolverService.cs      # pimpleFoam execution, force coefficient extraction
-│   ├── ResultsService.cs     # Results aggregation & formatting (table/CSV/JSON)
-│   ├── EnvironmentService.cs # OpenFOAM environment validation
-│   └── TemplateService.cs    # Scriban template rendering
-├── Templates/           # OpenFOAM case templates (Scriban)
-│   └── external_disc_rotating-ami_transient/
+│   ├── DomainService.cs         # Domain generation (rotor/tunnel STL)
+│   ├── GeometryService.cs       # Facade over StlConversion + Domain services
+│   ├── MeshService.cs           # blockMesh, snappyHexMesh, parallel workflow
+│   ├── SolverService.cs         # Solver execution, force coefficient extraction, log persistence
+│   ├── ResultsService.cs        # Results aggregation from coefficient.dat files
+│   ├── ReportService.cs         # Report orchestrator (data collection + chart + render)
+│   ├── ChartGenerator.cs        # ScottPlot AIAA-styled charts (polars, convergence)
+│   ├── HtmlReportGenerator.cs   # Scriban HTML report with embedded SVG charts
+│   ├── PdfReportGenerator.cs    # PdfSharpCore PDF report with PNG charts
+│   ├── ResidualParser.cs        # OpenFOAM solver log convergence parser
+│   ├── CoreResolver.cs          # Auto-detect CPU cores + FOAMSCRIPT_MAX_CORES env var
+│   ├── EnvironmentService.cs    # OpenFOAM environment validation
+│   └── TemplateService.cs       # Scriban template rendering
+├── Templates/           # OpenFOAM case + report templates (Scriban)
+│   ├── external_disc_rotatingwall_steady/
+│   └── report/report.html
 ├── Docs/Commands.md     # Full command reference
-├── foamscript.Tests/    # xUnit + Moq + FluentAssertions (117 tests)
+├── foamscript.Tests/    # xUnit + Moq + FluentAssertions (192 tests)
 └── study.example.jsonc  # Example JSON config file
 ```
 
@@ -124,7 +128,7 @@ foamscript/
 - **CommandLineParser** for declarative CLI verb/option parsing
 - **Command handler pattern** — each CLI verb has a dedicated handler class (`ICommandHandler<T>`), keeping `AppService` as a thin dispatcher (~70 LOC)
 - **Dependency injection** via `Microsoft.Extensions.Hosting`
-- **Service layer split** — `StlConversionService` (STEP→STL), `DomainService` (geometry generation), `MeshService` (OpenFOAM meshing), `SolverService` (solver execution), `ResultsService` (post-processing)
+- **Service layer split** — `StlConversionService` (STEP→STL), `DomainService` (geometry generation), `MeshService` (OpenFOAM meshing), `SolverService` (solver execution + log persistence), `ResultsService` (coefficient extraction), `ReportService` (AIAA report orchestration with `ChartGenerator`, `HtmlReportGenerator`, `PdfReportGenerator`)
 - **`IProcessExecutor` abstraction** wraps all external process calls — enables full unit test mocking without OpenFOAM installed
 - **Result object pattern** — all service calls return typed results (`IsSuccess`, `ErrorMessage`)
 - **Scriban templating** — OpenFOAM files rendered at case creation with pre-calculated physics context
