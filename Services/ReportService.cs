@@ -147,12 +147,15 @@ namespace foamscript.Services
                     Converged = c.Converged
                 }).ToList(),
 
-                // SVG charts
+                // Legacy SVG charts (backward compat for existing report.html templates)
                 ClVsAoaChart = _chartGenerator.GeneratePolarChartSvg(cases, "Cl", "Lift Coefficient vs Angle of Attack", "Lift Coefficient, C\u2097"),
                 CdVsAoaChart = _chartGenerator.GeneratePolarChartSvg(cases, "Cd", "Drag Coefficient vs Angle of Attack", "Drag Coefficient, C\u2084"),
                 CmVsAoaChart = _chartGenerator.GeneratePolarChartSvg(cases, "CmPitch", "Pitching Moment vs Angle of Attack", "Pitching Moment, C\u2098"),
                 LdVsAoaChart = _chartGenerator.GeneratePolarChartSvg(cases, "L/D", "Lift-to-Drag Ratio vs Angle of Attack", "L/D"),
                 DragPolarChart = _chartGenerator.GenerateDragPolarSvg(cases),
+
+                // Dynamic chart list from Coefficients keys
+                CoefficientCharts = BuildCoefficientCharts(cases, summary),
 
                 ConvergenceCharts = residuals.Select(r => new ConvergenceChartEntry
                 {
@@ -262,6 +265,25 @@ namespace foamscript.Services
             }
 
             return residuals;
+        }
+
+        /// <summary>
+        /// Generates one chart per coefficient key discovered in the results.
+        /// This is the data-driven replacement for the hardcoded Cl/Cd/Cm/LD chart list.
+        /// </summary>
+        private List<ChartEntry> BuildCoefficientCharts(List<CaseResult> cases, ResultsSummary summary)
+        {
+            var coeffKeys = ResultsService.GetCoefficientKeys(summary);
+            var charts = new List<ChartEntry>();
+
+            foreach (var key in coeffKeys)
+            {
+                var title = $"{key} vs Angle of Attack";
+                var svg = _chartGenerator.GeneratePolarChartSvg(cases, key, title, key);
+                charts.Add(new ChartEntry { Name = key, Title = title, Chart = svg });
+            }
+
+            return charts;
         }
 
         private static List<MeshStatEntry> CollectMeshStats(string studyDir, List<CaseResult> cases)
