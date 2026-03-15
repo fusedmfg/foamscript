@@ -163,13 +163,14 @@ namespace foamscript.Tests.Services
         [Fact]
         public void CalculateReferenceArea_Rectangular_ReturnsChordTimesSpan()
         {
-            var bbox = new BoundingBox { MinX = 0, MaxX = 1.0, MinY = -0.06, MaxY = 0.06, MinZ = 0, MaxZ = 0.5 };
+            // Airfoil: X=chord(1.0), Y=span(1.0), Z=thickness(0.12)
+            var bbox = new BoundingBox { MinX = 0, MaxX = 1.0, MinY = -0.5, MaxY = 0.5, MinZ = -0.06, MaxZ = 0.06 };
             var metadata = new TemplateMetadata { ReferenceAreaFormula = "rectangular" };
             double refLength = 1.0; // chord
 
             var result = TemplateMetadataService.CalculateReferenceArea(refLength, bbox, metadata);
 
-            result.Should().BeApproximately(0.5, 1e-10); // chord * span = 1.0 * 0.5
+            result.Should().BeApproximately(1.0, 1e-10); // chord * span = 1.0 * 1.0
         }
 
         [Fact]

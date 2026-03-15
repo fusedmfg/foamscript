@@ -77,7 +77,7 @@ namespace foamscript.Services
         {
             return metadata.ReferenceAreaFormula switch
             {
-                "rectangular" => refLength * bbox.Depth,     // chord * span for airfoils
+                "rectangular" => refLength * bbox.Height,    // chord * span (Y-extent) for airfoils
                 _             => Math.PI * Math.Pow(refLength / 2.0, 2)  // "circular" — current disc behavior
             };
         }

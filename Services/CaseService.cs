@@ -99,7 +99,8 @@ namespace foamscript.Services
                 {
                     var caseInfo = CreateCase(result.StudyDir, config.ProjectName, templatePath, angle,
                         config.Velocity, omega, config.Cores, geometryDir, refLength, aref,
-                        metadata.RequiredStlFiles, metadata.RequiresRotorZone, config.Physics, config.Domain);
+                        metadata.RequiredStlFiles, metadata.RequiresRotorZone, config.Physics, config.Domain,
+                        spanHalf: bbox.Height / 2.0);
                     result.Cases.Add(caseInfo);
                 }
 
@@ -229,7 +230,8 @@ namespace foamscript.Services
             double angle, double velocity, double omega, int cores,
             string geometryDir, double refLength, double aref,
             string[] requiredStlFiles, bool requiresRotorZone,
-            StudyPhysicsConfig physics, StudyDomainConfig domain)
+            StudyPhysicsConfig physics, StudyDomainConfig domain,
+            double spanHalf = 0.0)
         {
             var caseInfo = new CaseInfo
             {
@@ -249,7 +251,7 @@ namespace foamscript.Services
 
             // Calculate all template parameters
             var context = CalculateTemplateContext(caseInfo.Ux, caseInfo.Uz, omega, cores,
-                refLength, aref, requiresRotorZone, physics, domain);
+                refLength, aref, requiresRotorZone, physics, domain, spanHalf);
 
             // Process template with Scriban
             _templateService.ProcessTemplate(templatePath, caseDir, context);
@@ -265,7 +267,8 @@ namespace foamscript.Services
         /// </summary>
         internal static object CalculateTemplateContext(double ux, double uz, double omegaRotation,
             int cores, double refLength, double aref, bool requiresRotorZone,
-            StudyPhysicsConfig physics, StudyDomainConfig domain)
+            StudyPhysicsConfig physics, StudyDomainConfig domain,
+            double spanHalf = 0.0)
         {
             const double cmu = 0.09; // Standard k-omega SST turbulence model constant
 
@@ -334,7 +337,9 @@ namespace foamscript.Services
                 delta_t = deltaT,
                 max_delta_t = maxDeltaT,
                 max_iterations = physics.MaxIterations,
-                write_interval = physics.WriteInterval
+                write_interval = physics.WriteInterval,
+                nu_tilda = 3.0 * physics.Nu,  // Spalart-Allmaras initial value (~3x molecular viscosity)
+                domain_span_half = spanHalf > 0 ? spanHalf : domainRadial  // Y half-extent for 2D domains
             };
         }
 
