@@ -38,6 +38,18 @@ boundaryField
         value           uniform 0;
     }
 
+    lowerWall
+    {
+        type            freestream;
+        freestreamValue $internalField;
+    }
+
+    upperWall
+    {
+        type            freestream;
+        freestreamValue $internalField;
+    }
+
     frontAndBack
     {
         type            empty;

@@ -37,6 +37,18 @@ boundaryField
         type            noSlip;
     }
 
+    lowerWall
+    {
+        type            freestreamVelocity;
+        freestreamValue $internalField;
+    }
+
+    upperWall
+    {
+        type            freestreamVelocity;
+        freestreamValue $internalField;
+    }
+
     frontAndBack
     {
         type            empty;
