@@ -12,7 +12,7 @@
 - **TDD approach**: write tests alongside features
 - **AIAA aerospace standards**: all defaults, report formatting, and visualization framing follow AIAA conventions
 - Run `dotnet build` and `dotnet test` before committing
-- For E2E validation, SSH to Linux box (see MEMORY.md for credentials)
+- For E2E validation, SSH to Linux box running OpenFOAM v2512
 - Update `Docs/ExecutiveSummary.md` when features, tests, issues, or costs change
 
 ## Key Paths

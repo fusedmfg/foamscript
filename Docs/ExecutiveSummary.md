@@ -2,7 +2,7 @@
 
 **Last Updated:** March 14, 2026
 **Version:** 0.4.1 (Clean Build + Security Hardening)
-**Repository:** [fusedmfg/foamscript](https://github.com/fusedmfg/foamscript) (private)
+**Repository:** [fusedmfg/foamscript](https://github.com/fusedmfg/foamscript)
 
 *This is a living document revised alongside development. It serves two purposes: (1) document what FoamScript is and how it solves OpenFOAM complexity, and (2) provide an honest narrative on developing this application using a human/AI pair-coding approach.*
 
@@ -354,6 +354,16 @@ After 93 commits, the project had only 19 GitHub issues — a clear signal that 
 Creating issues after the fact with commit references (`Implemented in abc123`) restored traceability, but the process gap reveals a broader pattern: **AI pair-coding sessions naturally skip issue creation because the conversation IS the specification.** The engineer describes what they want, the AI builds it, and neither stops to create a tracking artifact. This is fast but leaves no paper trail for future developers (or future sessions of the same project).
 
 **Lesson:** Issue creation should be the first step of any feature, not an afterthought. A simple discipline — "before the AI writes code, create a GitHub issue" — ensures that every feature has a traceable origin, acceptance criteria, and linkage to commits. For projects using AI pair-coding, this is especially important because conversation context is ephemeral.
+
+### 5.8 AI Agents Don't Guard Repository Hygiene by Default
+
+During development, internal configuration files containing SSH usernames, private IP addresses, and key file paths were committed to git and later deleted. While the data posed no real security risk (private LAN, no keys committed), the files remained recoverable in git history — a pattern that would be a serious exposure in a public repository with actual secrets.
+
+**What happened:** `.claude/settings.local.json`, `DEPLOY.md`, and `SSH-SETUP.md` were committed during early development, then removed in later commits. The AI agent neither flagged the initial commits as potentially sensitive nor suggested `.gitignore` entries to prevent them. A pre-release security audit caught the issue, but only because the engineer explicitly requested one.
+
+**Why the AI missed it:** Repository hygiene — preventing sensitive files from entering version control — is a well-established best practice that should be in even the oldest AI models' training data. Yet AI coding agents are optimized for task completion, not proactive risk assessment. Unless explicitly asked "should this file be committed?" or "scan for secrets," the agent focuses on making the code work, not on what shouldn't be in the repo.
+
+**Lesson:** Treat `.gitignore` as a first-class deliverable. Before the first commit of any project, explicitly ask the AI to generate a comprehensive `.gitignore` that covers IDE settings, credential files, deployment configs, and environment-specific files. Better yet, use pre-commit hooks (like `git-secrets` or `detect-secrets`) that reject commits containing patterns that look like credentials. AI agents should proactively flag files that match sensitive patterns — the fact that they don't is a gap worth noting.
 
 ---
 
