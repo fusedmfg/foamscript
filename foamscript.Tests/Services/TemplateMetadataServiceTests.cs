@@ -221,7 +221,7 @@ namespace foamscript.Tests.Services
                 "type": "disc",
                 "stlName": "disc.stl",
                 "requiredStlFiles": ["disc.stl", "tunnel.stl"],
-                "surfaceOrient": "outward"
+                "surfaceOrient": { "outsidePoint": [0, 0, -1] }
               },
               "reference": {
                 "dimension": "diameter",
@@ -278,7 +278,8 @@ namespace foamscript.Tests.Services
             metadata.Geometry.Type.Should().Be("disc");
             metadata.Geometry.StlName.Should().Be("disc.stl");
             metadata.Geometry.RequiredStlFiles.Should().BeEquivalentTo("disc.stl", "tunnel.stl");
-            metadata.Geometry.SurfaceOrient.Should().Be("outward");
+            metadata.Geometry.SurfaceOrient.Should().NotBeNull();
+            metadata.Geometry.SurfaceOrient!.OutsidePoint.Should().BeEquivalentTo(new[] { 0.0, 0.0, -1.0 });
 
             // Reference
             metadata.Reference.Dimension.Should().Be("diameter");

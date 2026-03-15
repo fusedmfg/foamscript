@@ -69,7 +69,13 @@ namespace foamscript.Models
         public string[] RequiredStlFiles { get; set; } = [];
 
         [JsonPropertyName("surfaceOrient")]
-        public string? SurfaceOrient { get; set; }
+        public SurfaceOrientConfig? SurfaceOrient { get; set; }
+    }
+
+    public class SurfaceOrientConfig
+    {
+        [JsonPropertyName("outsidePoint")]
+        public double[] OutsidePoint { get; set; } = [];
     }
 
     public class ReferenceConfig
