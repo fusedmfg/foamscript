@@ -6,7 +6,6 @@ Complete reference for all FoamScript commands with explanations and examples.
 
 - [validate](#validate) - Validate OpenFOAM environment
 - [convert](#convert) - Convert STEP/IGES geometry to STL
-- [generate-domain](#generate-domain) - Generate rotor and tunnel domains
 - [new-study](#new-study) - Create OpenFOAM study with angle of attack sweep
 - [mesh](#mesh) - Mesh a case or study directory
 - [solve](#solve) - Run solver on a case or study directory
@@ -130,77 +129,6 @@ The command displays:
 - **Lower mesh-size = finer mesh** (more triangles, larger file, better accuracy)
 - **Feature angle preserves sharp edges** (use 20-45° for most cases)
 - For PDGA disc golf discs (diameter ~21-30cm), typical dimensions after conversion should be 0.21-0.30m
-
----
-
-## generate-domain
-
-Generates rotor (rotating region) and tunnel (stationary region) STL files from a disc STL geometry.
-
-### Usage
-
-```bash
-foamscript generate-domain [OPTIONS]
-```
-
-### Options
-
-| Option | Short | Description | Default |
-|--------|-------|-------------|---------|
-| `--disc` | `-d` | Input disc STL file (required) | - |
-| `--output-dir` | `-o` | Output directory for rotor.stl and tunnel.stl | `.` |
-| `--rotor-radius-scale` | | Rotor AMI cylinder radius as multiple of disc radius | `1.25` |
-| `--rotor-height-scale` | | Rotor AMI cylinder height as multiple of disc height | `1.5` |
-| `--tunnel-upstream` | | Tunnel upstream extent (disc diameters) | `5.0` |
-| `--tunnel-downstream` | | Tunnel downstream extent (disc diameters) | `10.0` |
-| `--tunnel-radial` | | Tunnel radial extent (disc diameters) | `5.0` |
-| `--mesh-resolution` | | Segments around generated cylinders | `32` |
-| `--validate` | | Run surfaceCheck validation on generated files | `false` |
-
-### How It Works
-
-1. **Analyzes disc geometry** to determine bounding box and center
-2. **Generates rotor cylinder** around the disc (AMI rotating region)
-3. **Generates tunnel box** around the rotor (stationary far-field)
-
-Defaults follow standard CFD conventions: 5D upstream, 10D downstream, 5D radial. The rotor cylinder provides ~25% clearance around the disc.
-
-### Examples
-
-**Generate with defaults:**
-```bash
-foamscript generate-domain disc.stl --output-dir ./
-```
-
-**Extended wake for wake analysis:**
-```bash
-foamscript generate-domain disc.stl \
-  --output-dir ./ \
-  --tunnel-downstream 15 \
-  --validate
-```
-
-**High-resolution mesh:**
-```bash
-foamscript generate-domain disc.stl \
-  --output-dir ./ \
-  --mesh-resolution 64 \
-  --validate
-```
-
-### Output
-
-The command creates:
-- `rotor.stl` - Cylindrical rotating region
-- `tunnel.stl` - Box-shaped stationary region
-
-And displays disc bounding box, rotor dimensions, tunnel extents, and optional validation results.
-
-### Notes
-
-- **Rotor must enclose disc completely** (use scales > 1.0)
-- **Tunnel must enclose rotor completely**
-- Standard CFD convention: 5D upstream, 10D downstream, 5D radial
 
 ---
 
@@ -659,19 +587,16 @@ foamscript solve -d ~/studies/DiscAnalysis
 foamscript report -d ~/studies/DiscAnalysis
 ```
 
-### Standalone Geometry Processing
+### Standalone Geometry Conversion
 
 ```bash
-# 1. Convert STEP to STL
+# Convert STEP to STL
 foamscript convert \
   --input disc.step \
   --output disc.stl \
   --input-units mm \
   --mesh-size 0.05 \
   --validate
-
-# 2. Generate domain STL files
-foamscript generate-domain disc.stl --output-dir ./ --validate
 ```
 
 ---

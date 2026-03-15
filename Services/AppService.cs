@@ -8,7 +8,6 @@ namespace foamscript
         private readonly Services.LoggingService _loggingService;
         private readonly ValidateHandler _validateHandler;
         private readonly ConvertHandler _convertHandler;
-        private readonly GenerateDomainHandler _generateDomainHandler;
         private readonly NewStudyHandler _newStudyHandler;
         private readonly MeshHandler _meshHandler;
         private readonly SolveHandler _solveHandler;
@@ -19,7 +18,6 @@ namespace foamscript
             Services.LoggingService loggingService,
             ValidateHandler validateHandler,
             ConvertHandler convertHandler,
-            GenerateDomainHandler generateDomainHandler,
             NewStudyHandler newStudyHandler,
             MeshHandler meshHandler,
             SolveHandler solveHandler,
@@ -29,7 +27,6 @@ namespace foamscript
             _loggingService = loggingService;
             _validateHandler = validateHandler;
             _convertHandler = convertHandler;
-            _generateDomainHandler = generateDomainHandler;
             _newStudyHandler = newStudyHandler;
             _meshHandler = meshHandler;
             _solveHandler = solveHandler;
@@ -45,7 +42,6 @@ namespace foamscript
                 {
                     ValidateModel m => _validateHandler.Handle(m),
                     ConvertModel m => _convertHandler.Handle(m),
-                    GenerateDomainModel m => _generateDomainHandler.Handle(m),
                     NewStudyModel m => _newStudyHandler.Handle(m),
                     MeshModel m => _meshHandler.Handle(m),
                     SolveModel m => _solveHandler.Handle(m),

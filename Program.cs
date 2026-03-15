@@ -80,7 +80,6 @@ namespace foamscript
                 // Command handlers.
                 builder.Services.AddTransient<ValidateHandler>();
                 builder.Services.AddTransient<ConvertHandler>();
-                builder.Services.AddTransient<GenerateDomainHandler>();
                 builder.Services.AddTransient<NewStudyHandler>();
                 builder.Services.AddTransient<MeshHandler>();
                 builder.Services.AddTransient<SolveHandler>();

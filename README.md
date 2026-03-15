@@ -51,7 +51,6 @@ foamscript new-study --config study.json
 |---------|-------------|
 | `validate` | Validate OpenFOAM environment (tools, env vars) |
 | `convert` | Convert STEP/IGES → STL via gmsh with unit scaling |
-| `generate-domain` | Generate rotor cylinder + tunnel box STL from disc geometry |
 | `new-study` | Full pipeline: geometry → domain → templated cases for AoA sweep |
 | `mesh` | Mesh a case or study directory (auto-detects cores, parallel by default) |
 | `solve` | Solve a case or study directory (auto-detects cores, parallel by default) |
