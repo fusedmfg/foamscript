@@ -1,6 +1,3 @@
-# foamscript
-C# CLI utility for OpenFOAM case management
-=======
 # FoamScript
 
 .NET 10 CLI tool for automating OpenFOAM CFD case setup and meshing for disc golf disc aerodynamic analysis.
