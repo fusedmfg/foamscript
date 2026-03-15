@@ -34,7 +34,7 @@ namespace foamscript.Tests.Handlers
                 templateService,
                 metadataService);
 
-            _handler = new NewStudyHandler(_mockLoggingService.Object, _mockCaseService.Object);
+            _handler = new NewStudyHandler(_mockLoggingService.Object, _mockCaseService.Object, metadataService);
         }
 
         public void Dispose()
@@ -69,10 +69,13 @@ namespace foamscript.Tests.Handlers
 
         private static NewStudyModel CreateValidCliModel() => new NewStudyModel
         {
+            TemplatePath = "external_disc_rotatingwall_steady",
             ProjectName = "TestProject",
             OutputDir = Path.GetTempPath(),
             ModelSource = "/tmp/disc.stl",
-            Angles = "0,5,10"
+            Angles = "0,5,10",
+            Velocity = 27.0,
+            Rpm = 925.0
         };
 
         private static string CreateValidJsonConfig(string? outputDir = null)

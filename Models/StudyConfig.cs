@@ -53,23 +53,23 @@ namespace foamscript.Models
 
     /// <summary>
     /// Domain geometry parameters controlling rotor zone and wind tunnel sizing.
-    /// All scales are relative to the detected disc diameter.
+    /// All scales are relative to the detected reference dimension.
     /// </summary>
     public class StudyDomainConfig
     {
-        /// <summary>Rotor AMI cylinder radius as a multiple of disc radius. Default: 1.25 (~25% clearance).</summary>
+        /// <summary>Rotor AMI cylinder radius as a multiple of geometry radius. Default: 1.25 (~25% clearance).</summary>
         public double RotorRadiusScale { get; set; } = 1.25;
 
-        /// <summary>Rotor AMI cylinder height as a multiple of disc height. Default: 1.5.</summary>
+        /// <summary>Rotor AMI cylinder height as a multiple of geometry height. Default: 1.5.</summary>
         public double RotorHeightScale { get; set; } = 1.5;
 
-        /// <summary>Wind tunnel upstream extent in disc diameters. Default: 5.0 (CFD convention).</summary>
+        /// <summary>Wind tunnel upstream extent in reference lengths. Default: 5.0 (CFD convention).</summary>
         public double TunnelUpstream { get; set; } = 5.0;
 
-        /// <summary>Wind tunnel downstream extent in disc diameters. Default: 10.0 (CFD convention).</summary>
+        /// <summary>Wind tunnel downstream extent in reference lengths. Default: 10.0 (CFD convention).</summary>
         public double TunnelDownstream { get; set; } = 10.0;
 
-        /// <summary>Wind tunnel radial extent in disc diameters. Default: 5.0 (CFD convention).</summary>
+        /// <summary>Wind tunnel radial extent in reference lengths. Default: 5.0 (CFD convention).</summary>
         public double TunnelRadial { get; set; } = 5.0;
 
         /// <summary>Number of vertices around the generated cylinder geometries. Default: 32.</summary>
