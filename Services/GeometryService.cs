@@ -23,7 +23,7 @@ namespace foamscript.Services
             => _conversionService.ValidateStl(stlFile);
 
         public DomainGenerationResult GenerateDomain(
-            string discStlFile,
+            string geometryStlFile,
             string outputDirectory,
             double rotorRadiusScale,
             double rotorHeightScale,
@@ -31,7 +31,7 @@ namespace foamscript.Services
             double tunnelDownstream,
             double tunnelRadial,
             int meshResolution)
-            => _domainService.GenerateDomain(discStlFile, outputDirectory, rotorRadiusScale, rotorHeightScale, tunnelUpstream, tunnelDownstream, tunnelRadial, meshResolution);
+            => _domainService.GenerateDomain(geometryStlFile, outputDirectory, rotorRadiusScale, rotorHeightScale, tunnelUpstream, tunnelDownstream, tunnelRadial, meshResolution);
 
         public DomainGenerationResult GenerateTunnelOnly(
             string stlFile,

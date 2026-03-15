@@ -413,7 +413,7 @@ namespace foamscript.Services
                 }
                 catch { }
             }
-            return "external_disc_rotatingwall_steady"; // backward compat fallback
+            return string.Empty; // no template name available — will use global report template
         }
 
         internal static PhysicsConfig ReadPhysicsConfig(string studyDir)

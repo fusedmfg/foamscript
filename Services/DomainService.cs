@@ -21,7 +21,7 @@ namespace foamscript.Services
         /// Validation (e.g., PDGA size checks) is the caller's responsibility via TemplateMetadata.
         /// </summary>
         public DomainGenerationResult GenerateDomain(
-            string discStlFile,
+            string geometryStlFile,
             string outputDirectory,
             double rotorRadiusScale,
             double rotorHeightScale,
@@ -33,21 +33,21 @@ namespace foamscript.Services
             var result = new DomainGenerationResult();
 
             // Check if STL exists
-            var fileCheckResult = _processExecutor.Execute("test", $"-f {discStlFile}");
+            var fileCheckResult = _processExecutor.Execute("test", $"-f {geometryStlFile}");
             if (fileCheckResult.ExitCode != 0)
             {
                 result.IsSuccess = false;
-                result.ErrorMessage = $"Disc STL file not found: {discStlFile}";
+                result.ErrorMessage = $"Geometry STL file not found: {geometryStlFile}";
                 return result;
             }
 
             // Parse STL and calculate bounding box
             // STL file is assumed to be in meters (converted by the convert command with --input-units)
-            var boundingBox = CalculateBoundingBox(discStlFile);
+            var boundingBox = CalculateBoundingBox(geometryStlFile);
             if (boundingBox == null)
             {
                 result.IsSuccess = false;
-                result.ErrorMessage = $"Failed to parse disc STL file: {discStlFile}";
+                result.ErrorMessage = $"Failed to parse geometry STL file: {geometryStlFile}";
                 return result;
             }
 
