@@ -2,12 +2,19 @@
   "name": "external_disc_rotating-ami_transient",
   "description": "Transient AMI simulation of rotating disc (pimpleFoam + sliding mesh interface)",
   "solver": "pimpleFoam",
-  "geometryType": "disc",
-  "geometryStlName": "disc.stl",
-  "referenceDimension": "diameter",
-  "referenceAreaFormula": "circular",
-  "requiresRotorZone": true,
-  "requiredStlFiles": ["disc.stl", "rotor.stl", "tunnel.stl"],
+  "geometry": {
+    "type": "disc",
+    "stlName": "disc.stl",
+    "requiredStlFiles": ["disc.stl", "rotor.stl", "tunnel.stl"]
+  },
+  "reference": {
+    "dimension": "diameter",
+    "areaFormula": "circular"
+  },
+  "rotation": {
+    "enabled": true,
+    "requiresRotorZone": true
+  },
   "validation": {
     "minSize": 0.18,
     "maxSize": 0.35,

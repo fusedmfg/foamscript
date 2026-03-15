@@ -4,8 +4,8 @@ using foamscript.Models;
 namespace foamscript.Services
 {
     /// <summary>
-    /// Loads template metadata from TEMPLATE.json files. Falls back to disc defaults
-    /// when the file is missing, ensuring backward compatibility.
+    /// Loads template metadata from TEMPLATE.json files. Throws if the file is missing
+    /// or contains invalid JSON — every template must have a valid TEMPLATE.json.
     /// </summary>
     public class TemplateMetadataService
     {
@@ -13,7 +13,8 @@ namespace foamscript.Services
 
         /// <summary>
         /// Loads metadata from the TEMPLATE.json in the given template directory.
-        /// Returns disc-compatible defaults if the file is missing or invalid.
+        /// Throws FileNotFoundException if the file is missing.
+        /// Throws JsonException if the file contains invalid JSON.
         /// </summary>
         public TemplateMetadata LoadMetadata(string templatePath)
         {
@@ -21,41 +22,14 @@ namespace foamscript.Services
 
             if (!File.Exists(jsonPath))
             {
-                return CreateDiscDefaults(templatePath);
+                throw new FileNotFoundException(
+                    $"Template metadata file not found: {jsonPath}", jsonPath);
             }
 
-            try
-            {
-                var json = File.ReadAllText(jsonPath);
-                var metadata = JsonSerializer.Deserialize<TemplateMetadata>(json);
-                return metadata ?? CreateDiscDefaults(templatePath);
-            }
-            catch (JsonException)
-            {
-                return CreateDiscDefaults(templatePath);
-            }
-        }
-
-        private static TemplateMetadata CreateDiscDefaults(string templatePath)
-        {
-            return new TemplateMetadata
-            {
-                Name = Path.GetFileName(templatePath),
-                Description = "Template (no TEMPLATE.json found — using disc defaults)",
-                Solver = "simpleFoam",
-                GeometryType = "disc",
-                GeometryStlName = "disc.stl",
-                ReferenceDimension = "diameter",
-                ReferenceAreaFormula = "circular",
-                RequiresRotorZone = true,
-                RequiredStlFiles = ["disc.stl", "tunnel.stl"],
-                Validation = new GeometryValidation
-                {
-                    MinSize = 0.18,
-                    MaxSize = 0.35,
-                    WarningMessage = "Disc diameter outside expected PDGA range (0.21-0.30m). Ensure correct --input-units."
-                }
-            };
+            var json = File.ReadAllText(jsonPath);
+            var metadata = JsonSerializer.Deserialize<TemplateMetadata>(json)
+                ?? throw new JsonException("Deserialized TEMPLATE.json was null.");
+            return metadata;
         }
 
         /// <summary>

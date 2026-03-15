@@ -2,10 +2,17 @@
   "name": "external_airfoil_static_steady",
   "description": "Steady-state 2D airfoil analysis (simpleFoam + Spalart-Allmaras)",
   "solver": "simpleFoam",
-  "geometryType": "airfoil",
-  "geometryStlName": "airfoil.stl",
-  "referenceDimension": "chord",
-  "referenceAreaFormula": "rectangular",
-  "requiresRotorZone": false,
-  "requiredStlFiles": ["airfoil.stl"]
+  "geometry": {
+    "type": "airfoil",
+    "stlName": "airfoil.stl",
+    "requiredStlFiles": ["airfoil.stl"]
+  },
+  "reference": {
+    "dimension": "chord",
+    "areaFormula": "rectangular"
+  },
+  "rotation": {
+    "enabled": false,
+    "requiresRotorZone": false
+  }
 }

@@ -2,12 +2,19 @@
   "name": "external_disc_rotatingwall_steady",
   "description": "Steady-state MRF simulation of rotating disc (simpleFoam + rotatingWallVelocity BC)",
   "solver": "simpleFoam",
-  "geometryType": "disc",
-  "geometryStlName": "disc.stl",
-  "referenceDimension": "diameter",
-  "referenceAreaFormula": "circular",
-  "requiresRotorZone": true,
-  "requiredStlFiles": ["disc.stl", "tunnel.stl"],
+  "geometry": {
+    "type": "disc",
+    "stlName": "disc.stl",
+    "requiredStlFiles": ["disc.stl", "tunnel.stl"]
+  },
+  "reference": {
+    "dimension": "diameter",
+    "areaFormula": "circular"
+  },
+  "rotation": {
+    "enabled": true,
+    "requiresRotorZone": true
+  },
   "validation": {
     "minSize": 0.18,
     "maxSize": 0.35,
