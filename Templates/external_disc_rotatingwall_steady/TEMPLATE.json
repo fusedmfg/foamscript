@@ -44,9 +44,9 @@
     { "command": "checkMesh", "args": "-case {caseDir}" }
   ],
   "solvePipeline": [
-    { "command": "decomposePar", "args": "-case {caseDir} -force" },
+    { "command": "decomposePar", "args": "-case {caseDir} -force", "parallelOnly": true },
     { "command": "simpleFoam", "args": "-case {caseDir}", "parallel": true },
-    { "command": "reconstructPar", "args": "-case {caseDir} -latestTime" }
+    { "command": "reconstructPar", "args": "-case {caseDir} -latestTime", "parallelOnly": true }
   ],
   "results": {
     "type": "forceCoefficients",
