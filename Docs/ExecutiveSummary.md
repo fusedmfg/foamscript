@@ -172,7 +172,7 @@ FoamScript was built using **Claude Code** (Anthropic's AI coding agent) as the 
 │  Test/Production Ratio 73.7%                     │
 │  Passing Tests         201                       │
 │  Template Files        42                        │
-│  GitHub Issues         33 (28 closed, 5 open)    │
+│  GitHub Issues         40 (28 closed, 12 open)   │
 └─────────────────────────────────────────────────┘
 ```
 
@@ -425,7 +425,7 @@ Based on the development history, approximately **70-75% of AI compute was produ
 | Test/Prod Ratio | 73.7% | Above industry average (~40-60% typical) |
 | Passing Tests | 201 | Zero failures |
 | Template Files | 42 | Comprehensive OpenFOAM coverage |
-| GitHub Issues | 33 total (28 closed, 5 open) | Comprehensive tracking |
+| GitHub Issues | 40 total (28 closed, 12 open) | Comprehensive tracking |
 | Build Status | Clean | Zero warnings |
 | Pipeline Validated | Yes | SimFlow match + grid convergence |
 
