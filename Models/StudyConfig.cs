@@ -15,7 +15,7 @@ namespace foamscript.Models
         public string InputUnits { get; set; } = "mm";
         public double MeshSize { get; set; } = 0.05;
         public double? FeatureAngle { get; set; }
-        public int Cores { get; set; } = 4;
+        public int Cores { get; set; } = 0;
         public StudyPhysicsConfig Physics { get; set; } = new();
         public StudyDomainConfig Domain { get; set; } = new();
     }

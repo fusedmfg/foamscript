@@ -48,8 +48,8 @@ namespace foamscript.Models
         [Option("feature-angle", Required = false, HelpText = "Feature angle for edge preservation in degrees (optional)")]
         public double? FeatureAngle { get; set; }
 
-        [Option("cores", Required = false, Default = 4, HelpText = "Number of CPU cores for parallel execution (default: 4)")]
-        public int Cores { get; set; } = 4;
+        [Option("cores", Required = false, Default = 0, HelpText = "Number of CPU cores for parallel execution (0 = auto-detect, default: auto-detect)")]
+        public int Cores { get; set; } = 0;
 
         // ── Physics parameters ────────────────────────────────────────────────
 
