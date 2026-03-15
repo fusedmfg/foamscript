@@ -30,14 +30,14 @@ namespace foamscript.Models
 
         // ── Optional study inputs (with sensible defaults) ────────────────────
 
-        [Option('t', "template", Required = false, HelpText = "Template name or path (defaults to external_disc_rotatingwall_steady)")]
+        [Option('t', "template", Required = false, HelpText = "Template name or path (required — use 'foamscript list-templates' to see available templates)")]
         public string? TemplatePath { get; set; }
 
-        [Option('v', "velocity", Required = false, Default = 27.0, HelpText = "Free stream velocity magnitude (m/s, default: 27.0 — elite amateur throw speed)")]
-        public double Velocity { get; set; } = 27.0;
+        [Option('v', "velocity", Required = false, HelpText = "Freestream velocity magnitude (m/s)")]
+        public double? Velocity { get; set; }
 
-        [Option('r', "rpm", Required = false, Default = 925.0, HelpText = "Disc rotation speed (RPM, default: 925 — elite amateur spin rate)")]
-        public double Rpm { get; set; } = 925.0;
+        [Option('r', "rpm", Required = false, HelpText = "Rotational speed (RPM)")]
+        public double? Rpm { get; set; }
 
         [Option('u', "input-units", Required = false, Default = "mm", HelpText = "Source file units (mm, cm, m, in, ft). Only used for STEP/IGES conversion. Default: mm")]
         public string InputUnits { get; set; } = "mm";
@@ -79,19 +79,19 @@ namespace foamscript.Models
 
         // ── Domain geometry parameters ────────────────────────────────────────
 
-        [Option("rotor-radius-scale", Required = false, Default = 1.25, HelpText = "Rotor AMI cylinder radius as a multiple of disc radius (default: 1.25)")]
+        [Option("rotor-radius-scale", Required = false, Default = 1.25, HelpText = "Rotor AMI cylinder radius as a multiple of geometry radius (default: 1.25)")]
         public double RotorRadiusScale { get; set; } = 1.25;
 
-        [Option("rotor-height-scale", Required = false, Default = 1.5, HelpText = "Rotor AMI cylinder height as a multiple of disc height (default: 1.5)")]
+        [Option("rotor-height-scale", Required = false, Default = 1.5, HelpText = "Rotor AMI cylinder height as a multiple of geometry height (default: 1.5)")]
         public double RotorHeightScale { get; set; } = 1.5;
 
-        [Option("tunnel-upstream", Required = false, Default = 5.0, HelpText = "Wind tunnel upstream extent in disc diameters (default: 5.0)")]
+        [Option("tunnel-upstream", Required = false, Default = 5.0, HelpText = "Wind tunnel upstream extent in reference lengths (default: 5.0)")]
         public double TunnelUpstream { get; set; } = 5.0;
 
-        [Option("tunnel-downstream", Required = false, Default = 10.0, HelpText = "Wind tunnel downstream extent in disc diameters (default: 10.0)")]
+        [Option("tunnel-downstream", Required = false, Default = 10.0, HelpText = "Wind tunnel downstream extent in reference lengths (default: 10.0)")]
         public double TunnelDownstream { get; set; } = 10.0;
 
-        [Option("tunnel-radial", Required = false, Default = 5.0, HelpText = "Wind tunnel radial extent in disc diameters (default: 5.0)")]
+        [Option("tunnel-radial", Required = false, Default = 5.0, HelpText = "Wind tunnel radial extent in reference lengths (default: 5.0)")]
         public double TunnelRadial { get; set; } = 5.0;
 
         [Option("mesh-resolution", Required = false, Default = 32, HelpText = "Number of vertices around generated cylinder geometries (default: 32)")]

@@ -173,7 +173,7 @@ boundaryField
                 commentLines.Should().Contain(l => l.Contains("RPM: 925"));
 
                 var dataLines = lines.Where(l => !l.StartsWith("#")).ToList();
-                dataLines[0].Should().Be("AoA_deg,Cd,Cl,CmPitch,L_over_D,Converged");
+                dataLines[0].Should().Be("AoA_deg,Cd,Cl,CmPitch,Converged");
                 dataLines.Should().HaveCount(4); // header + 3 data rows
 
                 // Verify first data row
@@ -181,7 +181,7 @@ boundaryField
                 fields[0].Should().Be("-5.0");
                 double.Parse(fields[1]).Should().BeApproximately(0.065, 0.001);
                 double.Parse(fields[2]).Should().BeApproximately(0.189, 0.001);
-                fields[5].Should().Be("True");
+                fields[4].Should().Be("True");
             }
             finally
             {

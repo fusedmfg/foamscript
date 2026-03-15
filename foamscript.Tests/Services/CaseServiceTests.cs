@@ -101,6 +101,28 @@ endsolid disc
             File.WriteAllText(Path.Combine(templateDir, "system", "controlDict"),
                 "endTime {{ end_time }};");
 
+            // TEMPLATE.json — required by TemplateMetadataService
+            File.WriteAllText(Path.Combine(templateDir, "TEMPLATE.json"), """
+            {
+              "name": "test_template",
+              "description": "Minimal test template",
+              "solver": "simpleFoam",
+              "geometry": {
+                "type": "disc",
+                "stlName": "disc.stl",
+                "requiredStlFiles": ["disc.stl", "tunnel.stl"]
+              },
+              "reference": {
+                "dimension": "diameter",
+                "areaFormula": "circular"
+              },
+              "rotation": {
+                "enabled": true,
+                "requiresRotorZone": true
+              }
+            }
+            """);
+
             return templateDir;
         }
 

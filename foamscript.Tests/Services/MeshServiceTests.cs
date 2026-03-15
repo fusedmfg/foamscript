@@ -11,6 +11,7 @@ namespace foamscript.Tests.Services
     {
         private readonly Mock<IProcessExecutor> _mockProcessExecutor;
         private readonly Mock<LoggingService> _mockLoggingService;
+        private readonly Mock<TemplateMetadataService> _mockMetadataService;
         private readonly MeshService _service;
         private readonly List<string> _tempDirs = new();
 
@@ -18,10 +19,12 @@ namespace foamscript.Tests.Services
         {
             _mockProcessExecutor = new Mock<IProcessExecutor>();
             _mockLoggingService = new Mock<LoggingService>(Mock.Of<ILogger<LoggingService>>());
+            _mockMetadataService = new Mock<TemplateMetadataService>();
             _service = new MeshService(
                 Mock.Of<ILogger<LoggingService>>(),
                 _mockProcessExecutor.Object,
-                _mockLoggingService.Object);
+                _mockLoggingService.Object,
+                _mockMetadataService.Object);
         }
 
         public void Dispose()
@@ -43,41 +46,63 @@ namespace foamscript.Tests.Services
             return dir;
         }
 
-        private void SetupBlockMeshSuccess(string caseDir) =>
-            _mockProcessExecutor
-                .Setup(x => x.Execute("blockMesh", $"-case {caseDir}"))
-                .Returns(new ProcessResult { ExitCode = 0, Output = "" });
-
-        private void SetupSurfaceOrientSuccess() =>
-            _mockProcessExecutor
-                .Setup(x => x.Execute("surfaceOrient", It.IsAny<string>()))
-                .Returns(new ProcessResult { ExitCode = 0, Output = "" });
-
-        private void SetupFeatureExtractSuccess(string caseDir) =>
-            _mockProcessExecutor
-                .Setup(x => x.Execute("surfaceFeatureExtract", $"-case {caseDir}"))
-                .Returns(new ProcessResult { ExitCode = 0, Output = "" });
-
-        private void SetupSerialSnappySuccess(string caseDir, bool overwrite = false)
+        /// <summary>
+        /// Returns a TemplateMetadata matching the disc rotatingwall steady template's mesh pipeline.
+        /// Serial pipeline: blockMesh → surfaceOrient (optional) → surfaceFeatureExtract → snappyHexMesh → checkMesh
+        /// Parallel pipeline: adds decomposePar (parallelOnly) before snappy and reconstructParMesh (parallelOnly) after.
+        /// </summary>
+        private static TemplateMetadata CreateDiscMetadata()
         {
-            var args = $"-case {caseDir}";
-            if (overwrite) args += " -overwrite";
+            return new TemplateMetadata
+            {
+                Name = "external_disc_rotatingwall_steady",
+                Solver = "simpleFoam",
+                Geometry = new GeometryConfig
+                {
+                    Type = "disc",
+                    StlName = "disc.stl",
+                    RequiredStlFiles = new[] { "disc.stl", "tunnel.stl" },
+                    SurfaceOrient = new SurfaceOrientConfig { OutsidePoint = new[] { 0.0, 0.0, -1.0 } }
+                },
+                MeshPipeline = new List<PipelineStep>
+                {
+                    new() { Command = "blockMesh", Args = "-case {caseDir}" },
+                    new() { Command = "surfaceOrient", Args = "{geometryStlPath} \"({outsidePoint})\" {geometryStlPath}", Optional = true },
+                    new() { Command = "surfaceFeatureExtract", Args = "-case {caseDir}" },
+                    new() { Command = "decomposePar", Args = "-case {caseDir}", ParallelOnly = true },
+                    new() { Command = "snappyHexMesh", Args = "-case {caseDir} -overwrite", Parallel = true },
+                    new() { Command = "reconstructParMesh", Args = "-case {caseDir} -constant", ParallelOnly = true },
+                    new() { Command = "checkMesh", Args = "-case {caseDir}" }
+                }
+            };
+        }
+
+        private void SetupMetadata(string caseDir, TemplateMetadata? metadata = null)
+        {
+            _mockMetadataService
+                .Setup(x => x.LoadMetadata(caseDir))
+                .Returns(metadata ?? CreateDiscMetadata());
+        }
+
+        private void SetupAllCommandsSuccess()
+        {
             _mockProcessExecutor
-                .Setup(x => x.Execute("snappyHexMesh", args))
+                .Setup(x => x.Execute(It.IsAny<string>(), It.IsAny<string>()))
                 .Returns(new ProcessResult { ExitCode = 0, Output = "" });
         }
 
-        private void SetupParallelWorkflowSuccess(string caseDir, int cores = 4)
+        private void SetupCommandFailure(string command, string output = "FOAM FATAL ERROR")
         {
             _mockProcessExecutor
-                .Setup(x => x.Execute("decomposePar", $"-case {caseDir} -no-fields"))
-                .Returns(new ProcessResult { ExitCode = 0 });
+                .Setup(x => x.Execute(command, It.IsAny<string>()))
+                .Returns(new ProcessResult { ExitCode = 1, Output = output });
+        }
+
+        private void SetupCommandSuccess(string command)
+        {
             _mockProcessExecutor
-                .Setup(x => x.Execute("mpirun", It.IsAny<string>()))
-                .Returns(new ProcessResult { ExitCode = 0 });
-            _mockProcessExecutor
-                .Setup(x => x.Execute("reconstructParMesh", $"-case {caseDir} -constant"))
-                .Returns(new ProcessResult { ExitCode = 0 });
+                .Setup(x => x.Execute(command, It.IsAny<string>()))
+                .Returns(new ProcessResult { ExitCode = 0, Output = "" });
         }
 
         // ── MeshCase — Input Validation ────────────────────────────────────────────
@@ -120,13 +145,41 @@ namespace foamscript.Tests.Services
         // ── MeshCase — Serial Workflow ─────────────────────────────────────────────
 
         [Fact]
+        public void MeshCase_Serial_ExecutesPipelineStepsInOrder()
+        {
+            var caseDir = CreateValidCaseDir();
+            SetupMetadata(caseDir);
+            SetupAllCommandsSuccess();
+
+            _service.MeshCase(caseDir, parallel: false, cores: 1, checkQuality: false, overwrite: false);
+
+            // blockMesh, surfaceOrient, surfaceFeatureExtract, snappyHexMesh all called
+            _mockProcessExecutor.Verify(x => x.Execute("blockMesh", It.IsAny<string>()), Times.Once);
+            _mockProcessExecutor.Verify(x => x.Execute("surfaceOrient", It.IsAny<string>()), Times.Once);
+            _mockProcessExecutor.Verify(x => x.Execute("surfaceFeatureExtract", It.IsAny<string>()), Times.Once);
+            _mockProcessExecutor.Verify(x => x.Execute("snappyHexMesh", It.IsAny<string>()), Times.Once);
+        }
+
+        [Fact]
+        public void MeshCase_Serial_SkipsParallelOnlySteps()
+        {
+            var caseDir = CreateValidCaseDir();
+            SetupMetadata(caseDir);
+            SetupAllCommandsSuccess();
+
+            _service.MeshCase(caseDir, parallel: false, cores: 1, checkQuality: false, overwrite: false);
+
+            // decomposePar and reconstructParMesh are parallelOnly — should NOT be called in serial mode
+            _mockProcessExecutor.Verify(x => x.Execute("decomposePar", It.IsAny<string>()), Times.Never);
+            _mockProcessExecutor.Verify(x => x.Execute("reconstructParMesh", It.IsAny<string>()), Times.Never);
+        }
+
+        [Fact]
         public void MeshCase_Serial_CallsBlockMeshWithCaseArg()
         {
             var caseDir = CreateValidCaseDir();
-            SetupBlockMeshSuccess(caseDir);
-            SetupSurfaceOrientSuccess();
-            SetupFeatureExtractSuccess(caseDir);
-            SetupSerialSnappySuccess(caseDir);
+            SetupMetadata(caseDir);
+            SetupAllCommandsSuccess();
 
             _service.MeshCase(caseDir, parallel: false, cores: 1, checkQuality: false, overwrite: false);
 
@@ -137,9 +190,8 @@ namespace foamscript.Tests.Services
         public void MeshCase_Serial_WhenBlockMeshFails_ReturnsFailure()
         {
             var caseDir = CreateValidCaseDir();
-            _mockProcessExecutor
-                .Setup(x => x.Execute("blockMesh", It.IsAny<string>()))
-                .Returns(new ProcessResult { ExitCode = 1, Output = "FOAM FATAL ERROR" });
+            SetupMetadata(caseDir);
+            SetupCommandFailure("blockMesh");
 
             var result = _service.MeshCase(caseDir, parallel: false, cores: 1, checkQuality: false, overwrite: false);
 
@@ -148,44 +200,26 @@ namespace foamscript.Tests.Services
         }
 
         [Fact]
-        public void MeshCase_Serial_CallsSnappyHexMeshWithCaseArg()
+        public void MeshCase_Serial_CallsSnappyHexMeshDirectly()
         {
             var caseDir = CreateValidCaseDir();
-            SetupBlockMeshSuccess(caseDir);
-            SetupSurfaceOrientSuccess();
-            SetupFeatureExtractSuccess(caseDir);
-            SetupSerialSnappySuccess(caseDir);
+            SetupMetadata(caseDir);
+            SetupAllCommandsSuccess();
 
             _service.MeshCase(caseDir, parallel: false, cores: 1, checkQuality: false, overwrite: false);
 
-            _mockProcessExecutor.Verify(x => x.Execute("snappyHexMesh", $"-case {caseDir}"), Times.Once);
-        }
-
-        [Fact]
-        public void MeshCase_Serial_WithOverwrite_AppendsOverwriteFlag()
-        {
-            var caseDir = CreateValidCaseDir();
-            SetupBlockMeshSuccess(caseDir);
-            SetupSurfaceOrientSuccess();
-            SetupFeatureExtractSuccess(caseDir);
-            SetupSerialSnappySuccess(caseDir, overwrite: true);
-
-            _service.MeshCase(caseDir, parallel: false, cores: 1, checkQuality: false, overwrite: true);
-
-            _mockProcessExecutor.Verify(x => x.Execute("snappyHexMesh",
-                It.Is<string>(args => args.Contains("-overwrite"))), Times.Once);
+            // In serial mode, snappyHexMesh runs directly (not via mpirun)
+            _mockProcessExecutor.Verify(x => x.Execute("snappyHexMesh", It.IsAny<string>()), Times.Once);
+            _mockProcessExecutor.Verify(x => x.Execute("mpirun", It.IsAny<string>()), Times.Never);
         }
 
         [Fact]
         public void MeshCase_Serial_WhenSnappyFails_ReturnsFailure()
         {
             var caseDir = CreateValidCaseDir();
-            SetupBlockMeshSuccess(caseDir);
-            SetupSurfaceOrientSuccess();
-            SetupFeatureExtractSuccess(caseDir);
-            _mockProcessExecutor
-                .Setup(x => x.Execute("snappyHexMesh", It.IsAny<string>()))
-                .Returns(new ProcessResult { ExitCode = 1, Output = "FOAM FATAL ERROR" });
+            SetupMetadata(caseDir);
+            SetupAllCommandsSuccess();
+            SetupCommandFailure("snappyHexMesh");
 
             var result = _service.MeshCase(caseDir, parallel: false, cores: 1, checkQuality: false, overwrite: false);
 
@@ -197,10 +231,8 @@ namespace foamscript.Tests.Services
         public void MeshCase_Serial_WhenAllCommandsSucceed_ReturnsSuccess()
         {
             var caseDir = CreateValidCaseDir();
-            SetupBlockMeshSuccess(caseDir);
-            SetupSurfaceOrientSuccess();
-            SetupFeatureExtractSuccess(caseDir);
-            SetupSerialSnappySuccess(caseDir);
+            SetupMetadata(caseDir);
+            SetupAllCommandsSuccess();
 
             var result = _service.MeshCase(caseDir, parallel: false, cores: 1, checkQuality: false, overwrite: false);
 
@@ -208,32 +240,55 @@ namespace foamscript.Tests.Services
             result.ErrorMessage.Should().BeNull();
         }
 
+        [Fact]
+        public void MeshCase_Serial_WhenSurfaceOrientFails_ContinuesAsOptional()
+        {
+            var caseDir = CreateValidCaseDir();
+            SetupMetadata(caseDir);
+            SetupAllCommandsSuccess();
+            SetupCommandFailure("surfaceOrient", "surfaceOrient error");
+
+            var result = _service.MeshCase(caseDir, parallel: false, cores: 1, checkQuality: false, overwrite: false);
+
+            result.IsSuccess.Should().BeTrue();
+            result.Warnings.Should().Contain(w => w.Contains("surfaceOrient failed"));
+        }
+
+        [Fact]
+        public void MeshCase_Serial_ResolvesTokensInSurfaceOrientArgs()
+        {
+            var caseDir = CreateValidCaseDir();
+            SetupMetadata(caseDir);
+            SetupAllCommandsSuccess();
+
+            _service.MeshCase(caseDir, parallel: false, cores: 1, checkQuality: false, overwrite: false);
+
+            var expectedStlPath = Path.Combine(caseDir, "constant", "triSurface", "disc.stl");
+            _mockProcessExecutor.Verify(x => x.Execute("surfaceOrient",
+                It.Is<string>(args => args.Contains(expectedStlPath) && args.Contains("0 0 -1"))), Times.Once);
+        }
+
         // ── MeshCase — Parallel Workflow ───────────────────────────────────────────
 
         [Fact]
-        public void MeshCase_Parallel_CallsDecomposeParBeforeSnappy()
+        public void MeshCase_Parallel_CallsDecomposePar()
         {
             var caseDir = CreateValidCaseDir();
-            SetupBlockMeshSuccess(caseDir);
-            SetupSurfaceOrientSuccess();
-            SetupFeatureExtractSuccess(caseDir);
-            SetupParallelWorkflowSuccess(caseDir);
+            SetupMetadata(caseDir);
+            SetupAllCommandsSuccess();
 
             _service.MeshCase(caseDir, parallel: true, cores: 4, checkQuality: false, overwrite: false);
 
-            _mockProcessExecutor.Verify(x => x.Execute("decomposePar", $"-case {caseDir} -no-fields"), Times.Once);
+            _mockProcessExecutor.Verify(x => x.Execute("decomposePar", It.Is<string>(args => args.Contains($"-case {caseDir}"))), Times.Once);
         }
 
         [Fact]
         public void MeshCase_Parallel_WhenDecomposeParFails_ReturnsFailure()
         {
             var caseDir = CreateValidCaseDir();
-            SetupBlockMeshSuccess(caseDir);
-            SetupSurfaceOrientSuccess();
-            SetupFeatureExtractSuccess(caseDir);
-            _mockProcessExecutor
-                .Setup(x => x.Execute("decomposePar", It.IsAny<string>()))
-                .Returns(new ProcessResult { ExitCode = 1, Output = "Error" });
+            SetupMetadata(caseDir);
+            SetupAllCommandsSuccess();
+            SetupCommandFailure("decomposePar", "Error");
 
             var result = _service.MeshCase(caseDir, parallel: true, cores: 4, checkQuality: false, overwrite: false);
 
@@ -245,11 +300,13 @@ namespace foamscript.Tests.Services
         public void MeshCase_Parallel_CallsMpirunWithCorrectArgs()
         {
             var caseDir = CreateValidCaseDir();
+            SetupMetadata(caseDir);
             int cores = 4;
-            SetupBlockMeshSuccess(caseDir);
-            SetupSurfaceOrientSuccess();
-            SetupFeatureExtractSuccess(caseDir);
-            SetupParallelWorkflowSuccess(caseDir, cores);
+            SetupAllCommandsSuccess();
+            // Override: snappyHexMesh with parallel=true should call mpirun
+            _mockProcessExecutor
+                .Setup(x => x.Execute("mpirun", It.IsAny<string>()))
+                .Returns(new ProcessResult { ExitCode = 0, Output = "" });
 
             _service.MeshCase(caseDir, parallel: true, cores: cores, checkQuality: false, overwrite: false);
 
@@ -261,75 +318,24 @@ namespace foamscript.Tests.Services
         }
 
         [Fact]
-        public void MeshCase_Parallel_WithOverwrite_AppendsOverwriteToMpirunArgs()
+        public void MeshCase_Parallel_CallsReconstructParMesh()
         {
             var caseDir = CreateValidCaseDir();
-            SetupBlockMeshSuccess(caseDir);
-            SetupSurfaceOrientSuccess();
-            SetupFeatureExtractSuccess(caseDir);
-            _mockProcessExecutor
-                .Setup(x => x.Execute("decomposePar", It.IsAny<string>()))
-                .Returns(new ProcessResult { ExitCode = 0 });
-            _mockProcessExecutor
-                .Setup(x => x.Execute("mpirun", It.Is<string>(args => args.Contains("-overwrite"))))
-                .Returns(new ProcessResult { ExitCode = 0 });
-            _mockProcessExecutor
-                .Setup(x => x.Execute("reconstructParMesh", It.IsAny<string>()))
-                .Returns(new ProcessResult { ExitCode = 0 });
-
-            _service.MeshCase(caseDir, parallel: true, cores: 4, checkQuality: false, overwrite: true);
-
-            _mockProcessExecutor.Verify(x => x.Execute("mpirun",
-                It.Is<string>(args => args.Contains("-overwrite"))), Times.Once);
-        }
-
-        [Fact]
-        public void MeshCase_Parallel_WhenSnappyFails_ReturnsFailure()
-        {
-            var caseDir = CreateValidCaseDir();
-            SetupBlockMeshSuccess(caseDir);
-            SetupSurfaceOrientSuccess();
-            SetupFeatureExtractSuccess(caseDir);
-            _mockProcessExecutor
-                .Setup(x => x.Execute("decomposePar", It.IsAny<string>()))
-                .Returns(new ProcessResult { ExitCode = 0 });
-            _mockProcessExecutor
-                .Setup(x => x.Execute("mpirun", It.IsAny<string>()))
-                .Returns(new ProcessResult { ExitCode = 1, Output = "FOAM FATAL ERROR" });
-
-            var result = _service.MeshCase(caseDir, parallel: true, cores: 4, checkQuality: false, overwrite: false);
-
-            result.IsSuccess.Should().BeFalse();
-            result.ErrorMessage.Should().Contain("snappyHexMesh (parallel) failed");
-        }
-
-        [Fact]
-        public void MeshCase_Parallel_CallsReconstructParMeshWithConstantFlag()
-        {
-            var caseDir = CreateValidCaseDir();
-            SetupBlockMeshSuccess(caseDir);
-            SetupSurfaceOrientSuccess();
-            SetupFeatureExtractSuccess(caseDir);
-            SetupParallelWorkflowSuccess(caseDir);
+            SetupMetadata(caseDir);
+            SetupAllCommandsSuccess();
 
             _service.MeshCase(caseDir, parallel: true, cores: 4, checkQuality: false, overwrite: false);
 
-            _mockProcessExecutor.Verify(x => x.Execute("reconstructParMesh", $"-case {caseDir} -constant"), Times.Once);
+            _mockProcessExecutor.Verify(x => x.Execute("reconstructParMesh",
+                It.Is<string>(args => args.Contains($"-case {caseDir}") && args.Contains("-constant"))), Times.Once);
         }
 
         [Fact]
         public void MeshCase_Parallel_WhenReconstructFails_AddsWarningButReturnsSuccess()
         {
             var caseDir = CreateValidCaseDir();
-            SetupBlockMeshSuccess(caseDir);
-            SetupSurfaceOrientSuccess();
-            SetupFeatureExtractSuccess(caseDir);
-            _mockProcessExecutor
-                .Setup(x => x.Execute("decomposePar", It.IsAny<string>()))
-                .Returns(new ProcessResult { ExitCode = 0 });
-            _mockProcessExecutor
-                .Setup(x => x.Execute("mpirun", It.IsAny<string>()))
-                .Returns(new ProcessResult { ExitCode = 0 });
+            SetupMetadata(caseDir);
+            SetupAllCommandsSuccess();
             _mockProcessExecutor
                 .Setup(x => x.Execute("reconstructParMesh", It.IsAny<string>()))
                 .Returns(new ProcessResult { ExitCode = 1, Output = "Warning output" });
@@ -342,13 +348,27 @@ namespace foamscript.Tests.Services
         }
 
         [Fact]
+        public void MeshCase_Parallel_WhenSnappyFails_ReturnsFailure()
+        {
+            var caseDir = CreateValidCaseDir();
+            SetupMetadata(caseDir);
+            SetupAllCommandsSuccess();
+            _mockProcessExecutor
+                .Setup(x => x.Execute("mpirun", It.IsAny<string>()))
+                .Returns(new ProcessResult { ExitCode = 1, Output = "FOAM FATAL ERROR" });
+
+            var result = _service.MeshCase(caseDir, parallel: true, cores: 4, checkQuality: false, overwrite: false);
+
+            result.IsSuccess.Should().BeFalse();
+            result.ErrorMessage.Should().Contain("snappyHexMesh failed");
+        }
+
+        [Fact]
         public void MeshCase_Parallel_WhenFullWorkflowSucceeds_ReturnsSuccess()
         {
             var caseDir = CreateValidCaseDir();
-            SetupBlockMeshSuccess(caseDir);
-            SetupSurfaceOrientSuccess();
-            SetupFeatureExtractSuccess(caseDir);
-            SetupParallelWorkflowSuccess(caseDir);
+            SetupMetadata(caseDir);
+            SetupAllCommandsSuccess();
 
             var result = _service.MeshCase(caseDir, parallel: true, cores: 4, checkQuality: false, overwrite: false);
 
@@ -361,13 +381,8 @@ namespace foamscript.Tests.Services
         public void MeshCase_WhenCheckQualityTrue_CallsCheckMesh()
         {
             var caseDir = CreateValidCaseDir();
-            SetupBlockMeshSuccess(caseDir);
-            SetupSurfaceOrientSuccess();
-            SetupFeatureExtractSuccess(caseDir);
-            SetupSerialSnappySuccess(caseDir);
-            _mockProcessExecutor
-                .Setup(x => x.Execute("checkMesh", $"-case {caseDir}"))
-                .Returns(new ProcessResult { ExitCode = 0, Output = "" });
+            SetupMetadata(caseDir);
+            SetupAllCommandsSuccess();
 
             _service.MeshCase(caseDir, parallel: false, cores: 1, checkQuality: true, overwrite: false);
 
@@ -378,10 +393,8 @@ namespace foamscript.Tests.Services
         public void MeshCase_WhenCheckQualityFalse_DoesNotCallCheckMesh()
         {
             var caseDir = CreateValidCaseDir();
-            SetupBlockMeshSuccess(caseDir);
-            SetupSurfaceOrientSuccess();
-            SetupFeatureExtractSuccess(caseDir);
-            SetupSerialSnappySuccess(caseDir);
+            SetupMetadata(caseDir);
+            SetupAllCommandsSuccess();
 
             _service.MeshCase(caseDir, parallel: false, cores: 1, checkQuality: false, overwrite: false);
 
@@ -392,13 +405,8 @@ namespace foamscript.Tests.Services
         public void MeshCase_WhenCheckMeshSucceeds_SetsMeshQualityPassedTrue()
         {
             var caseDir = CreateValidCaseDir();
-            SetupBlockMeshSuccess(caseDir);
-            SetupSurfaceOrientSuccess();
-            SetupFeatureExtractSuccess(caseDir);
-            SetupSerialSnappySuccess(caseDir);
-            _mockProcessExecutor
-                .Setup(x => x.Execute("checkMesh", It.IsAny<string>()))
-                .Returns(new ProcessResult { ExitCode = 0, Output = "" });
+            SetupMetadata(caseDir);
+            SetupAllCommandsSuccess();
 
             var result = _service.MeshCase(caseDir, parallel: false, cores: 1, checkQuality: true, overwrite: false);
 
@@ -409,10 +417,8 @@ namespace foamscript.Tests.Services
         public void MeshCase_WhenCheckMeshFails_AddsWarningAndSetsMeshQualityPassedFalse()
         {
             var caseDir = CreateValidCaseDir();
-            SetupBlockMeshSuccess(caseDir);
-            SetupSurfaceOrientSuccess();
-            SetupFeatureExtractSuccess(caseDir);
-            SetupSerialSnappySuccess(caseDir);
+            SetupMetadata(caseDir);
+            SetupAllCommandsSuccess();
             _mockProcessExecutor
                 .Setup(x => x.Execute("checkMesh", It.IsAny<string>()))
                 .Returns(new ProcessResult { ExitCode = 1, Output = "Mesh quality issues found" });
@@ -433,10 +439,8 @@ namespace foamscript.Tests.Services
         public void MeshCase_ParsesCheckMeshOutput_ExtractsCellCount()
         {
             var caseDir = CreateValidCaseDir();
-            SetupBlockMeshSuccess(caseDir);
-            SetupSurfaceOrientSuccess();
-            SetupFeatureExtractSuccess(caseDir);
-            SetupSerialSnappySuccess(caseDir);
+            SetupMetadata(caseDir);
+            SetupAllCommandsSuccess();
             _mockProcessExecutor
                 .Setup(x => x.Execute("checkMesh", It.IsAny<string>()))
                 .Returns(new ProcessResult { ExitCode = 0, Output = CheckMeshOutput });
@@ -450,10 +454,8 @@ namespace foamscript.Tests.Services
         public void MeshCase_ParsesCheckMeshOutput_ExtractsPointCount()
         {
             var caseDir = CreateValidCaseDir();
-            SetupBlockMeshSuccess(caseDir);
-            SetupSurfaceOrientSuccess();
-            SetupFeatureExtractSuccess(caseDir);
-            SetupSerialSnappySuccess(caseDir);
+            SetupMetadata(caseDir);
+            SetupAllCommandsSuccess();
             _mockProcessExecutor
                 .Setup(x => x.Execute("checkMesh", It.IsAny<string>()))
                 .Returns(new ProcessResult { ExitCode = 0, Output = CheckMeshOutput });
@@ -467,10 +469,8 @@ namespace foamscript.Tests.Services
         public void MeshCase_ParsesCheckMeshOutput_ExtractsFaceCount()
         {
             var caseDir = CreateValidCaseDir();
-            SetupBlockMeshSuccess(caseDir);
-            SetupSurfaceOrientSuccess();
-            SetupFeatureExtractSuccess(caseDir);
-            SetupSerialSnappySuccess(caseDir);
+            SetupMetadata(caseDir);
+            SetupAllCommandsSuccess();
             _mockProcessExecutor
                 .Setup(x => x.Execute("checkMesh", It.IsAny<string>()))
                 .Returns(new ProcessResult { ExitCode = 0, Output = CheckMeshOutput });
@@ -484,10 +484,8 @@ namespace foamscript.Tests.Services
         public void MeshCase_WhenCheckMeshOutputHasNoStats_CountsRemainNull()
         {
             var caseDir = CreateValidCaseDir();
-            SetupBlockMeshSuccess(caseDir);
-            SetupSurfaceOrientSuccess();
-            SetupFeatureExtractSuccess(caseDir);
-            SetupSerialSnappySuccess(caseDir);
+            SetupMetadata(caseDir);
+            SetupAllCommandsSuccess();
             _mockProcessExecutor
                 .Setup(x => x.Execute("checkMesh", It.IsAny<string>()))
                 .Returns(new ProcessResult { ExitCode = 0, Output = "Mesh OK" });
@@ -498,6 +496,62 @@ namespace foamscript.Tests.Services
             result.CellCount.Should().BeNull();
             result.PointCount.Should().BeNull();
             result.FaceCount.Should().BeNull();
+        }
+
+        // ── MeshCase — Template-Driven Pipeline ───────────────────────────────────
+
+        [Fact]
+        public void MeshCase_LoadsMetadataFromCaseDir()
+        {
+            var caseDir = CreateValidCaseDir();
+            SetupMetadata(caseDir);
+            SetupAllCommandsSuccess();
+
+            _service.MeshCase(caseDir, parallel: false, cores: 1, checkQuality: false, overwrite: false);
+
+            _mockMetadataService.Verify(x => x.LoadMetadata(caseDir), Times.Once);
+        }
+
+        [Fact]
+        public void MeshCase_WhenMetadataLoadFails_ReturnsFailure()
+        {
+            var caseDir = CreateValidCaseDir();
+            _mockMetadataService
+                .Setup(x => x.LoadMetadata(caseDir))
+                .Throws(new FileNotFoundException("TEMPLATE.json not found"));
+
+            var result = _service.MeshCase(caseDir, parallel: false, cores: 1, checkQuality: false, overwrite: false);
+
+            result.IsSuccess.Should().BeFalse();
+            result.ErrorMessage.Should().Contain("TEMPLATE.json not found");
+        }
+
+        [Fact]
+        public void MeshCase_WithAirfoilTemplate_SkipsSurfaceOrient()
+        {
+            var caseDir = CreateValidCaseDir();
+            var airfoilMetadata = new TemplateMetadata
+            {
+                Name = "external_airfoil_static_steady",
+                Geometry = new GeometryConfig
+                {
+                    StlName = "airfoil.stl",
+                    SurfaceOrient = null
+                },
+                MeshPipeline = new List<PipelineStep>
+                {
+                    new() { Command = "blockMesh", Args = "-case {caseDir}" },
+                    new() { Command = "surfaceFeatureExtract", Args = "-case {caseDir}" },
+                    new() { Command = "snappyHexMesh", Args = "-case {caseDir} -overwrite", Parallel = true },
+                    new() { Command = "checkMesh", Args = "-case {caseDir}" }
+                }
+            };
+            SetupMetadata(caseDir, airfoilMetadata);
+            SetupAllCommandsSuccess();
+
+            _service.MeshCase(caseDir, parallel: false, cores: 1, checkQuality: false, overwrite: false);
+
+            _mockProcessExecutor.Verify(x => x.Execute("surfaceOrient", It.IsAny<string>()), Times.Never);
         }
 
         // ── MeshStudy — Input Validation ───────────────────────────────────────────
@@ -582,20 +636,15 @@ namespace foamscript.Tests.Services
 
             foreach (var name in new[] { "case_C", "case_A", "case_B" })
             {
-                Directory.CreateDirectory(Path.Combine(studyDir, name, "constant"));
-                Directory.CreateDirectory(Path.Combine(studyDir, name, "system"));
+                var caseDir = Path.Combine(studyDir, name);
+                Directory.CreateDirectory(Path.Combine(caseDir, "constant"));
+                Directory.CreateDirectory(Path.Combine(caseDir, "system"));
+                _mockMetadataService
+                    .Setup(x => x.LoadMetadata(caseDir))
+                    .Returns(CreateDiscMetadata());
             }
 
-            _mockProcessExecutor
-                .Setup(x => x.Execute("blockMesh", It.IsAny<string>()))
-                .Returns(new ProcessResult { ExitCode = 0 });
-            SetupSurfaceOrientSuccess();
-            _mockProcessExecutor
-                .Setup(x => x.Execute("surfaceFeatureExtract", It.IsAny<string>()))
-                .Returns(new ProcessResult { ExitCode = 0 });
-            _mockProcessExecutor
-                .Setup(x => x.Execute("snappyHexMesh", It.IsAny<string>()))
-                .Returns(new ProcessResult { ExitCode = 0 });
+            SetupAllCommandsSuccess();
 
             var result = _service.MeshStudy(studyDir, parallel: false, cores: 1,
                 checkQuality: false, overwrite: false, continueOnError: false);
@@ -613,20 +662,15 @@ namespace foamscript.Tests.Services
 
             foreach (var name in new[] { "case_0", "case_5", "case_10" })
             {
-                Directory.CreateDirectory(Path.Combine(studyDir, name, "constant"));
-                Directory.CreateDirectory(Path.Combine(studyDir, name, "system"));
+                var caseDir = Path.Combine(studyDir, name);
+                Directory.CreateDirectory(Path.Combine(caseDir, "constant"));
+                Directory.CreateDirectory(Path.Combine(caseDir, "system"));
+                _mockMetadataService
+                    .Setup(x => x.LoadMetadata(caseDir))
+                    .Returns(CreateDiscMetadata());
             }
 
-            _mockProcessExecutor
-                .Setup(x => x.Execute("blockMesh", It.IsAny<string>()))
-                .Returns(new ProcessResult { ExitCode = 0 });
-            SetupSurfaceOrientSuccess();
-            _mockProcessExecutor
-                .Setup(x => x.Execute("surfaceFeatureExtract", It.IsAny<string>()))
-                .Returns(new ProcessResult { ExitCode = 0 });
-            _mockProcessExecutor
-                .Setup(x => x.Execute("snappyHexMesh", It.IsAny<string>()))
-                .Returns(new ProcessResult { ExitCode = 0 });
+            SetupAllCommandsSuccess();
 
             var result = _service.MeshStudy(studyDir, parallel: false, cores: 1,
                 checkQuality: false, overwrite: false, continueOnError: false);
@@ -643,13 +687,15 @@ namespace foamscript.Tests.Services
 
             foreach (var name in new[] { "case_0", "case_5" })
             {
-                Directory.CreateDirectory(Path.Combine(studyDir, name, "constant"));
-                Directory.CreateDirectory(Path.Combine(studyDir, name, "system"));
+                var caseDir = Path.Combine(studyDir, name);
+                Directory.CreateDirectory(Path.Combine(caseDir, "constant"));
+                Directory.CreateDirectory(Path.Combine(caseDir, "system"));
+                _mockMetadataService
+                    .Setup(x => x.LoadMetadata(caseDir))
+                    .Returns(CreateDiscMetadata());
             }
 
-            _mockProcessExecutor
-                .Setup(x => x.Execute(It.IsAny<string>(), It.IsAny<string>()))
-                .Returns(new ProcessResult { ExitCode = 0 });
+            SetupAllCommandsSuccess();
 
             var result = _service.MeshStudy(studyDir, parallel: false, cores: 1,
                 checkQuality: false, overwrite: false, continueOnError: false);
@@ -667,13 +713,15 @@ namespace foamscript.Tests.Services
 
             foreach (var name in new[] { "case_0", "case_5" })
             {
-                Directory.CreateDirectory(Path.Combine(studyDir, name, "constant"));
-                Directory.CreateDirectory(Path.Combine(studyDir, name, "system"));
+                var caseDir = Path.Combine(studyDir, name);
+                Directory.CreateDirectory(Path.Combine(caseDir, "constant"));
+                Directory.CreateDirectory(Path.Combine(caseDir, "system"));
+                _mockMetadataService
+                    .Setup(x => x.LoadMetadata(caseDir))
+                    .Returns(CreateDiscMetadata());
             }
 
-            _mockProcessExecutor
-                .Setup(x => x.Execute("blockMesh", It.IsAny<string>()))
-                .Returns(new ProcessResult { ExitCode = 1, Output = "FOAM FATAL ERROR" });
+            SetupCommandFailure("blockMesh");
 
             var result = _service.MeshStudy(studyDir, parallel: false, cores: 1,
                 checkQuality: false, overwrite: false, continueOnError: true);
@@ -690,13 +738,15 @@ namespace foamscript.Tests.Services
 
             foreach (var name in new[] { "case_A", "case_B", "case_C" })
             {
-                Directory.CreateDirectory(Path.Combine(studyDir, name, "constant"));
-                Directory.CreateDirectory(Path.Combine(studyDir, name, "system"));
+                var caseDir = Path.Combine(studyDir, name);
+                Directory.CreateDirectory(Path.Combine(caseDir, "constant"));
+                Directory.CreateDirectory(Path.Combine(caseDir, "system"));
+                _mockMetadataService
+                    .Setup(x => x.LoadMetadata(caseDir))
+                    .Returns(CreateDiscMetadata());
             }
 
-            _mockProcessExecutor
-                .Setup(x => x.Execute("blockMesh", It.IsAny<string>()))
-                .Returns(new ProcessResult { ExitCode = 1, Output = "Error" });
+            SetupCommandFailure("blockMesh");
 
             var result = _service.MeshStudy(studyDir, parallel: false, cores: 1,
                 checkQuality: false, overwrite: false, continueOnError: false);
@@ -713,13 +763,15 @@ namespace foamscript.Tests.Services
 
             foreach (var name in new[] { "case_A", "case_B", "case_C" })
             {
-                Directory.CreateDirectory(Path.Combine(studyDir, name, "constant"));
-                Directory.CreateDirectory(Path.Combine(studyDir, name, "system"));
+                var caseDir = Path.Combine(studyDir, name);
+                Directory.CreateDirectory(Path.Combine(caseDir, "constant"));
+                Directory.CreateDirectory(Path.Combine(caseDir, "system"));
+                _mockMetadataService
+                    .Setup(x => x.LoadMetadata(caseDir))
+                    .Returns(CreateDiscMetadata());
             }
 
-            _mockProcessExecutor
-                .Setup(x => x.Execute("blockMesh", It.IsAny<string>()))
-                .Returns(new ProcessResult { ExitCode = 1, Output = "Error" });
+            SetupCommandFailure("blockMesh");
 
             var result = _service.MeshStudy(studyDir, parallel: false, cores: 1,
                 checkQuality: false, overwrite: false, continueOnError: true);

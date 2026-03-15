@@ -21,7 +21,8 @@ namespace foamscript.Tests.Handlers
             _mockMeshService = new Mock<MeshService>(
                 Mock.Of<ILogger<LoggingService>>(),
                 Mock.Of<IProcessExecutor>(),
-                _mockLoggingService.Object);
+                _mockLoggingService.Object,
+                Mock.Of<TemplateMetadataService>());
 
             _handler = new MeshHandler(_mockLoggingService.Object, _mockMeshService.Object);
         }

@@ -9,16 +9,18 @@ namespace foamscript.Services
         private readonly ILogger<LoggingService> _logger;
         private readonly IProcessExecutor _processExecutor;
         private readonly LoggingService _loggingService;
+        private readonly TemplateMetadataService _metadataService;
 
-        public MeshService(ILogger<LoggingService> logger, IProcessExecutor processExecutor, LoggingService loggingService)
+        public MeshService(ILogger<LoggingService> logger, IProcessExecutor processExecutor, LoggingService loggingService, TemplateMetadataService metadataService)
         {
             _logger = logger;
             _processExecutor = processExecutor;
             _loggingService = loggingService;
+            _metadataService = metadataService;
         }
 
         /// <summary>
-        /// Meshes an OpenFOAM case using blockMesh and snappyHexMesh.
+        /// Meshes an OpenFOAM case using a template-driven pipeline from TEMPLATE.json.
         /// </summary>
         public virtual MeshResult MeshCase(string caseDir, bool parallel, int cores, bool checkQuality, bool overwrite)
         {
@@ -48,191 +50,86 @@ namespace foamscript.Services
                     return result;
                 }
 
-                // Step 1: Run blockMesh
-                Console.WriteLine("Running blockMesh...");
-                var blockMeshResult = _processExecutor.Execute("blockMesh", $"-case {caseDir}");
+                // Load template metadata for pipeline definition
+                var metadata = _metadataService.LoadMetadata(caseDir);
 
-                if (blockMeshResult.ExitCode != 0)
+                // Execute mesh pipeline from TEMPLATE.json
+                foreach (var step in metadata.MeshPipeline)
                 {
-                    result.IsSuccess = false;
-                    result.ErrorMessage = $"blockMesh failed with exit code {blockMeshResult.ExitCode}";
+                    // Skip parallel-only steps (decomposePar, reconstructParMesh) in serial mode
+                    if (step.ParallelOnly && !parallel)
+                        continue;
 
-                    // Log detailed error output to file
-                    _loggingService.LogError($"blockMesh failed with exit code {blockMeshResult.ExitCode}");
-                    _loggingService.LogError($"blockMesh stdout:\n{blockMeshResult.Output}");
-                    if (!string.IsNullOrEmpty(blockMeshResult.Error))
+                    // Skip checkMesh if quality checking is not requested
+                    if (step.Command == "checkMesh" && !checkQuality)
+                        continue;
+
+                    var resolvedArgs = ResolvePipelineTokens(step.Args, caseDir, metadata);
+                    Console.WriteLine($"Running {step.Command}...");
+
+                    ProcessResult stepResult;
+                    if (step.Parallel && cores > 1)
                     {
-                        _loggingService.LogError($"blockMesh stderr:\n{blockMeshResult.Error}");
-                    }
-
-                    return result;
-                }
-
-                Console.WriteLine("✓ blockMesh completed successfully");
-
-                // Step 1.5: Orient disc STL normals outward.
-                // gmsh preserves BREP face orientation from STEP files. Shapr3D's Parasolid
-                // kernel may produce inward-facing normals, which causes snappyHexMesh to
-                // create boundary faces with reversed area vectors → all force coefficient
-                // signs flip. surfaceOrient uses a known-outside point (0,0,-1) — below
-                // the disc — to determine outward direction, then reorients all normals.
-                Console.WriteLine("Orienting disc surface normals...");
-                var discStl = Path.Combine(caseDir, "constant", "triSurface", "disc.stl");
-                var orientResult = _processExecutor.Execute("surfaceOrient",
-                    $"{discStl} \"(0 0 -1)\" {discStl}");
-
-                if (orientResult.ExitCode != 0)
-                {
-                    result.Warnings.Add("surfaceOrient failed — disc normals may be incorrect");
-                    _loggingService.LogError($"surfaceOrient failed: {orientResult.Output}");
-                }
-                else
-                {
-                    Console.WriteLine("✓ Disc surface normals oriented outward");
-                }
-
-                // Step 2: Extract surface features (generates .eMesh files for snappyHexMesh)
-                Console.WriteLine("Extracting surface features...");
-                var featureResult = _processExecutor.Execute("surfaceFeatureExtract", $"-case {caseDir}");
-
-                if (featureResult.ExitCode != 0)
-                {
-                    result.IsSuccess = false;
-                    result.ErrorMessage = $"surfaceFeatureExtract failed with exit code {featureResult.ExitCode}";
-
-                    _loggingService.LogError($"surfaceFeatureExtract failed with exit code {featureResult.ExitCode}");
-                    _loggingService.LogError($"surfaceFeatureExtract stdout:\n{featureResult.Output}");
-                    if (!string.IsNullOrEmpty(featureResult.Error))
-                    {
-                        _loggingService.LogError($"surfaceFeatureExtract stderr:\n{featureResult.Error}");
-                    }
-
-                    return result;
-                }
-
-                Console.WriteLine("✓ Surface features extracted successfully");
-
-                // Step 3: Run snappyHexMesh
-                if (parallel)
-                {
-                    // Decompose domain for parallel processing
-                    Console.WriteLine($"Decomposing domain for {cores} processors...");
-                    var decomposeResult = _processExecutor.Execute("decomposePar", $"-case {caseDir} -no-fields");
-
-                    if (decomposeResult.ExitCode != 0)
-                    {
-                        result.IsSuccess = false;
-                        result.ErrorMessage = $"decomposePar failed with exit code {decomposeResult.ExitCode}";
-
-                        // Log detailed error output to file
-                        _loggingService.LogError($"decomposePar failed with exit code {decomposeResult.ExitCode}");
-                        _loggingService.LogError($"decomposePar stdout:\n{decomposeResult.Output}");
-                        if (!string.IsNullOrEmpty(decomposeResult.Error))
-                        {
-                            _loggingService.LogError($"decomposePar stderr:\n{decomposeResult.Error}");
-                        }
-
-                        return result;
-                    }
-
-                    Console.WriteLine("✓ Domain decomposed successfully");
-
-                    // Copy triSurface files to each processor directory
-                    DistributeTriSurface(caseDir, cores);
-
-                    // Run snappyHexMesh in parallel
-                    Console.WriteLine($"Running snappyHexMesh in parallel ({cores} cores)...");
-                    var snappyArgs = $"-np {cores} snappyHexMesh -case {caseDir} -parallel";
-                    if (overwrite) snappyArgs += " -overwrite";
-
-                    var snappyResult = _processExecutor.Execute("mpirun", snappyArgs);
-
-                    if (snappyResult.ExitCode != 0)
-                    {
-                        result.IsSuccess = false;
-                        result.ErrorMessage = $"snappyHexMesh (parallel) failed with exit code {snappyResult.ExitCode}";
-
-                        // Log detailed error output to file
-                        _loggingService.LogError($"snappyHexMesh (parallel) failed with exit code {snappyResult.ExitCode}");
-                        _loggingService.LogError($"snappyHexMesh stdout:\n{snappyResult.Output}");
-                        if (!string.IsNullOrEmpty(snappyResult.Error))
-                        {
-                            _loggingService.LogError($"snappyHexMesh stderr:\n{snappyResult.Error}");
-                        }
-
-                        return result;
-                    }
-
-                    Console.WriteLine("✓ snappyHexMesh completed successfully");
-
-                    // Reconstruct mesh
-                    Console.WriteLine("Reconstructing mesh...");
-                    var reconstructResult = _processExecutor.Execute("reconstructParMesh", $"-case {caseDir} -constant");
-
-                    if (reconstructResult.ExitCode != 0)
-                    {
-                        result.Warnings.Add($"reconstructParMesh returned exit code {reconstructResult.ExitCode} (may be non-critical)");
+                        stepResult = _processExecutor.Execute("mpirun", $"-np {cores} {step.Command} {resolvedArgs} -parallel");
                     }
                     else
                     {
-                        Console.WriteLine("✓ Mesh reconstructed successfully");
+                        stepResult = _processExecutor.Execute(step.Command, resolvedArgs);
                     }
-                }
-                else
-                {
-                    // Run snappyHexMesh in serial
-                    Console.WriteLine("Running snappyHexMesh...");
-                    var snappyArgs = $"-case {caseDir}";
-                    if (overwrite) snappyArgs += " -overwrite";
 
-                    var snappyResult = _processExecutor.Execute("snappyHexMesh", snappyArgs);
-
-                    if (snappyResult.ExitCode != 0)
+                    if (stepResult.ExitCode != 0)
                     {
-                        result.IsSuccess = false;
-                        result.ErrorMessage = $"snappyHexMesh failed with exit code {snappyResult.ExitCode}";
-
-                        // Log detailed error output to file
-                        _loggingService.LogError($"snappyHexMesh failed with exit code {snappyResult.ExitCode}");
-                        _loggingService.LogError($"snappyHexMesh stdout:\n{snappyResult.Output}");
-                        if (!string.IsNullOrEmpty(snappyResult.Error))
+                        if (step.Optional)
                         {
-                            _loggingService.LogError($"snappyHexMesh stderr:\n{snappyResult.Error}");
+                            result.Warnings.Add($"{step.Command} failed (optional step — continuing)");
+                            _loggingService.LogError($"{step.Command} failed: {stepResult.Output}");
+                        }
+                        else if (step.Command == "checkMesh")
+                        {
+                            // checkMesh failure is non-fatal — parse output and add warning
+                            ParseCheckMeshOutput(stepResult.Output, result);
+                            result.MeshQualityPassed = false;
+                            result.Warnings.Add("Mesh quality check failed - review mesh for issues");
+                        }
+                        else if (step.Command == "reconstructParMesh")
+                        {
+                            // reconstructParMesh failure is non-critical
+                            result.Warnings.Add($"reconstructParMesh returned exit code {stepResult.ExitCode} (may be non-critical)");
+                        }
+                        else
+                        {
+                            result.IsSuccess = false;
+                            result.ErrorMessage = $"{step.Command} failed with exit code {stepResult.ExitCode}";
+                            _loggingService.LogError($"{step.Command} stdout:\n{stepResult.Output}");
+                            if (!string.IsNullOrEmpty(stepResult.Error))
+                                _loggingService.LogError($"{step.Command} stderr:\n{stepResult.Error}");
+                            return result;
+                        }
+                    }
+                    else
+                    {
+                        Console.WriteLine($"✓ {step.Command} completed successfully");
+
+                        // After successful decomposePar, distribute triSurface files to processor dirs
+                        if (step.Command == "decomposePar")
+                        {
+                            DistributeTriSurface(caseDir, cores);
                         }
 
-                        return result;
+                        // After successful checkMesh, parse output for mesh statistics
+                        if (step.Command == "checkMesh")
+                        {
+                            ParseCheckMeshOutput(stepResult.Output, result);
+                            result.MeshQualityPassed = true;
+                        }
                     }
-
-                    Console.WriteLine("✓ snappyHexMesh completed successfully");
                 }
 
-                // Step: Convert rotor wall patches to cyclicAMI (only for AMI templates)
+                // Post-pipeline: convert rotor wall patches to cyclicAMI if needed
                 var createPatchPath = Path.Combine(caseDir, "system", "createPatchDict");
                 if (File.Exists(createPatchPath))
                 {
                     PatchBoundaryForAMI(caseDir);
-                }
-
-
-                // Step 3: Check mesh quality (optional)
-                if (checkQuality)
-                {
-                    Console.WriteLine("Checking mesh quality...");
-                    var checkMeshResult = _processExecutor.Execute("checkMesh", $"-case {caseDir}");
-
-                    // Parse checkMesh output for mesh statistics
-                    ParseCheckMeshOutput(checkMeshResult.Output, result);
-
-                    if (checkMeshResult.ExitCode == 0)
-                    {
-                        result.MeshQualityPassed = true;
-                        Console.WriteLine("✓ Mesh quality check passed");
-                    }
-                    else
-                    {
-                        result.MeshQualityPassed = false;
-                        result.Warnings.Add("Mesh quality check failed - review mesh for issues");
-                    }
                 }
 
                 result.IsSuccess = true;
@@ -244,6 +141,22 @@ namespace foamscript.Services
                 result.ErrorMessage = $"Meshing failed: {ex.Message}";
                 return result;
             }
+        }
+
+        /// <summary>
+        /// Resolves template tokens in pipeline step arguments.
+        /// </summary>
+        private static string ResolvePipelineTokens(string args, string caseDir, TemplateMetadata metadata)
+        {
+            var geometryStlPath = Path.Combine(caseDir, "constant", "triSurface", metadata.Geometry.StlName);
+            var outsidePoint = metadata.Geometry.SurfaceOrient?.OutsidePoint is { Length: 3 } pt
+                ? $"{pt[0]} {pt[1]} {pt[2]}"
+                : "0 0 0";
+
+            return args
+                .Replace("{caseDir}", caseDir)
+                .Replace("{geometryStlPath}", geometryStlPath)
+                .Replace("{outsidePoint}", outsidePoint);
         }
 
         /// <summary>

@@ -11,6 +11,7 @@ namespace foamscript.Tests.Services
     {
         private readonly Mock<IProcessExecutor> _mockProcessExecutor;
         private readonly Mock<LoggingService> _mockLoggingService;
+        private readonly Mock<TemplateMetadataService> _mockMetadataService;
         private readonly SolverService _service;
         private readonly List<string> _tempDirs = new();
 
@@ -18,7 +19,11 @@ namespace foamscript.Tests.Services
         {
             _mockProcessExecutor = new Mock<IProcessExecutor>();
             _mockLoggingService = new Mock<LoggingService>(Mock.Of<ILogger<LoggingService>>());
-            _service = new SolverService(_mockProcessExecutor.Object, _mockLoggingService.Object);
+            _mockMetadataService = new Mock<TemplateMetadataService>();
+            _service = new SolverService(
+                _mockProcessExecutor.Object,
+                _mockLoggingService.Object,
+                _mockMetadataService.Object);
         }
 
         public void Dispose()
@@ -57,23 +62,69 @@ namespace foamscript.Tests.Services
             return studyDir;
         }
 
-        private void SetupSerialSolverSuccess(string caseDir) =>
-            _mockProcessExecutor
-                .Setup(x => x.Execute("simpleFoam", $"-case {caseDir}"))
-                .Returns(new ProcessResult { ExitCode = 0, Output = "" });
+        /// <summary>
+        /// Returns metadata matching the disc rotatingwall steady template's solve pipeline.
+        /// Parallel pipeline: decomposePar (parallelOnly) → simpleFoam (parallel) → reconstructPar (parallelOnly)
+        /// Serial pipeline: simpleFoam only (parallelOnly steps skipped)
+        /// </summary>
+        private static TemplateMetadata CreateDiscSolveMetadata()
+        {
+            return new TemplateMetadata
+            {
+                Name = "external_disc_rotatingwall_steady",
+                Solver = "simpleFoam",
+                Geometry = new GeometryConfig
+                {
+                    Type = "disc",
+                    StlName = "disc.stl",
+                    RequiredStlFiles = new[] { "disc.stl", "tunnel.stl" },
+                    SurfaceOrient = new SurfaceOrientConfig { OutsidePoint = new[] { 0.0, 0.0, -1.0 } }
+                },
+                SolvePipeline = new List<PipelineStep>
+                {
+                    new() { Command = "decomposePar", Args = "-case {caseDir} -force", ParallelOnly = true },
+                    new() { Command = "simpleFoam", Args = "-case {caseDir}", Parallel = true },
+                    new() { Command = "reconstructPar", Args = "-case {caseDir} -latestTime", ParallelOnly = true }
+                }
+            };
+        }
 
-        private void SetupParallelSolverSuccess(string caseDir, int cores = 4)
+        /// <summary>
+        /// Returns metadata matching the airfoil steady template's solve pipeline (same structure, no rotation).
+        /// </summary>
+        private static TemplateMetadata CreateAirfoilSolveMetadata()
+        {
+            return new TemplateMetadata
+            {
+                Name = "external_airfoil_static_steady",
+                Solver = "simpleFoam",
+                Geometry = new GeometryConfig
+                {
+                    Type = "airfoil",
+                    StlName = "airfoil.stl",
+                    RequiredStlFiles = new[] { "airfoil.stl" }
+                },
+                SolvePipeline = new List<PipelineStep>
+                {
+                    new() { Command = "decomposePar", Args = "-case {caseDir}", ParallelOnly = true },
+                    new() { Command = "simpleFoam", Args = "-case {caseDir}", Parallel = true },
+                    new() { Command = "reconstructPar", Args = "-case {caseDir} -latestTime", ParallelOnly = true }
+                }
+            };
+        }
+
+        private void SetupMetadata(string caseDir, TemplateMetadata? metadata = null)
+        {
+            _mockMetadataService
+                .Setup(x => x.LoadMetadata(caseDir))
+                .Returns(metadata ?? CreateDiscSolveMetadata());
+        }
+
+        private void SetupAllCommandsSuccess()
         {
             _mockProcessExecutor
-                .Setup(x => x.Execute("decomposePar", $"-case {caseDir}"))
-                .Returns(new ProcessResult { ExitCode = 0 });
-            // Parallel solver runs via bash with tee for log capture
-            _mockProcessExecutor
-                .Setup(x => x.Execute("bash", It.Is<string>(a => a.Contains($"mpirun -np {cores} simpleFoam -case {caseDir} -parallel"))))
-                .Returns(new ProcessResult { ExitCode = 0 });
-            _mockProcessExecutor
-                .Setup(x => x.Execute("reconstructPar", $"-case {caseDir}"))
-                .Returns(new ProcessResult { ExitCode = 0 });
+                .Setup(x => x.Execute(It.IsAny<string>(), It.IsAny<string>()))
+                .Returns(new ProcessResult { ExitCode = 0, Output = "" });
         }
 
         // ── SolveCase — Input Validation ─────────────────────────────────────────
@@ -117,26 +168,72 @@ namespace foamscript.Tests.Services
             result.ErrorMessage.Should().Contain("initial conditions");
         }
 
+        // ── SolveCase — Template-Driven Pipeline ─────────────────────────────────
+
+        [Fact]
+        public void SolveCase_LoadsMetadataFromCaseDir()
+        {
+            var caseDir = CreateMeshedCaseDir();
+            SetupMetadata(caseDir);
+            SetupAllCommandsSuccess();
+
+            _service.SolveCase(caseDir, false, 4);
+
+            _mockMetadataService.Verify(x => x.LoadMetadata(caseDir), Times.Once);
+        }
+
+        [Fact]
+        public void SolveCase_WhenMetadataLoadFails_ReturnsFailure()
+        {
+            var caseDir = CreateMeshedCaseDir();
+            _mockMetadataService
+                .Setup(x => x.LoadMetadata(caseDir))
+                .Throws(new FileNotFoundException("TEMPLATE.json not found"));
+
+            var result = _service.SolveCase(caseDir, false, 4);
+
+            result.IsSuccess.Should().BeFalse();
+            result.ErrorMessage.Should().Contain("TEMPLATE.json not found");
+        }
+
         // ── SolveCase — Serial Workflow ──────────────────────────────────────────
 
         [Fact]
-        public void SolveCase_Serial_CallsSimpleFoam()
+        public void SolveCase_Serial_SkipsParallelOnlySteps()
         {
             var caseDir = CreateMeshedCaseDir();
-            SetupSerialSolverSuccess(caseDir);
+            SetupMetadata(caseDir);
+            SetupAllCommandsSuccess();
+
+            _service.SolveCase(caseDir, false, 4);
+
+            // decomposePar and reconstructPar are parallelOnly — should NOT be called in serial
+            _mockProcessExecutor.Verify(x => x.Execute("decomposePar", It.IsAny<string>()), Times.Never);
+            _mockProcessExecutor.Verify(x => x.Execute("reconstructPar", It.IsAny<string>()), Times.Never);
+        }
+
+        [Fact]
+        public void SolveCase_Serial_CallsSolverDirectly()
+        {
+            var caseDir = CreateMeshedCaseDir();
+            SetupMetadata(caseDir);
+            SetupAllCommandsSuccess();
 
             var result = _service.SolveCase(caseDir, false, 4);
 
             result.IsSuccess.Should().BeTrue();
+            // In serial mode, solver runs directly (not via mpirun/bash)
             _mockProcessExecutor.Verify(
                 x => x.Execute("simpleFoam", $"-case {caseDir}"),
                 Times.Once);
+            _mockProcessExecutor.Verify(x => x.Execute("bash", It.IsAny<string>()), Times.Never);
         }
 
         [Fact]
         public void SolveCase_Serial_Failure_ReturnsError()
         {
             var caseDir = CreateMeshedCaseDir();
+            SetupMetadata(caseDir);
             _mockProcessExecutor
                 .Setup(x => x.Execute("simpleFoam", $"-case {caseDir}"))
                 .Returns(new ProcessResult { ExitCode = 1, Output = "FOAM FATAL ERROR" });
@@ -147,31 +244,52 @@ namespace foamscript.Tests.Services
             result.ErrorMessage.Should().Contain("simpleFoam failed");
         }
 
+        [Fact]
+        public void SolveCase_Serial_PersistsSolverLog()
+        {
+            var caseDir = CreateMeshedCaseDir();
+            SetupMetadata(caseDir);
+            _mockProcessExecutor
+                .Setup(x => x.Execute("simpleFoam", $"-case {caseDir}"))
+                .Returns(new ProcessResult { ExitCode = 0, Output = "solver output here" });
+
+            _service.SolveCase(caseDir, false, 4);
+
+            var logPath = Path.Combine(caseDir, "log.simpleFoam");
+            File.Exists(logPath).Should().BeTrue();
+            File.ReadAllText(logPath).Should().Contain("solver output here");
+        }
+
         // ── SolveCase — Parallel Workflow ────────────────────────────────────────
 
         [Fact]
-        public void SolveCase_Parallel_CallsDecomposeMpirunReconstruct()
+        public void SolveCase_Parallel_ExecutesFullPipeline()
         {
             var caseDir = CreateMeshedCaseDir();
-            SetupParallelSolverSuccess(caseDir);
+            SetupMetadata(caseDir);
+            SetupAllCommandsSuccess();
 
             var result = _service.SolveCase(caseDir, true, 4);
 
             result.IsSuccess.Should().BeTrue();
+            // decomposePar and reconstructPar should be called
             _mockProcessExecutor.Verify(
-                x => x.Execute("decomposePar", $"-case {caseDir}"), Times.Once);
+                x => x.Execute("decomposePar", It.Is<string>(a => a.Contains($"-case {caseDir}"))), Times.Once);
+            // solver should be called via bash/mpirun
             _mockProcessExecutor.Verify(
-                x => x.Execute("bash", It.Is<string>(a => a.Contains($"mpirun -np 4 simpleFoam -case {caseDir} -parallel"))), Times.Once);
+                x => x.Execute("bash", It.Is<string>(a =>
+                    a.Contains($"mpirun -np 4 simpleFoam -case {caseDir} -parallel"))), Times.Once);
             _mockProcessExecutor.Verify(
-                x => x.Execute("reconstructPar", $"-case {caseDir}"), Times.Once);
+                x => x.Execute("reconstructPar", It.Is<string>(a => a.Contains($"-case {caseDir}"))), Times.Once);
         }
 
         [Fact]
         public void SolveCase_Parallel_DecomposeFailure_ReturnsError()
         {
             var caseDir = CreateMeshedCaseDir();
+            SetupMetadata(caseDir);
             _mockProcessExecutor
-                .Setup(x => x.Execute("decomposePar", $"-case {caseDir}"))
+                .Setup(x => x.Execute("decomposePar", It.IsAny<string>()))
                 .Returns(new ProcessResult { ExitCode = 1 });
 
             var result = _service.SolveCase(caseDir, true, 4);
@@ -184,8 +302,9 @@ namespace foamscript.Tests.Services
         public void SolveCase_Parallel_SolverFailure_ReturnsError()
         {
             var caseDir = CreateMeshedCaseDir();
+            SetupMetadata(caseDir);
             _mockProcessExecutor
-                .Setup(x => x.Execute("decomposePar", $"-case {caseDir}"))
+                .Setup(x => x.Execute("decomposePar", It.IsAny<string>()))
                 .Returns(new ProcessResult { ExitCode = 0 });
             _mockProcessExecutor
                 .Setup(x => x.Execute("bash", It.Is<string>(a => a.Contains($"mpirun -np 4 simpleFoam -case {caseDir} -parallel"))))
@@ -201,14 +320,10 @@ namespace foamscript.Tests.Services
         public void SolveCase_Parallel_ReconstructFailure_AddsWarning()
         {
             var caseDir = CreateMeshedCaseDir();
+            SetupMetadata(caseDir);
+            SetupAllCommandsSuccess();
             _mockProcessExecutor
-                .Setup(x => x.Execute("decomposePar", $"-case {caseDir}"))
-                .Returns(new ProcessResult { ExitCode = 0 });
-            _mockProcessExecutor
-                .Setup(x => x.Execute("bash", It.Is<string>(a => a.Contains($"mpirun -np 4 simpleFoam -case {caseDir} -parallel"))))
-                .Returns(new ProcessResult { ExitCode = 0 });
-            _mockProcessExecutor
-                .Setup(x => x.Execute("reconstructPar", $"-case {caseDir}"))
+                .Setup(x => x.Execute("reconstructPar", It.IsAny<string>()))
                 .Returns(new ProcessResult { ExitCode = 1 });
 
             var result = _service.SolveCase(caseDir, true, 4);
@@ -221,17 +336,45 @@ namespace foamscript.Tests.Services
         public void SolveCase_Parallel_CleansOldProcessorDirs()
         {
             var caseDir = CreateMeshedCaseDir();
+            SetupMetadata(caseDir);
             // Create old processor dirs
             Directory.CreateDirectory(Path.Combine(caseDir, "processor0"));
             Directory.CreateDirectory(Path.Combine(caseDir, "processor1"));
 
-            SetupParallelSolverSuccess(caseDir);
+            SetupAllCommandsSuccess();
 
             _service.SolveCase(caseDir, true, 4);
 
             // Old processor dirs should be cleaned
             Directory.Exists(Path.Combine(caseDir, "processor0")).Should().BeFalse();
             Directory.Exists(Path.Combine(caseDir, "processor1")).Should().BeFalse();
+        }
+
+        [Fact]
+        public void SolveCase_Parallel_DecomposeUsesForceFlag()
+        {
+            var caseDir = CreateMeshedCaseDir();
+            SetupMetadata(caseDir); // disc metadata has "-force" in decomposePar args
+            SetupAllCommandsSuccess();
+
+            _service.SolveCase(caseDir, true, 4);
+
+            _mockProcessExecutor.Verify(
+                x => x.Execute("decomposePar", It.Is<string>(a => a.Contains("-force"))), Times.Once);
+        }
+
+        [Fact]
+        public void SolveCase_Parallel_AirfoilDecomposeNoForceFlag()
+        {
+            var caseDir = CreateMeshedCaseDir();
+            SetupMetadata(caseDir, CreateAirfoilSolveMetadata());
+            SetupAllCommandsSuccess();
+
+            _service.SolveCase(caseDir, true, 4);
+
+            // Airfoil decomposePar args don't include -force
+            _mockProcessExecutor.Verify(
+                x => x.Execute("decomposePar", It.Is<string>(a => !a.Contains("-force"))), Times.Once);
         }
 
         // ── SolveStudy ──────────────────────────────────────────────────────────
@@ -263,10 +406,13 @@ namespace foamscript.Tests.Services
         {
             var studyDir = CreateStudyDir("Study_0.0", "Study_5.0");
 
-            // Setup serial solver success for both cases
-            _mockProcessExecutor
-                .Setup(x => x.Execute("simpleFoam", It.IsAny<string>()))
-                .Returns(new ProcessResult { ExitCode = 0, Output = "" });
+            // Setup metadata for both case dirs
+            foreach (var name in new[] { "Study_0.0", "Study_5.0" })
+            {
+                var caseDir = Path.Combine(studyDir, name);
+                SetupMetadata(caseDir);
+            }
+            SetupAllCommandsSuccess();
 
             var result = _service.SolveStudy(studyDir, false, 4, false);
 
@@ -283,10 +429,14 @@ namespace foamscript.Tests.Services
             var case0 = Path.Combine(studyDir, "Study_0.0");
             var case5 = Path.Combine(studyDir, "Study_5.0");
 
-            // First case fails, second succeeds
+            SetupMetadata(case0);
+            SetupMetadata(case5);
+
+            // First case: solver fails
             _mockProcessExecutor
                 .Setup(x => x.Execute("simpleFoam", $"-case {case0}"))
                 .Returns(new ProcessResult { ExitCode = 1 });
+            // Second case: solver succeeds
             _mockProcessExecutor
                 .Setup(x => x.Execute("simpleFoam", $"-case {case5}"))
                 .Returns(new ProcessResult { ExitCode = 0 });
@@ -303,6 +453,8 @@ namespace foamscript.Tests.Services
         {
             var studyDir = CreateStudyDir("Study_0.0", "Study_5.0");
             var case0 = Path.Combine(studyDir, "Study_0.0");
+
+            SetupMetadata(case0);
 
             _mockProcessExecutor
                 .Setup(x => x.Execute("simpleFoam", $"-case {case0}"))
@@ -350,15 +502,9 @@ namespace foamscript.Tests.Services
 
         // ── ParseForceCoeffsFile ─────────────────────────────────────────────────
 
-        // ── Real v2512 format — the primary test fixture must match actual OpenFOAM output ──
-
         [Fact]
         public void ParseForceCoeffsFile_V2512Format_ReturnsCorrectColumns()
         {
-            // Real OpenFOAM v2512 coefficient.dat format — 13 data columns.
-            // This test exists because a production bug read Cd(r) as Cl and Cl(f) as CmPitch
-            // due to assuming legacy 7-column format. The header-based parser must select the
-            // correct Cd, Cl, and CmPitch columns from the full v2512 layout.
             var file = Path.Combine(Path.GetTempPath(), $"coeffs-{Guid.NewGuid()}.dat");
             var content = @"# Time        Cd            Cd(f)         Cd(r)         Cl            Cl(f)         Cl(r)         CmPitch       CmRoll        CmYaw         Cs            Cs(f)         Cs(r)
 100	0.055000	0.027000	0.028000	0.170000	0.060000	0.110000	-0.040000	0.001000	0.000500	0.002000	0.001000	0.001000
@@ -378,11 +524,8 @@ namespace foamscript.Tests.Services
                 var result = SolverService.ParseForceCoeffsFile(file, 0.1);
 
                 result.Should().NotBeNull();
-                // Cd must be column "Cd" (0.0551), NOT Cd(f) or Cd(r)
                 result!.Value.Cd.Should().BeApproximately(0.0551, 0.0005);
-                // Cl must be column "Cl" (0.1705), NOT Cl(f)=0.060 or Cd(r)=0.028
                 result.Value.Cl.Should().BeApproximately(0.1705, 0.001);
-                // CmPitch must be column "CmPitch" (-0.04025), NOT Cl(f)=0.060
                 result.Value.CmPitch.Should().BeApproximately(-0.04025, 0.001);
                 result.Value.LastTime.Should().BeApproximately(1000, 1);
             }
@@ -395,11 +538,6 @@ namespace foamscript.Tests.Services
         [Fact]
         public void ParseForceCoeffsFile_V2512Format_DoesNotConfuseSubColumns()
         {
-            // Regression test: Cd(f), Cd(r), Cl(f), Cl(r) sub-columns must NOT be
-            // confused with the aggregate Cd and Cl columns. The bug was that without
-            // header parsing, parts[3] was read as Cl (actually Cd(r)) and parts[5]
-            // was read as CmPitch (actually Cl(f)). This test uses values where
-            // sub-columns differ dramatically from aggregates to catch such confusion.
             var file = Path.Combine(Path.GetTempPath(), $"coeffs-{Guid.NewGuid()}.dat");
             var content = @"# Time        Cd            Cd(f)         Cd(r)         Cl            Cl(f)         Cl(r)         CmPitch       CmRoll        CmYaw         Cs            Cs(f)         Cs(r)
 1000	0.055	0.999	0.888	0.171	0.777	0.666	-0.042	0.555	0.444	0.333	0.222	0.111";
@@ -423,8 +561,6 @@ namespace foamscript.Tests.Services
         [Fact]
         public void ParseForceCoeffsFile_LegacyFormat_StillWorks()
         {
-            // Legacy OpenFOAM format (pre-v2512) with 7 columns. The dynamic header
-            // parser must handle both old and new formats gracefully.
             var file = Path.Combine(Path.GetTempPath(), $"coeffs-{Guid.NewGuid()}.dat");
             var content = @"# Time Cd Cs Cl CmRoll CmPitch CmYaw
 0.0500	0.050	0.001	0.150	0.0001	0.015	0.0001
@@ -485,7 +621,6 @@ namespace foamscript.Tests.Services
         [Fact]
         public void ParseForceCoeffs_WithCoefficientFile_ReturnsValues()
         {
-            // Integration test using real v2512 format — verifies full path resolution + parsing
             var caseDir = CreateMeshedCaseDir();
             var postDir = Path.Combine(caseDir, "postProcessing", "forces", "0");
             Directory.CreateDirectory(postDir);

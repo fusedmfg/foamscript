@@ -20,7 +20,8 @@ namespace foamscript.Tests.Handlers
             _mockLoggingService = new Mock<LoggingService>(Mock.Of<ILogger<LoggingService>>());
             _mockSolverService = new Mock<SolverService>(
                 Mock.Of<IProcessExecutor>(),
-                _mockLoggingService.Object);
+                _mockLoggingService.Object,
+                Mock.Of<TemplateMetadataService>());
 
             _handler = new SolveHandler(_mockLoggingService.Object, _mockSolverService.Object);
         }

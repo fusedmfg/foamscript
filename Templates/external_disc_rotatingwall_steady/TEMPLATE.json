@@ -2,15 +2,59 @@
   "name": "external_disc_rotatingwall_steady",
   "description": "Steady-state MRF simulation of rotating disc (simpleFoam + rotatingWallVelocity BC)",
   "solver": "simpleFoam",
-  "geometryType": "disc",
-  "geometryStlName": "disc.stl",
-  "referenceDimension": "diameter",
-  "referenceAreaFormula": "circular",
-  "requiresRotorZone": true,
-  "requiredStlFiles": ["disc.stl", "tunnel.stl"],
+  "geometry": {
+    "type": "disc",
+    "stlName": "disc.stl",
+    "requiredStlFiles": ["disc.stl", "tunnel.stl"],
+    "surfaceOrient": { "outsidePoint": [0, 0, -1] }
+  },
+  "reference": {
+    "dimension": "diameter",
+    "areaFormula": "circular"
+  },
+  "rotation": {
+    "enabled": true,
+    "requiresRotorZone": true
+  },
   "validation": {
     "minSize": 0.18,
     "maxSize": 0.35,
     "warningMessage": "Disc diameter outside expected PDGA range (0.21-0.30m). Ensure correct --input-units."
+  },
+  "parameters": {
+    "velocity": { "required": true, "description": "Freestream velocity (m/s)" },
+    "rpm": { "required": true, "description": "Rotational speed (RPM)" },
+    "angles": { "required": true, "description": "Angle(s) of attack (degrees)" },
+    "refinementMin": { "required": false, "default": 5, "description": "Minimum refinement level" },
+    "refinementMax": { "required": false, "default": 6, "description": "Maximum refinement level" },
+    "maxIterations": { "required": false, "default": 500, "description": "Maximum solver iterations" }
+  },
+  "domain": {
+    "upstream": 5.0,
+    "downstream": 10.0,
+    "radial": 5.0
+  },
+  "meshPipeline": [
+    { "command": "blockMesh", "args": "-case {caseDir}" },
+    { "command": "surfaceOrient", "args": "{geometryStlPath} \"({outsidePoint})\" {geometryStlPath}", "optional": true },
+    { "command": "surfaceFeatureExtract", "args": "-case {caseDir}" },
+    { "command": "decomposePar", "args": "-case {caseDir}", "parallelOnly": true },
+    { "command": "snappyHexMesh", "args": "-case {caseDir} -overwrite", "parallel": true },
+    { "command": "reconstructParMesh", "args": "-case {caseDir} -constant", "parallelOnly": true },
+    { "command": "checkMesh", "args": "-case {caseDir}" }
+  ],
+  "solvePipeline": [
+    { "command": "decomposePar", "args": "-case {caseDir} -force", "parallelOnly": true },
+    { "command": "simpleFoam", "args": "-case {caseDir}", "parallel": true },
+    { "command": "reconstructPar", "args": "-case {caseDir} -latestTime", "parallelOnly": true }
+  ],
+  "results": {
+    "type": "forceCoefficients",
+    "dataFile": "postProcessing/forces/0/coefficient.dat",
+    "columns": { "Cd": 1, "Cl": 4, "CmPitch": 7 }
+  },
+  "report": {
+    "template": "report/report.html",
+    "standard": "AIAA"
   }
 }
