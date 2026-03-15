@@ -85,6 +85,11 @@ namespace foamscript.Handlers
                 };
             }
 
+            // Resolve cores (0 = auto-detect)
+            var requestedCores = config.Cores;
+            var (resolvedCores, _) = CoreResolver.Resolve(config.Cores);
+            config.Cores = resolvedCores;
+
             // Validate physics parameters
             var validationErrors = new List<string>();
             if (config.Velocity <= 0) validationErrors.Add($"Velocity must be positive (got {config.Velocity})");
@@ -139,7 +144,7 @@ namespace foamscript.Handlers
             Console.WriteLine($"Angles:           {config.Angles}");
             Console.WriteLine($"Velocity:         {config.Velocity} m/s");
             Console.WriteLine($"RPM:              {config.Rpm}");
-            Console.WriteLine($"Cores:            {config.Cores}");
+            Console.WriteLine($"Cores:            {config.Cores} ({(requestedCores == 0 ? "auto-detected" : "specified")})");
             Console.WriteLine();
             Console.WriteLine("Geometry / Domain Parameters:");
             Console.WriteLine($"  Input units:        {config.InputUnits} (output in meters)");
