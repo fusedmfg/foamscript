@@ -1,4 +1,5 @@
 using foamscript.Models;
+using System.Text.Json;
 using System.Text.RegularExpressions;
 
 namespace foamscript.Services
@@ -11,12 +12,15 @@ namespace foamscript.Services
         private readonly IProcessExecutor _processExecutor;
         private readonly GeometryService _geometryService;
         private readonly TemplateService _templateService;
+        private readonly TemplateMetadataService _metadataService;
 
-        public CaseService(IProcessExecutor processExecutor, GeometryService geometryService, TemplateService templateService)
+        public CaseService(IProcessExecutor processExecutor, GeometryService geometryService,
+            TemplateService templateService, TemplateMetadataService metadataService)
         {
             _processExecutor = processExecutor;
             _geometryService = geometryService;
             _templateService = templateService;
+            _metadataService = metadataService;
         }
 
         /// <summary>
@@ -45,6 +49,9 @@ namespace foamscript.Services
                     return result;
                 }
 
+                // Load template metadata (falls back to disc defaults if TEMPLATE.json missing)
+                var metadata = _metadataService.LoadMetadata(templatePath);
+
                 // Parse angles
                 var angles = ParseAngles(config.Angles);
                 if (angles.Length == 0)
@@ -62,7 +69,7 @@ namespace foamscript.Services
                 Directory.CreateDirectory(geometryDir);
 
                 // Process geometry (convert and generate domain)
-                var geometryResult = ProcessGeometry(geometryDir, config);
+                var geometryResult = ProcessGeometry(geometryDir, config, metadata);
                 if (!geometryResult.Success)
                 {
                     result.IsSuccess = false;
@@ -70,7 +77,19 @@ namespace foamscript.Services
                     return result;
                 }
 
-                var discDiameter = geometryResult.DiscDiameter;
+                var refLength = geometryResult.RefLength;
+                var bbox = geometryResult.BoundingBox!;
+                var aref = TemplateMetadataService.CalculateReferenceArea(refLength, bbox, metadata);
+
+                // Validate geometry dimensions from template metadata
+                if (metadata.Validation != null)
+                {
+                    if ((metadata.Validation.MinSize.HasValue && refLength < metadata.Validation.MinSize.Value) ||
+                        (metadata.Validation.MaxSize.HasValue && refLength > metadata.Validation.MaxSize.Value))
+                    {
+                        Console.WriteLine($"⚠ Warning: {metadata.Validation.WarningMessage}");
+                    }
+                }
 
                 // Convert RPM to rad/s
                 var omega = RpmToRadPerSec(config.Rpm);
@@ -79,9 +98,16 @@ namespace foamscript.Services
                 foreach (var angle in angles)
                 {
                     var caseInfo = CreateCase(result.StudyDir, config.ProjectName, templatePath, angle,
-                        config.Velocity, omega, config.Cores, geometryDir, discDiameter, config.Physics, config.Domain);
+                        config.Velocity, omega, config.Cores, geometryDir, refLength, aref,
+                        metadata.RequiredStlFiles, metadata.RequiresRotorZone, config.Physics, config.Domain);
                     result.Cases.Add(caseInfo);
                 }
+
+                // Write study manifest for downstream tools (e.g., ReportService)
+                var manifest = new StudyManifest { TemplateName = metadata.Name };
+                var manifestJson = JsonSerializer.Serialize(manifest,
+                    new JsonSerializerOptions { WriteIndented = true });
+                File.WriteAllText(Path.Combine(result.StudyDir, "study.json"), manifestJson);
 
                 result.IsSuccess = true;
                 return result;
@@ -97,15 +123,15 @@ namespace foamscript.Services
         /// <summary>
         /// Processes geometry: copies source file, converts if needed, generates domain.
         /// </summary>
-        private (bool Success, string? ErrorMessage, double DiscDiameter) ProcessGeometry(
-            string geometryDir, StudyConfig config)
+        private (bool Success, string? ErrorMessage, double RefLength, BoundingBox? BoundingBox) ProcessGeometry(
+            string geometryDir, StudyConfig config, TemplateMetadata metadata)
         {
             try
             {
                 // Validate source file exists
                 if (!File.Exists(config.ModelSource))
                 {
-                    return (false, $"Model source file not found: {config.ModelSource}", 0.0);
+                    return (false, $"Model source file not found: {config.ModelSource}", 0.0, null);
                 }
 
                 var sourceExt = Path.GetExtension(config.ModelSource).ToLowerInvariant();
@@ -115,16 +141,17 @@ namespace foamscript.Services
                 // Copy source file to geometry directory
                 File.Copy(config.ModelSource, sourceCopyPath, overwrite: true);
 
-                string discStlPath;
+                var geomStlName = metadata.GeometryStlName;
+                string geomStlPath;
 
                 // If STEP or IGES, convert to STL
                 if (sourceExt == ".step" || sourceExt == ".stp" || sourceExt == ".iges" || sourceExt == ".igs")
                 {
-                    discStlPath = Path.Combine(geometryDir, "disc.stl");
+                    geomStlPath = Path.Combine(geometryDir, geomStlName);
 
                     var conversionResult = _geometryService.ConvertStepToStl(
                         sourceCopyPath,
-                        discStlPath,
+                        geomStlPath,
                         config.MeshSize,
                         config.FeatureAngle,
                         config.InputUnits
@@ -132,49 +159,66 @@ namespace foamscript.Services
 
                     if (!conversionResult.IsSuccess)
                     {
-                        return (false, $"Failed to convert geometry: {conversionResult.ErrorMessage}", 0.0);
+                        return (false, $"Failed to convert geometry: {conversionResult.ErrorMessage}", 0.0, null);
                     }
                 }
                 else if (sourceExt == ".stl")
                 {
-                    // If already STL, just rename/copy to disc.stl
-                    discStlPath = Path.Combine(geometryDir, "disc.stl");
-                    if (sourceCopyPath != discStlPath)
+                    // If already STL, copy to expected name
+                    geomStlPath = Path.Combine(geometryDir, geomStlName);
+                    if (sourceCopyPath != geomStlPath)
                     {
-                        File.Copy(sourceCopyPath, discStlPath, overwrite: true);
+                        File.Copy(sourceCopyPath, geomStlPath, overwrite: true);
                     }
                 }
                 else
                 {
-                    return (false, $"Unsupported file format: {sourceExt}. Supported formats: .step, .stp, .iges, .igs, .stl", 0.0);
+                    return (false, $"Unsupported file format: {sourceExt}. Supported formats: .step, .stp, .iges, .igs, .stl", 0.0, null);
                 }
 
                 var domain = config.Domain;
+                DomainGenerationResult domainResult;
 
-                // Generate rotor and tunnel STL files from disc
-                var domainResult = _geometryService.GenerateDomain(
-                    discStlPath,
-                    geometryDir,
-                    rotorRadiusScale: domain.RotorRadiusScale,
-                    rotorHeightScale: domain.RotorHeightScale,
-                    tunnelUpstream: domain.TunnelUpstream,
-                    tunnelDownstream: domain.TunnelDownstream,
-                    tunnelRadial: domain.TunnelRadial,
-                    meshResolution: domain.MeshResolution
-                );
-                if (!domainResult.IsSuccess)
+                if (metadata.RequiresRotorZone)
                 {
-                    return (false, $"Failed to generate domain: {domainResult.ErrorMessage}", 0.0);
+                    // Generate rotor and tunnel STL files
+                    domainResult = _geometryService.GenerateDomain(
+                        geomStlPath,
+                        geometryDir,
+                        rotorRadiusScale: domain.RotorRadiusScale,
+                        rotorHeightScale: domain.RotorHeightScale,
+                        tunnelUpstream: domain.TunnelUpstream,
+                        tunnelDownstream: domain.TunnelDownstream,
+                        tunnelRadial: domain.TunnelRadial,
+                        meshResolution: domain.MeshResolution
+                    );
+                }
+                else
+                {
+                    // Generate only tunnel (no rotor zone needed)
+                    domainResult = _geometryService.GenerateTunnelOnly(
+                        geomStlPath,
+                        geometryDir,
+                        tunnelUpstream: domain.TunnelUpstream,
+                        tunnelDownstream: domain.TunnelDownstream,
+                        tunnelRadial: domain.TunnelRadial
+                    );
                 }
 
-                // Extract disc diameter from bounding box
-                var discDiameter = domainResult.DiscBoundingBox?.Diameter ?? 0.0;
+                if (!domainResult.IsSuccess)
+                {
+                    return (false, $"Failed to generate domain: {domainResult.ErrorMessage}", 0.0, null);
+                }
 
-                return (true, null, discDiameter);
+                // Extract reference dimension from bounding box using metadata rules
+                var bbox = domainResult.DiscBoundingBox!;
+                var refLength = TemplateMetadataService.CalculateReferenceDimension(bbox, metadata);
+
+                return (true, null, refLength, bbox);
             }
             catch (Exception ex)
             {
-                return (false, $"Geometry processing failed: {ex.Message}", 0.0);
+                return (false, $"Geometry processing failed: {ex.Message}", 0.0, null);
             }
         }
 
@@ -183,7 +227,9 @@ namespace foamscript.Services
         /// </summary>
         private CaseInfo CreateCase(string studyDir, string studyName, string templatePath,
             double angle, double velocity, double omega, int cores,
-            string geometryDir, double discDiameter, StudyPhysicsConfig physics, StudyDomainConfig domain)
+            string geometryDir, double refLength, double aref,
+            string[] requiredStlFiles, bool requiresRotorZone,
+            StudyPhysicsConfig physics, StudyDomainConfig domain)
         {
             var caseInfo = new CaseInfo
             {
@@ -202,13 +248,14 @@ namespace foamscript.Services
             caseInfo.Uz = velocity * Math.Sin(angleRad);
 
             // Calculate all template parameters
-            var context = CalculateTemplateContext(caseInfo.Ux, caseInfo.Uz, omega, cores, discDiameter, physics, domain);
+            var context = CalculateTemplateContext(caseInfo.Ux, caseInfo.Uz, omega, cores,
+                refLength, aref, requiresRotorZone, physics, domain);
 
             // Process template with Scriban
             _templateService.ProcessTemplate(templatePath, caseDir, context);
 
             // Copy STL files from geometry directory
-            CopyStlFiles(geometryDir, caseDir);
+            CopyStlFiles(geometryDir, caseDir, requiredStlFiles);
 
             return caseInfo;
         }
@@ -216,42 +263,48 @@ namespace foamscript.Services
         /// <summary>
         /// Calculates all template context parameters for Scriban rendering.
         /// </summary>
-        private static object CalculateTemplateContext(double ux, double uz, double omegaRotation,
-            int cores, double discDiameter, StudyPhysicsConfig physics, StudyDomainConfig domain)
+        internal static object CalculateTemplateContext(double ux, double uz, double omegaRotation,
+            int cores, double refLength, double aref, bool requiresRotorZone,
+            StudyPhysicsConfig physics, StudyDomainConfig domain)
         {
             const double cmu = 0.09; // Standard k-omega SST turbulence model constant
 
             var velocityMagnitude = Math.Sqrt(ux * ux + uz * uz);
             var k = 1.5 * Math.Pow(velocityMagnitude * physics.TurbulenceIntensity, 2);
-            var mixingLength = 0.07 * discDiameter;
+            var mixingLength = 0.07 * refLength;
             var omegaTurbulence = Math.Sqrt(k) / (Math.Pow(cmu, 0.25) * mixingLength);
-
-            // Reference area: pi * (diameter/2)^2
-            var aref = Math.PI * Math.Pow(discDiameter / 2.0, 2);
 
             // Domain extents in meters (with 10% margin beyond tunnel STL)
             const double margin = 1.1;
-            var domainUpstream = domain.TunnelUpstream * discDiameter * margin;
-            var domainDownstream = domain.TunnelDownstream * discDiameter * margin;
-            var domainRadial = domain.TunnelRadial * discDiameter * margin;
+            var domainUpstream = domain.TunnelUpstream * refLength * margin;
+            var domainDownstream = domain.TunnelDownstream * refLength * margin;
+            var domainRadial = domain.TunnelRadial * refLength * margin;
 
             // Compute safe initial deltaT targeting Co ≈ 0.125 at finest refinement level
-            // (4× safety factor — snappyHexMesh creates smaller cells than theoretical estimate)
             var domainLength = domainUpstream + domainDownstream;
-            var nxCells = Math.Ceiling(domainLength / discDiameter * 4);
+            var nxCells = Math.Ceiling(domainLength / refLength * 4);
             var baseCellSize = domainLength / nxCells;
             var fineCellSize = baseCellSize / Math.Pow(2, physics.RefinementLevelMax);
             var deltaT = 0.125 * fineCellSize / Math.Max(velocityMagnitude, 1.0);
 
-            // Cap maxDeltaT: constrained by both flow time and mesh motion Courant number
-            // Mesh motion velocity at rotor boundary (rotor radius ≈ 1.5× disc radius)
-            var rotorRadius = discDiameter * 0.75;
-            var meshMotionVelocity = Math.Abs(omegaRotation) * rotorRadius;
+            // Cap maxDeltaT
             var maxDeltaTFlow = physics.EndTime / 100.0;
-            var maxDeltaTMeshMotion = meshMotionVelocity > 0
-                ? 0.5 * fineCellSize / meshMotionVelocity
-                : maxDeltaTFlow;
-            var maxDeltaT = Math.Min(maxDeltaTFlow, maxDeltaTMeshMotion);
+            double maxDeltaT;
+
+            if (requiresRotorZone)
+            {
+                // Mesh motion velocity at rotor boundary (rotor radius ≈ 1.5× geometry radius)
+                var rotorRadius = refLength * 0.75;
+                var meshMotionVelocity = Math.Abs(omegaRotation) * rotorRadius;
+                var maxDeltaTMeshMotion = meshMotionVelocity > 0
+                    ? 0.5 * fineCellSize / meshMotionVelocity
+                    : maxDeltaTFlow;
+                maxDeltaT = Math.Min(maxDeltaTFlow, maxDeltaTMeshMotion);
+            }
+            else
+            {
+                maxDeltaT = maxDeltaTFlow;
+            }
 
             return new
             {
@@ -261,7 +314,8 @@ namespace foamscript.Services
                 turbulence_intensity = physics.TurbulenceIntensity,
                 k = k,
                 cmu = cmu,
-                disc_diameter = discDiameter,
+                disc_diameter = refLength,  // backward compat alias
+                ref_length = refLength,
                 mixing_length = mixingLength,
                 omega_turbulence = omegaTurbulence,
                 nu = physics.Nu,
@@ -287,14 +341,12 @@ namespace foamscript.Services
         /// <summary>
         /// Copies STL files to case constant/triSurface directory.
         /// </summary>
-        private static void CopyStlFiles(string stlDir, string caseDir)
+        private static void CopyStlFiles(string stlDir, string caseDir, string[] stlFileNames)
         {
             var triSurfaceDir = Path.Combine(caseDir, "constant", "triSurface");
             Directory.CreateDirectory(triSurfaceDir);
 
-            var stlFiles = new[] { "disc.stl", "tunnel.stl" };
-
-            foreach (var stlFile in stlFiles)
+            foreach (var stlFile in stlFileNames)
             {
                 var sourcePath = Path.Combine(stlDir, stlFile);
                 if (File.Exists(sourcePath))

@@ -13,6 +13,7 @@ namespace foamscript.Tests.Services
         private readonly Mock<LoggingService> _mockLoggingService;
         private readonly GeometryService _geometryService;
         private readonly TemplateService _templateService;
+        private readonly TemplateMetadataService _metadataService;
         private readonly CaseService _service;
         private readonly List<string> _tempDirs = new();
 
@@ -24,7 +25,8 @@ namespace foamscript.Tests.Services
                 new StlConversionService(_mockProcessExecutor.Object, _mockLoggingService.Object),
                 new DomainService(_mockProcessExecutor.Object, _mockLoggingService.Object));
             _templateService = new TemplateService(_mockLoggingService.Object);
-            _service = new CaseService(_mockProcessExecutor.Object, _geometryService, _templateService);
+            _metadataService = new TemplateMetadataService();
+            _service = new CaseService(_mockProcessExecutor.Object, _geometryService, _templateService, _metadataService);
         }
 
         public void Dispose()

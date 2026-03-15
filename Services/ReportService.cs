@@ -97,7 +97,7 @@ namespace foamscript.Services
             if (generateHtml)
             {
                 Console.WriteLine("Generating HTML report...");
-                var htmlData = BuildHtmlReportData(studyName, resultsSummary, residualData, meshStats, physicsConfig, visualization);
+                var htmlData = BuildHtmlReportData(studyDir, studyName, resultsSummary, residualData, meshStats, physicsConfig, visualization);
                 var htmlPath = Path.Combine(outputDir, $"{studyName}_report.html");
                 _htmlGenerator.WriteReport(htmlData, htmlPath);
                 result.HtmlPath = htmlPath;
@@ -118,7 +118,7 @@ namespace foamscript.Services
             return result;
         }
 
-        private ReportData BuildHtmlReportData(string studyName, ResultsSummary summary,
+        private ReportData BuildHtmlReportData(string studyDir, string studyName, ResultsSummary summary,
             List<CaseResidualData> residuals, List<MeshStatEntry> meshStats, PhysicsConfig config,
             SliceVisualizationResult? visualization)
         {
@@ -127,7 +127,7 @@ namespace foamscript.Services
             {
                 StudyName = studyName,
                 GenerationDate = DateTime.Now.ToString("yyyy-MM-dd HH:mm"),
-                TemplateName = "external_disc_rotatingwall_steady",
+                TemplateName = ReadTemplateName(studyDir),
                 Velocity = config.Velocity,
                 Rpm = config.Rpm,
                 TurbulenceIntensity = config.TurbulenceIntensity,
@@ -372,6 +372,23 @@ namespace foamscript.Services
                     ld,
                     c.Converged));
             }
+        }
+
+        private static string ReadTemplateName(string studyDir)
+        {
+            var manifestPath = Path.Combine(studyDir, "study.json");
+            if (File.Exists(manifestPath))
+            {
+                try
+                {
+                    var json = File.ReadAllText(manifestPath);
+                    var manifest = System.Text.Json.JsonSerializer.Deserialize<Models.StudyManifest>(json);
+                    if (manifest != null && !string.IsNullOrEmpty(manifest.TemplateName))
+                        return manifest.TemplateName;
+                }
+                catch { }
+            }
+            return "external_disc_rotatingwall_steady"; // backward compat fallback
         }
 
         internal static PhysicsConfig ReadPhysicsConfig(string studyDir)

@@ -1,0 +1,16 @@
+{
+  "name": "external_disc_rotatingwall_steady",
+  "description": "Steady-state MRF simulation of rotating disc (simpleFoam + rotatingWallVelocity BC)",
+  "solver": "simpleFoam",
+  "geometryType": "disc",
+  "geometryStlName": "disc.stl",
+  "referenceDimension": "diameter",
+  "referenceAreaFormula": "circular",
+  "requiresRotorZone": true,
+  "requiredStlFiles": ["disc.stl", "tunnel.stl"],
+  "validation": {
+    "minSize": 0.18,
+    "maxSize": 0.35,
+    "warningMessage": "Disc diameter outside expected PDGA range (0.21-0.30m). Ensure correct --input-units."
+  }
+}
