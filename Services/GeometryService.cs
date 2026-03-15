@@ -32,5 +32,16 @@ namespace foamscript.Services
             double tunnelRadial,
             int meshResolution)
             => _domainService.GenerateDomain(discStlFile, outputDirectory, rotorRadiusScale, rotorHeightScale, tunnelUpstream, tunnelDownstream, tunnelRadial, meshResolution);
+
+        public DomainGenerationResult GenerateTunnelOnly(
+            string stlFile,
+            string outputDirectory,
+            double tunnelUpstream,
+            double tunnelDownstream,
+            double tunnelRadial)
+            => _domainService.GenerateTunnelOnly(stlFile, outputDirectory, tunnelUpstream, tunnelDownstream, tunnelRadial);
+
+        public BoundingBox? CalculateBoundingBox(string stlFile)
+            => _domainService.CalculateBoundingBox(stlFile);
     }
 }

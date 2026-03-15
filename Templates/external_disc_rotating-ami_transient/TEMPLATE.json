@@ -1,0 +1,16 @@
+{
+  "name": "external_disc_rotating-ami_transient",
+  "description": "Transient AMI simulation of rotating disc (pimpleFoam + sliding mesh interface)",
+  "solver": "pimpleFoam",
+  "geometryType": "disc",
+  "geometryStlName": "disc.stl",
+  "referenceDimension": "diameter",
+  "referenceAreaFormula": "circular",
+  "requiresRotorZone": true,
+  "requiredStlFiles": ["disc.stl", "rotor.stl", "tunnel.stl"],
+  "validation": {
+    "minSize": 0.18,
+    "maxSize": 0.35,
+    "warningMessage": "Disc diameter outside expected PDGA range (0.21-0.30m). Ensure correct --input-units."
+  }
+}
