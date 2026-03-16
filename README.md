@@ -63,12 +63,14 @@ See **[Commands.md](Docs/Commands.md)** for full reference with all options, JSO
 - OpenFOAM v2312+ (tested with v2512)
 - .NET 10.0 SDK
 - gmsh (for STEP/IGES → STL conversion)
+- ParaView with pvpython (for flow visualization — `report` command)
+- python3 with matplotlib and numpy (for flow visualization rendering)
 
 ### Build & Test
 
 ```bash
 dotnet build
-dotnet test    # 192 tests
+dotnet test    # 234 tests
 ```
 
 ### Deploy to Linux
@@ -113,9 +115,12 @@ foamscript/
 │   └── TemplateService.cs       # Scriban template rendering
 ├── Templates/           # OpenFOAM case + report templates (Scriban)
 │   ├── external_disc_rotatingwall_steady/
-│   └── report/report.html
+│   └── report/
+│       ├── report.html            # Scriban HTML report template
+│       ├── extract_slice.py       # pvpython slice data extraction
+│       └── render_slice.py        # matplotlib contour plot rendering
 ├── Docs/Commands.md     # Full command reference
-├── foamscript.Tests/    # xUnit + Moq + FluentAssertions (192 tests)
+├── foamscript.Tests/    # xUnit + Moq + FluentAssertions (234 tests)
 └── study.example.jsonc  # Example JSON config file
 ```
 

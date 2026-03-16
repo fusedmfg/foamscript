@@ -84,6 +84,29 @@ namespace foamscript.Handlers
                 Console.WriteLine("✓ All required tools found");
             }
 
+            // Optional tools (visualization)
+            if (model.Verbose && !model.Quiet)
+            {
+                Console.WriteLine();
+                Console.WriteLine("Optional Tools (flow visualization):");
+                foreach (var (tool, path) in result.OptionalTools)
+                {
+                    Console.WriteLine($"  ✓ {tool}: {path}");
+                }
+                foreach (var missing in result.MissingOptionalTools)
+                {
+                    Console.WriteLine($"  ⚠ {missing}: NOT FOUND (report visualization will be skipped)");
+                }
+            }
+            else if (result.MissingOptionalTools.Count > 0 && !model.Quiet)
+            {
+                Console.WriteLine($"⚠ Optional tools missing (flow visualization): {string.Join(", ", result.MissingOptionalTools)}");
+            }
+            else if (result.OptionalTools.Count > 0 && !model.Quiet)
+            {
+                Console.WriteLine("✓ Flow visualization tools found (pvpython, python3/matplotlib)");
+            }
+
             // Summary
             if (!model.Quiet)
             {

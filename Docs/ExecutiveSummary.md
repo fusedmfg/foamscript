@@ -51,9 +51,9 @@ foamscript report -d ./DiscStudy
 | **Auto-Detection** | Single `-d` flag intelligently detects case vs. study directories |
 | **Auto-Parallel** | CPU cores auto-detected; `--cores N` to override, `FOAMSCRIPT_MAX_CORES` env var to cap |
 | **AIAA-Quality Reports** | Publication-standard HTML + PDF reports with aerodynamic polars, convergence history, mesh statistics, coefficient tables, and geometry-referenced flow visualizations |
-| **Flow Visualization** | Pressure and velocity contour slices via ParaView (pvpython) + matplotlib, with AIAA-standard geometry-referenced framing |
+| **Flow Visualization** | Pressure and velocity contour slices via ParaView (pvpython) + matplotlib (python3, numpy). Requires: `pvpython` (ParaView), `python3` with `matplotlib` and `numpy`. AIAA-standard geometry-referenced framing. Gracefully skipped if dependencies unavailable |
 | **AIAA CSV Data Export** | Machine-readable coefficient data with reference conditions header, always generated alongside reports |
-| **Environment Validation** | Pre-flight checks for OpenFOAM, gmsh, and system dependencies |
+| **Environment Validation** | Pre-flight checks for OpenFOAM, gmsh, pvpython, python3/matplotlib, and system dependencies |
 
 ### Validation Status
 

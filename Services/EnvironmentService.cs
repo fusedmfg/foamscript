@@ -29,6 +29,12 @@ namespace foamscript.Services
             "gmsh"
         };
 
+        private readonly string[] _optionalTools = new[]
+        {
+            "pvpython",
+            "python3"
+        };
+
         public EnvironmentService(IProcessExecutor processExecutor)
         {
             _processExecutor = processExecutor;
@@ -208,6 +214,44 @@ namespace foamscript.Services
                 else
                 {
                     result.MissingTools.Add(tool);
+                }
+            }
+
+            // Check optional tools (visualization dependencies)
+            foreach (var tool in _optionalTools)
+            {
+                var check = CheckToolAvailable(tool);
+                if (check.IsAvailable)
+                {
+                    result.OptionalTools[tool] = check.Path!;
+                }
+                else
+                {
+                    result.MissingOptionalTools.Add(tool);
+                }
+            }
+
+            // Check python3 matplotlib/numpy if python3 is available
+            if (result.OptionalTools.ContainsKey("python3"))
+            {
+                var matplotlibCheck = _processExecutor.Execute("python3", "-c \"import matplotlib\"");
+                if (matplotlibCheck.ExitCode == 0)
+                {
+                    result.OptionalTools["matplotlib"] = "available";
+                }
+                else
+                {
+                    result.MissingOptionalTools.Add("matplotlib (pip install matplotlib)");
+                }
+
+                var numpyCheck = _processExecutor.Execute("python3", "-c \"import numpy\"");
+                if (numpyCheck.ExitCode == 0)
+                {
+                    result.OptionalTools["numpy"] = "available";
+                }
+                else
+                {
+                    result.MissingOptionalTools.Add("numpy (pip install numpy)");
                 }
             }
 

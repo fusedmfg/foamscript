@@ -125,6 +125,23 @@ namespace foamscript.Tests.Services
             result.Version.Should().Be("v2512");
             result.MissingTools.Should().BeEmpty();
             result.MissingVariables.Should().BeEmpty();
+            result.OptionalTools.Should().ContainKey("pvpython");
+            result.OptionalTools.Should().ContainKey("matplotlib");
+        }
+
+        [Fact]
+        public void ValidateEnvironment_WhenOptionalToolsMissing_StillReturnsValid()
+        {
+            // Arrange — all required tools present, but pvpython/python3 missing
+            SetupEnvironmentWithMissingOptionalTools();
+
+            // Act
+            var result = _service.ValidateEnvironment();
+
+            // Assert — IsValid should still be true
+            result.IsValid.Should().BeTrue();
+            result.MissingOptionalTools.Should().Contain("pvpython");
+            result.MissingOptionalTools.Should().Contain("python3");
         }
 
         [Fact]
@@ -195,6 +212,20 @@ namespace foamscript.Tests.Services
                     .Setup(x => x.Execute("which", tool))
                     .Returns(new ProcessResult { ExitCode = 0, Output = $"/usr/bin/{tool}\n" });
             }
+
+            // Optional tools
+            _mockProcessExecutor
+                .Setup(x => x.Execute("which", "pvpython"))
+                .Returns(new ProcessResult { ExitCode = 0, Output = "/usr/bin/pvpython\n" });
+            _mockProcessExecutor
+                .Setup(x => x.Execute("which", "python3"))
+                .Returns(new ProcessResult { ExitCode = 0, Output = "/usr/bin/python3\n" });
+            _mockProcessExecutor
+                .Setup(x => x.Execute("python3", "-c \"import matplotlib\""))
+                .Returns(new ProcessResult { ExitCode = 0, Output = "" });
+            _mockProcessExecutor
+                .Setup(x => x.Execute("python3", "-c \"import numpy\""))
+                .Returns(new ProcessResult { ExitCode = 0, Output = "" });
         }
 
         private void SetupEnvironmentWithMissingTools()
@@ -248,6 +279,28 @@ namespace foamscript.Tests.Services
 
             _mockProcessExecutor
                 .Setup(x => x.Execute("which", "gmsh"))
+                .Returns(new ProcessResult { ExitCode = 1, Output = "" });
+
+            // Optional tools — not found (shouldn't affect IsValid)
+            _mockProcessExecutor
+                .Setup(x => x.Execute("which", "pvpython"))
+                .Returns(new ProcessResult { ExitCode = 1, Output = "" });
+            _mockProcessExecutor
+                .Setup(x => x.Execute("which", "python3"))
+                .Returns(new ProcessResult { ExitCode = 1, Output = "" });
+        }
+
+        private void SetupEnvironmentWithMissingOptionalTools()
+        {
+            // All required tools present
+            SetupSuccessfulEnvironment();
+
+            // Override optional tools to be missing
+            _mockProcessExecutor
+                .Setup(x => x.Execute("which", "pvpython"))
+                .Returns(new ProcessResult { ExitCode = 1, Output = "" });
+            _mockProcessExecutor
+                .Setup(x => x.Execute("which", "python3"))
                 .Returns(new ProcessResult { ExitCode = 1, Output = "" });
         }
 

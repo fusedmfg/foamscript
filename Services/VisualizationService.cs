@@ -3,45 +3,14 @@ using foamscript.Models;
 namespace foamscript.Services
 {
     /// <summary>
-    /// Generates flow field visualizations using OpenFOAM postProcess + C# rendering:
-    /// 1. Writes surfaceSampling function object dict to system/
-    /// 2. Runs postProcess to generate raw surface data
-    /// 3. Parses raw output with VtkSliceParser.ParseRawFiles
-    /// 4. Renders heatmaps with VtkSliceRenderer (ScottPlot)
-    /// Gracefully degrades if postProcess fails.
+    /// Generates flow field visualizations using a two-phase approach:
+    /// Phase 1: pvpython extracts slice data from the OpenFOAM case (no rendering).
+    /// Phase 2: python3 + matplotlib renders contour plots (headless via Agg backend).
+    /// Gracefully degrades if pvpython or python3 is not available.
     /// </summary>
     public class VisualizationService
     {
         private readonly IProcessExecutor _processExecutor;
-
-        private const string SurfaceSamplingDict = """
-            FoamFile
-            {
-                version     2.0;
-                format      ascii;
-                class       dictionary;
-                object      surfaceSampling;
-            }
-
-            surfaceSampling
-            {
-                type            surfaces;
-                libs            (sampling);
-                writeControl    writeTime;
-                surfaceFormat   raw;
-                fields          (p U);
-                surfaces
-                {
-                    yNormal
-                    {
-                        type        cuttingPlane;
-                        point       (0 0 0);
-                        normal      (0 1 0);
-                        interpolate true;
-                    }
-                }
-            }
-            """;
 
         public VisualizationService(IProcessExecutor processExecutor)
         {
@@ -50,172 +19,119 @@ namespace foamscript.Services
 
         /// <summary>
         /// Generates pressure and velocity slice visualizations for a case.
-        /// Returns rendered PNGs, or null if postProcess or rendering fails.
+        /// Returns paths to generated PNGs, or null if visualization tools are unavailable.
         /// </summary>
         public virtual SliceVisualizationResult? GenerateSliceVisualization(string caseDir, string outputDir)
         {
-            var systemDir = Path.Combine(caseDir, "system");
-            if (!Directory.Exists(systemDir))
+            // Locate the Python scripts (bundled alongside the executable)
+            var scriptDir = FindScriptDirectory();
+            if (scriptDir == null)
             {
-                Console.Error.WriteLine("  Warning: Case system/ directory not found — skipping flow visualization");
+                Console.Error.WriteLine("  Warning: Visualization scripts not found — skipping flow visualization");
                 return null;
             }
 
-            var dictPath = Path.Combine(systemDir, "surfaceSampling");
+            var extractScript = Path.Combine(scriptDir, "extract_slice.py");
+            var renderScript = Path.Combine(scriptDir, "render_slice.py");
 
-            try
+            if (!File.Exists(extractScript) || !File.Exists(renderScript))
             {
-                // Step 1: Write surfaceSampling function object dict
-                File.WriteAllText(dictPath, SurfaceSamplingDict);
-
-                // Step 2: Run OpenFOAM postProcess
-                Console.WriteLine("  Running postProcess surface sampling...");
-                var postResult = _processExecutor.Execute(
-                    "postProcess", $"-case {caseDir} -func surfaceSampling -latestTime");
-
-                if (postResult.ExitCode != 0)
-                {
-                    Console.Error.WriteLine($"  Warning: postProcess failed (exit code {postResult.ExitCode}) — skipping flow visualization");
-                    return null;
-                }
-
-                // Step 3: Find VTK output in postProcessing/surfaceSampling/<latestTime>/
-                var postProcDir = Path.Combine(caseDir, "postProcessing", "surfaceSampling");
-                if (!Directory.Exists(postProcDir))
-                {
-                    Console.Error.WriteLine("  Warning: postProcessing output not found — skipping flow visualization");
-                    return null;
-                }
-
-                var latestTimeDir = Directory.GetDirectories(postProcDir)
-                    .Select(d => new DirectoryInfo(d))
-                    .Where(d => double.TryParse(d.Name, System.Globalization.NumberStyles.Float,
-                        System.Globalization.CultureInfo.InvariantCulture, out _))
-                    .OrderByDescending(d => double.Parse(d.Name, System.Globalization.CultureInfo.InvariantCulture))
-                    .FirstOrDefault();
-
-                if (latestTimeDir == null)
-                {
-                    Console.Error.WriteLine("  Warning: No time directories in postProcessing output — skipping flow visualization");
-                    return null;
-                }
-
-                var rawFiles = Directory.GetFiles(latestTimeDir.FullName, "*.raw");
-                if (rawFiles.Length == 0)
-                {
-                    Console.Error.WriteLine("  Warning: No raw surface files found in postProcessing output — skipping flow visualization");
-                    return null;
-                }
-
-                // Step 4: Parse raw files and render
-                // Each field produces a separate .raw file (e.g., p_yNormal.raw, U_yNormal.raw)
-                Console.WriteLine("  Parsing surface slice data...");
-                var fieldFiles = new Dictionary<string, string>();
-                foreach (var rawFile in rawFiles)
-                {
-                    var fileName = Path.GetFileNameWithoutExtension(rawFile);
-                    // Extract field name: "p_yNormal" -> "p", "U_yNormal" -> "U"
-                    var fieldName = fileName.Split('_')[0];
-                    fieldFiles[fieldName] = File.ReadAllText(rawFile);
-                }
-                var sliceData = VtkSliceParser.ParseRawFiles(fieldFiles);
-
-                if (sliceData.Points.Count == 0)
-                {
-                    Console.Error.WriteLine("  Warning: Surface slice contains no points — skipping flow visualization");
-                    return null;
-                }
-
-                // Step 5: Read geometry bounding box from STL for AIAA-standard view framing
-                var geometryBounds = FindGeometryBounds(caseDir);
-
-                // Step 6: Render with ScottPlot
-                Console.WriteLine("  Rendering flow visualizations...");
-                var result = VtkSliceRenderer.Render(sliceData, geometryBounds);
-
-                // Write PNGs to output directory
-                Directory.CreateDirectory(outputDir);
-                if (result.PressureSlicePng != null)
-                {
-                    result.PressureSlicePath = Path.Combine(outputDir, "p_slice.png");
-                    File.WriteAllBytes(result.PressureSlicePath, result.PressureSlicePng);
-                }
-                if (result.VelocitySlicePng != null)
-                {
-                    result.VelocitySlicePath = Path.Combine(outputDir, "umag_slice.png");
-                    File.WriteAllBytes(result.VelocitySlicePath, result.VelocitySlicePng);
-                }
-
-                return result;
+                Console.Error.WriteLine("  Warning: Visualization scripts not found — skipping flow visualization");
+                return null;
             }
-            finally
+
+            // Check if pvpython is available
+            var pvCheck = _processExecutor.Execute("which", "pvpython");
+            if (pvCheck.ExitCode != 0)
             {
-                // Clean up surfaceSampling dict
-                try { File.Delete(dictPath); } catch { /* Non-critical */ }
+                Console.Error.WriteLine("  Warning: pvpython not found — skipping flow visualization");
+                Console.Error.WriteLine("  Install ParaView for flow field visualizations");
+                return null;
             }
+
+            // Check if python3 + matplotlib is available
+            var pyCheck = _processExecutor.Execute("python3", "-c \"import matplotlib\"");
+            if (pyCheck.ExitCode != 0)
+            {
+                Console.Error.WriteLine("  Warning: python3 with matplotlib not found — skipping flow visualization");
+                return null;
+            }
+
+            Directory.CreateDirectory(outputDir);
+            var jsonPath = Path.Combine(outputDir, "slice_data.json");
+
+            // Phase 1: Extract slice data via pvpython
+            Console.WriteLine("  Extracting flow field slice data...");
+            var extractResult = _processExecutor.Execute(
+                "pvpython", $"--force-offscreen-rendering {extractScript} {caseDir} {jsonPath}");
+
+            if (extractResult.ExitCode != 0 || !File.Exists(jsonPath))
+            {
+                Console.Error.WriteLine($"  Warning: Slice data extraction failed (exit code {extractResult.ExitCode})");
+                if (!string.IsNullOrEmpty(extractResult.Error))
+                    Console.Error.WriteLine($"  {extractResult.Error.Split('\n').LastOrDefault(l => !l.Contains("Authorization"))?.Trim()}");
+                return null;
+            }
+
+            // Phase 2: Render contour plots via python3 + matplotlib
+            Console.WriteLine("  Rendering flow visualizations...");
+            var renderResult = _processExecutor.Execute(
+                "python3", $"{renderScript} {jsonPath} {outputDir}");
+
+            if (renderResult.ExitCode != 0)
+            {
+                Console.Error.WriteLine($"  Warning: Visualization rendering failed (exit code {renderResult.ExitCode})");
+                return null;
+            }
+
+            var pressurePath = Path.Combine(outputDir, "p_slice.png");
+            var velocityPath = Path.Combine(outputDir, "umag_slice.png");
+
+            var result = new SliceVisualizationResult();
+            if (File.Exists(pressurePath))
+            {
+                result.PressureSlicePath = pressurePath;
+                result.PressureSlicePng = File.ReadAllBytes(pressurePath);
+            }
+            if (File.Exists(velocityPath))
+            {
+                result.VelocitySlicePath = velocityPath;
+                result.VelocitySlicePng = File.ReadAllBytes(velocityPath);
+            }
+
+            // Clean up intermediate JSON
+            try { File.Delete(jsonPath); } catch { /* Non-critical */ }
+
+            return result;
         }
+
         /// <summary>
-        /// Finds the geometry STL in constant/triSurface/ and computes its bounding box.
-        /// Returns null if no geometry STL found (falls back to data-extent framing).
-        /// Skips tunnel.stl — looks for the actual geometry (disc.stl, airfoil.stl, etc.).
+        /// Locates the directory containing visualization Python scripts.
+        /// Searches relative to the executable, then common development paths.
         /// </summary>
-        private static BoundingBox? FindGeometryBounds(string caseDir)
+        private static string? FindScriptDirectory()
         {
-            var triSurfDir = Path.Combine(caseDir, "constant", "triSurface");
-            if (!Directory.Exists(triSurfDir))
-                return null;
-
-            // Find geometry STL (skip tunnel.stl which is the wind tunnel domain)
-            var stlFiles = Directory.GetFiles(triSurfDir, "*.stl")
-                .Where(f => !Path.GetFileName(f).Equals("tunnel.stl", StringComparison.OrdinalIgnoreCase))
-                .ToArray();
-
-            if (stlFiles.Length == 0)
-                return null;
-
-            var stlFile = stlFiles[0];
-            try
+            var candidates = new[]
             {
-                var lines = File.ReadAllLines(stlFile);
-                double minX = double.MaxValue, maxX = double.MinValue;
-                double minY = double.MaxValue, maxY = double.MinValue;
-                double minZ = double.MaxValue, maxZ = double.MinValue;
+                // Relative to executable (production)
+                Path.Combine(AppContext.BaseDirectory, "Templates", "report"),
+                // Development paths
+                Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "Templates", "report"),
+                // Absolute fallback
+                Path.Combine(Directory.GetCurrentDirectory(), "Templates", "report"),
+            };
 
-                foreach (var line in lines)
+            foreach (var candidate in candidates)
+            {
+                var normalized = Path.GetFullPath(candidate);
+                if (Directory.Exists(normalized) &&
+                    File.Exists(Path.Combine(normalized, "extract_slice.py")))
                 {
-                    var trimmed = line.Trim();
-                    if (trimmed.StartsWith("vertex"))
-                    {
-                        var parts = trimmed.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-                        if (parts.Length >= 4 &&
-                            double.TryParse(parts[1], System.Globalization.NumberStyles.Float,
-                                System.Globalization.CultureInfo.InvariantCulture, out var x) &&
-                            double.TryParse(parts[2], System.Globalization.NumberStyles.Float,
-                                System.Globalization.CultureInfo.InvariantCulture, out var y) &&
-                            double.TryParse(parts[3], System.Globalization.NumberStyles.Float,
-                                System.Globalization.CultureInfo.InvariantCulture, out var z))
-                        {
-                            minX = Math.Min(minX, x); maxX = Math.Max(maxX, x);
-                            minY = Math.Min(minY, y); maxY = Math.Max(maxY, y);
-                            minZ = Math.Min(minZ, z); maxZ = Math.Max(maxZ, z);
-                        }
-                    }
+                    return normalized;
                 }
-
-                if (minX == double.MaxValue)
-                    return null;
-
-                return new BoundingBox
-                {
-                    MinX = minX, MaxX = maxX,
-                    MinY = minY, MaxY = maxY,
-                    MinZ = minZ, MaxZ = maxZ
-                };
             }
-            catch
-            {
-                return null; // Non-critical — fall back to data-extent framing
-            }
+
+            return null;
         }
     }
 

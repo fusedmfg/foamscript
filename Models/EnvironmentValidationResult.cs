@@ -12,6 +12,8 @@ namespace foamscript.Models
         public List<string> MissingVariables { get; set; } = new();
         public Dictionary<string, string> EnvironmentVariables { get; set; } = new();
         public Dictionary<string, string> AvailableTools { get; set; } = new();
+        public Dictionary<string, string> OptionalTools { get; set; } = new();
+        public List<string> MissingOptionalTools { get; set; } = new();
 
         /// <summary>
         /// List of detected OpenFOAM installation paths (for diagnostics).

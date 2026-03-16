@@ -118,7 +118,7 @@ namespace foamscript.Services
             return result;
         }
 
-        private ReportData BuildHtmlReportData(string studyDir, string studyName, ResultsSummary summary,
+        internal ReportData BuildHtmlReportData(string studyDir, string studyName, ResultsSummary summary,
             List<CaseResidualData> residuals, List<MeshStatEntry> meshStats, PhysicsConfig config,
             SliceVisualizationResult? visualization)
         {
@@ -177,7 +177,7 @@ namespace foamscript.Services
             return data;
         }
 
-        private PdfReportData BuildPdfReportData(string studyName, ResultsSummary summary,
+        internal PdfReportData BuildPdfReportData(string studyName, ResultsSummary summary,
             List<CaseResidualData> residuals, List<MeshStatEntry> meshStats, PhysicsConfig config,
             SliceVisualizationResult? visualization)
         {
