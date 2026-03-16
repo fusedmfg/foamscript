@@ -79,10 +79,10 @@ namespace foamscript.Models
 
         // ── Domain geometry parameters ────────────────────────────────────────
 
-        [Option("rotor-radius-scale", Required = false, Default = 1.25, HelpText = "Rotor AMI cylinder radius as a multiple of geometry radius (default: 1.25)")]
+        [Option("rotor-radius-scale", Required = false, Default = 1.25, HelpText = "Rotor cylinder radius as a multiple of reference radius — rotating templates only (default: 1.25)")]
         public double RotorRadiusScale { get; set; } = 1.25;
 
-        [Option("rotor-height-scale", Required = false, Default = 1.5, HelpText = "Rotor AMI cylinder height as a multiple of geometry height (default: 1.5)")]
+        [Option("rotor-height-scale", Required = false, Default = 1.5, HelpText = "Rotor cylinder height as a multiple of geometry height — rotating templates only (default: 1.5)")]
         public double RotorHeightScale { get; set; } = 1.5;
 
         [Option("tunnel-upstream", Required = false, Default = 5.0, HelpText = "Wind tunnel upstream extent in reference lengths (default: 5.0)")]

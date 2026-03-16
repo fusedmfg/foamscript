@@ -2,7 +2,7 @@ using CommandLine;
 
 namespace foamscript.Models
 {
-    [Verb("report", HelpText = "Generate AIAA-quality analysis report (HTML + PDF) with aerodynamic polars, convergence plots, and mesh statistics.")]
+    [Verb("report", HelpText = "Generate AIAA-quality analysis report (HTML + PDF + CSV) with aerodynamic polars, convergence plots, and mesh statistics.")]
     public class ReportModel : VerbModel
     {
         [Option('d', "dir", Required = true, HelpText = "Study or case directory (auto-detects)")]
