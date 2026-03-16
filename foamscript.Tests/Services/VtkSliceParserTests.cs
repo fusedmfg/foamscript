@@ -70,4 +70,81 @@ public class VtkSliceParserTests
         result.Points.Should().BeEmpty();
         result.ScalarFields.Should().BeEmpty();
     }
+
+    // --- Raw format tests (OpenFOAM postProcess raw surface output) ---
+
+    [Fact]
+    public void ParseRawFiles_ExtractsScalarField()
+    {
+        var pRaw = """
+            # p  POINT_DATA 3
+            # x y z  p
+            0.1 0.0 -0.05 100.0
+            0.2 0.0 0.0 200.0
+            0.3 0.0 0.05 150.0
+            """;
+
+        var result = VtkSliceParser.ParseRawFiles(new Dictionary<string, string> { ["p"] = pRaw });
+
+        result.Points.Should().HaveCount(3);
+        result.Points[0].X.Should().BeApproximately(0.1, 1e-6);
+        result.Points[0].Z.Should().BeApproximately(-0.05, 1e-6);
+        result.ScalarFields.Should().ContainKey("p");
+        result.ScalarFields["p"].Should().BeEquivalentTo(new[] { 100.0, 200.0, 150.0 });
+    }
+
+    [Fact]
+    public void ParseRawFiles_ExtractsVectorFieldAsMagnitude()
+    {
+        var uRaw = """
+            # U  POINT_DATA 2
+            # x y z  U_x U_y U_z
+            0.1 0.0 -0.05 3.0 4.0 0.0
+            0.2 0.0 0.0 0.0 0.0 5.0
+            """;
+
+        var result = VtkSliceParser.ParseRawFiles(new Dictionary<string, string> { ["U"] = uRaw });
+
+        result.ScalarFields.Should().ContainKey("U");
+        result.ScalarFields["U"][0].Should().BeApproximately(5.0, 1e-6); // sqrt(9+16+0) = 5
+        result.ScalarFields["U"][1].Should().BeApproximately(5.0, 1e-6); // sqrt(0+0+25) = 5
+    }
+
+    [Fact]
+    public void ParseRawFiles_CombinesMultipleFields()
+    {
+        var pRaw = """
+            # p  POINT_DATA 2
+            # x y z  p
+            0.1 0.0 -0.05 100.0
+            0.2 0.0 0.0 200.0
+            """;
+        var uRaw = """
+            # U  POINT_DATA 2
+            # x y z  U_x U_y U_z
+            0.1 0.0 -0.05 10.0 0.0 0.0
+            0.2 0.0 0.0 20.0 0.0 0.0
+            """;
+
+        var result = VtkSliceParser.ParseRawFiles(new Dictionary<string, string>
+        {
+            ["p"] = pRaw,
+            ["U"] = uRaw
+        });
+
+        result.Points.Should().HaveCount(2);
+        result.ScalarFields.Should().ContainKey("p");
+        result.ScalarFields.Should().ContainKey("U");
+        result.ScalarFields["U"][0].Should().BeApproximately(10.0, 1e-6);
+        result.ScalarFields["U"][1].Should().BeApproximately(20.0, 1e-6);
+    }
+
+    [Fact]
+    public void ParseRawFiles_EmptyInput_ReturnsEmptyResult()
+    {
+        var result = VtkSliceParser.ParseRawFiles(new Dictionary<string, string>());
+
+        result.Points.Should().BeEmpty();
+        result.ScalarFields.Should().BeEmpty();
+    }
 }

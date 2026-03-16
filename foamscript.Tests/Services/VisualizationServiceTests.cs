@@ -60,6 +60,7 @@ public class VisualizationServiceTests
             capturedContent.Should().NotBeNull("service should write surfaceSampling dict before calling postProcess");
             capturedContent.Should().Contain("cuttingPlane");
             capturedContent.Should().Contain("(p U)");
+            capturedContent.Should().Contain("surfaceFormat   raw", "should use raw format for simple text parsing");
         }
         finally
         {

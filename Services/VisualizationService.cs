@@ -5,8 +5,8 @@ namespace foamscript.Services
     /// <summary>
     /// Generates flow field visualizations using OpenFOAM postProcess + C# rendering:
     /// 1. Writes surfaceSampling function object dict to system/
-    /// 2. Runs postProcess to generate VTK surface data
-    /// 3. Parses VTK output with VtkSliceParser
+    /// 2. Runs postProcess to generate raw surface data
+    /// 3. Parses raw output with VtkSliceParser.ParseRawFiles
     /// 4. Renders heatmaps with VtkSliceRenderer (ScottPlot)
     /// Gracefully degrades if postProcess fails.
     /// </summary>
@@ -28,7 +28,7 @@ namespace foamscript.Services
                 type            surfaces;
                 libs            (sampling);
                 writeControl    writeTime;
-                surfaceFormat   vtk;
+                surfaceFormat   raw;
                 fields          (p U);
                 surfaces
                 {
@@ -100,22 +100,29 @@ namespace foamscript.Services
                     return null;
                 }
 
-                var vtkFiles = Directory.GetFiles(latestTimeDir.FullName, "*.vtk");
-                if (vtkFiles.Length == 0)
+                var rawFiles = Directory.GetFiles(latestTimeDir.FullName, "*.raw");
+                if (rawFiles.Length == 0)
                 {
-                    Console.Error.WriteLine("  Warning: No VTK files found in postProcessing output — skipping flow visualization");
+                    Console.Error.WriteLine("  Warning: No raw surface files found in postProcessing output — skipping flow visualization");
                     return null;
                 }
 
-                // Step 4: Parse VTK and render
-                // Combine data from all VTK files (there may be one per surface)
-                Console.WriteLine("  Parsing VTK slice data...");
-                var vtkContent = File.ReadAllText(vtkFiles[0]);
-                var sliceData = VtkSliceParser.Parse(vtkContent);
+                // Step 4: Parse raw files and render
+                // Each field produces a separate .raw file (e.g., p_yNormal.raw, U_yNormal.raw)
+                Console.WriteLine("  Parsing surface slice data...");
+                var fieldFiles = new Dictionary<string, string>();
+                foreach (var rawFile in rawFiles)
+                {
+                    var fileName = Path.GetFileNameWithoutExtension(rawFile);
+                    // Extract field name: "p_yNormal" -> "p", "U_yNormal" -> "U"
+                    var fieldName = fileName.Split('_')[0];
+                    fieldFiles[fieldName] = File.ReadAllText(rawFile);
+                }
+                var sliceData = VtkSliceParser.ParseRawFiles(fieldFiles);
 
                 if (sliceData.Points.Count == 0)
                 {
-                    Console.Error.WriteLine("  Warning: VTK slice contains no points — skipping flow visualization");
+                    Console.Error.WriteLine("  Warning: Surface slice contains no points — skipping flow visualization");
                     return null;
                 }
 
