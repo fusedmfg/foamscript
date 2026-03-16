@@ -51,9 +51,9 @@ foamscript report -d ./DiscStudy
 | **Auto-Detection** | Single `-d` flag intelligently detects case vs. study directories |
 | **Auto-Parallel** | CPU cores auto-detected; `--cores N` to override, `FOAMSCRIPT_MAX_CORES` env var to cap |
 | **AIAA-Quality Reports** | Publication-standard HTML + PDF reports with aerodynamic polars, convergence history, mesh statistics, coefficient tables, and geometry-referenced flow visualizations |
-| **Flow Visualization** | Pressure and velocity contour slices via ParaView (pvpython) + matplotlib, with AIAA-standard geometry-referenced framing |
+| **Flow Visualization** | Pressure and velocity contour slices via ParaView (pvpython) + matplotlib (python3, numpy). Requires: `pvpython` (ParaView), `python3` with `matplotlib` and `numpy`. AIAA-standard geometry-referenced framing. Gracefully skipped if dependencies unavailable |
 | **AIAA CSV Data Export** | Machine-readable coefficient data with reference conditions header, always generated alongside reports |
-| **Environment Validation** | Pre-flight checks for OpenFOAM, gmsh, and system dependencies |
+| **Environment Validation** | Config-based OpenFOAM management (`~/.foamscript/config.json`), auto-bashrc sourcing, pre-flight env injection, 23-check grouped validation with install hints. All dependencies required: OpenFOAM, gmsh, mpirun, pvpython, python3, matplotlib, numpy |
 
 ### Validation Status
 
@@ -433,7 +433,7 @@ Based on the development history, approximately **70-75% of AI compute was produ
 | Production LOC | 6,318 | Substantial for CLI tool scope |
 | Test LOC | 4,658 | Strong investment |
 | Test/Prod Ratio | 73.7% | Above industry average (~40-60% typical) |
-| Passing Tests | 201 | Zero failures |
+| Passing Tests | 241 | Zero failures |
 | Template Files | 42 | Comprehensive OpenFOAM coverage |
 | GitHub Issues | 40 total (28 closed, 12 open) | Comprehensive tracking |
 | Build Status | Clean | Zero warnings |

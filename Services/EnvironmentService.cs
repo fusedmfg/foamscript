@@ -4,43 +4,50 @@ namespace foamscript.Services
 {
     /// <summary>
     /// Service for validating OpenFOAM environment and tool availability.
+    /// Produces a grouped checklist with install hints for every failure.
     /// </summary>
     public class EnvironmentService
     {
         private readonly IProcessExecutor _processExecutor;
+        private readonly OpenFoamEnvironment _openFoamEnvironment;
 
-        private readonly string[] _requiredEnvironmentVariables = new[]
+        private static readonly (string Group, string[] Tools, string InstallHint)[] ToolGroups = new[]
         {
-            "WM_PROJECT_DIR",
-            "WM_PROJECT_VERSION",
-            "FOAM_APPBIN",
-            "FOAM_LIBBIN"
+            ("Meshing Tools", new[] { "blockMesh", "snappyHexMesh", "surfaceFeatureExtract",
+                "surfaceOrient", "surfaceCheck", "decomposePar", "reconstructParMesh", "checkMesh" },
+                "Included with OpenFOAM"),
+            ("Solver Tools", new[] { "simpleFoam", "pimpleFoam", "reconstructPar" },
+                "Included with OpenFOAM"),
+            ("Parallel Execution", new[] { "mpirun" },
+                "sudo apt install openmpi-bin"),
+            ("Geometry Processing", new[] { "gmsh" },
+                "sudo apt install gmsh"),
+            ("Flow Visualization", new[] { "pvpython" },
+                "sudo apt install paraview"),
         };
 
-        private readonly string[] _requiredTools = new[]
+        private static readonly string[] RequiredEnvVars = new[]
         {
-            "blockMesh",
-            "snappyHexMesh",
-            "surfaceFeatureExtract",
-            "decomposePar",
-            "pimpleFoam",
-            "reconstructPar",
-            "checkMesh",
-            "gmsh"
+            "WM_PROJECT_DIR", "WM_PROJECT_VERSION", "FOAM_APPBIN", "FOAM_LIBBIN"
         };
 
-        public EnvironmentService(IProcessExecutor processExecutor)
+        private static readonly (string Module, string InstallHint)[] PythonModules = new[]
+        {
+            ("matplotlib", "pip3 install matplotlib"),
+            ("numpy", "pip3 install numpy"),
+        };
+
+        public EnvironmentService(IProcessExecutor processExecutor, OpenFoamEnvironment openFoamEnvironment)
         {
             _processExecutor = processExecutor;
+            _openFoamEnvironment = openFoamEnvironment;
         }
 
         /// <summary>
         /// Auto-detects OpenFOAM installations in common directories.
-        /// Searches /usr/lib/openfoam and /opt for openfoam* directories with etc/bashrc.
         /// </summary>
         public List<string> DetectOpenFOAMInstallations()
         {
-            // Search common installation paths for directories that have etc/bashrc
             var result = _processExecutor.Execute("bash",
                 "-c \"find /usr/lib/openfoam /opt -maxdepth 3 -type f -path '*/etc/bashrc' 2>/dev/null | xargs dirname | xargs dirname || true\"");
 
@@ -74,161 +81,187 @@ namespace foamscript.Services
         }
 
         /// <summary>
-        /// Detects the installed OpenFOAM version.
+        /// Performs a complete grouped validation of the OpenFOAM environment.
+        /// Auto-detects OpenFOAM, sources bashrc, checks all tools using the sourced env.
+        /// Writes ~/.foamscript/config.json on success.
         /// </summary>
-        public string? DetectOpenFOAMVersion()
+        public EnvironmentValidationResult ValidateEnvironment(string? configPath = null)
         {
-            var result = _processExecutor.Execute("bash", "-c \"echo $WM_PROJECT_VERSION\"");
+            var result = new EnvironmentValidationResult();
 
-            if (result.ExitCode == 0)
+            // --- OpenFOAM group: detect installation + source bashrc ---
+            var openfoamGroup = new CheckGroup { Name = "OpenFOAM" };
+
+            // Try to load existing config first, fall back to auto-detection
+            var config = OpenFoamEnvironment.LoadConfig(configPath);
+            string? bashrcPath = config?.OpenFoamBashrc;
+
+            if (string.IsNullOrEmpty(bashrcPath) || !File.Exists(bashrcPath))
             {
-                var version = result.Output.Trim();
-                return string.IsNullOrEmpty(version) ? null : version;
+                bashrcPath = null;
+                // Auto-detect
+                result.DetectedInstallations = DetectOpenFOAMInstallations();
+                if (result.DetectedInstallations.Count > 0)
+                {
+                    bashrcPath = FindBashrcInInstallation(result.DetectedInstallations[0]);
+                }
             }
 
-            return null;
+            if (string.IsNullOrEmpty(bashrcPath))
+            {
+                openfoamGroup.Checks.Add(new CheckItem
+                {
+                    Passed = false,
+                    Name = "Installation",
+                    Detail = "NOT FOUND",
+                    InstallHint = "Install OpenFOAM: https://openfoam.org/download/"
+                });
+                result.Groups.Add(openfoamGroup);
+                result.IsValid = false;
+                return result;
+            }
+
+            result.DetectedBashrcPath = bashrcPath;
+            openfoamGroup.Checks.Add(new CheckItem
+            {
+                Passed = true,
+                Name = "Installation",
+                Detail = Path.GetDirectoryName(Path.GetDirectoryName(bashrcPath))
+            });
+
+            // Source bashrc and capture env
+            var capturedEnv = _openFoamEnvironment.CaptureEnvironment(bashrcPath);
+            if (capturedEnv == null)
+            {
+                openfoamGroup.Checks.Add(new CheckItem
+                {
+                    Passed = false,
+                    Name = "Bashrc sourced",
+                    Detail = $"Failed to source {bashrcPath}",
+                    InstallHint = "Check that the bashrc file is a valid OpenFOAM installation"
+                });
+                result.Groups.Add(openfoamGroup);
+                result.IsValid = false;
+                return result;
+            }
+
+            openfoamGroup.Checks.Add(new CheckItem
+            {
+                Passed = true,
+                Name = "Bashrc sourced",
+                Detail = bashrcPath
+            });
+
+            // Version
+            var version = capturedEnv.TryGetValue("WM_PROJECT_VERSION", out var v) ? v : null;
+            result.OpenFoamVersion = version;
+            openfoamGroup.Checks.Add(new CheckItem
+            {
+                Passed = version != null,
+                Name = "Version",
+                Detail = version ?? "NOT SET",
+                InstallHint = version == null ? "WM_PROJECT_VERSION not set after sourcing bashrc" : null
+            });
+
+            // Required env vars
+            foreach (var varName in RequiredEnvVars)
+            {
+                var hasVar = capturedEnv.TryGetValue(varName, out var val) && !string.IsNullOrEmpty(val);
+                openfoamGroup.Checks.Add(new CheckItem
+                {
+                    Passed = hasVar,
+                    Name = varName,
+                    Detail = hasVar ? val : "NOT SET",
+                    InstallHint = hasVar ? null : $"source {bashrcPath}"
+                });
+            }
+
+            result.Groups.Add(openfoamGroup);
+
+            // --- Tool groups: check each tool using sourced env ---
+            foreach (var (groupName, tools, defaultHint) in ToolGroups)
+            {
+                var group = new CheckGroup { Name = groupName };
+                foreach (var tool in tools)
+                {
+                    var check = CheckToolInEnvironment(bashrcPath, tool);
+                    group.Checks.Add(new CheckItem
+                    {
+                        Passed = check.IsAvailable,
+                        Name = tool,
+                        Detail = check.IsAvailable ? check.Path : "NOT FOUND",
+                        InstallHint = check.IsAvailable ? null : defaultHint
+                    });
+                }
+                result.Groups.Add(group);
+            }
+
+            // --- Python modules group ---
+            var pythonGroup = new CheckGroup { Name = "Python Libraries" };
+            foreach (var (module, hint) in PythonModules)
+            {
+                var check = CheckPythonModuleInEnvironment(bashrcPath, module);
+                pythonGroup.Checks.Add(new CheckItem
+                {
+                    Passed = check,
+                    Name = module,
+                    Detail = check ? "available" : "NOT FOUND",
+                    InstallHint = check ? null : hint
+                });
+            }
+            result.Groups.Add(pythonGroup);
+
+            // --- Determine overall validity ---
+            result.IsValid = result.TotalChecks == result.PassedChecks;
+
+            // --- Write config on success ---
+            if (result.IsValid)
+            {
+                OpenFoamEnvironment.SaveConfig(new FoamScriptConfig
+                {
+                    OpenFoamBashrc = bashrcPath,
+                    OpenFoamVersion = version ?? "",
+                    ConfiguredAt = DateTime.UtcNow
+                });
+            }
+
+            return result;
         }
 
         /// <summary>
-        /// Checks if an environment variable is set.
+        /// Checks if a tool is available within the OpenFOAM-sourced environment.
         /// </summary>
-        public EnvironmentVariableCheck CheckEnvironmentVariable(string variableName)
+        internal ToolCheck CheckToolInEnvironment(string bashrcPath, string toolName)
         {
-            var result = _processExecutor.Execute("bash", $"-c \"echo ${variableName}\"");
+            var result = _processExecutor.Execute("bash",
+                $"-c \"source '{bashrcPath}' 2>/dev/null && which {toolName}\"");
 
-            if (result.ExitCode == 0)
+            if (result.ExitCode == 0 && !string.IsNullOrWhiteSpace(result.Output))
             {
-                var value = result.Output.Trim();
-                return new EnvironmentVariableCheck
-                {
-                    IsValid = !string.IsNullOrEmpty(value),
-                    Value = string.IsNullOrEmpty(value) ? null : value
-                };
-            }
-
-            return new EnvironmentVariableCheck { IsValid = false, Value = null };
-        }
-
-        /// <summary>
-        /// Checks if a command-line tool is available.
-        /// </summary>
-        public ToolCheck CheckToolAvailable(string toolName)
-        {
-            var result = _processExecutor.Execute("which", toolName);
-
-            if (result.ExitCode == 0)
-            {
-                var path = result.Output.Trim();
-                return new ToolCheck
-                {
-                    IsAvailable = true,
-                    Path = path
-                };
+                return new ToolCheck { IsAvailable = true, Path = result.Output.Trim() };
             }
 
             return new ToolCheck { IsAvailable = false, Path = null };
         }
 
         /// <summary>
-        /// Performs a complete validation of the OpenFOAM environment.
+        /// Checks if a Python module is importable.
         /// </summary>
-        public EnvironmentValidationResult ValidateEnvironment()
+        internal bool CheckPythonModuleInEnvironment(string bashrcPath, string moduleName)
         {
-            var result = new EnvironmentValidationResult();
+            var result = _processExecutor.Execute("bash",
+                $"-c \"source '{bashrcPath}' 2>/dev/null && python3 -c 'import {moduleName}'\"");
 
-            // Check OpenFOAM version
-            result.Version = DetectOpenFOAMVersion();
-            if (result.Version == null)
-            {
-                result.IsValid = false;
-
-                // Try to auto-detect installations to provide helpful error message
-                result.DetectedInstallations = DetectOpenFOAMInstallations();
-
-                if (result.DetectedInstallations.Count > 0)
-                {
-                    // OpenFOAM is installed but not sourced
-                    var bashrcPath = FindBashrcInInstallation(result.DetectedInstallations[0]);
-                    result.DetectedBashrcPath = bashrcPath;
-
-                    var errorMsg = "OpenFOAM is installed but not sourced. Please run:\n";
-                    if (bashrcPath != null)
-                    {
-                        errorMsg += $"  source {bashrcPath}";
-                    }
-                    else
-                    {
-                        errorMsg += $"  source {result.DetectedInstallations[0]}/etc/bashrc";
-                    }
-
-                    if (result.DetectedInstallations.Count > 1)
-                    {
-                        errorMsg += $"\n\nOther detected installations:";
-                        foreach (var install in result.DetectedInstallations.Skip(1))
-                        {
-                            errorMsg += $"\n  - {install}";
-                        }
-                    }
-
-                    result.ErrorMessage = errorMsg;
-                }
-                else
-                {
-                    // No installations found
-                    result.ErrorMessage = "OpenFOAM environment not detected and no installations found.\n" +
-                                         "Please install OpenFOAM or source the bashrc file:\n" +
-                                         "  source /path/to/openfoam/etc/bashrc";
-                }
-
-                return result;
-            }
-
-            // Check required environment variables
-            foreach (var varName in _requiredEnvironmentVariables)
-            {
-                var check = CheckEnvironmentVariable(varName);
-                if (check.IsValid)
-                {
-                    result.EnvironmentVariables[varName] = check.Value!;
-                }
-                else
-                {
-                    result.MissingVariables.Add(varName);
-                }
-            }
-
-            // Check required tools
-            foreach (var tool in _requiredTools)
-            {
-                var check = CheckToolAvailable(tool);
-                if (check.IsAvailable)
-                {
-                    result.AvailableTools[tool] = check.Path!;
-                }
-                else
-                {
-                    result.MissingTools.Add(tool);
-                }
-            }
-
-            // Determine overall validity
-            result.IsValid = result.MissingVariables.Count == 0 && result.MissingTools.Count == 0;
-
-            if (!result.IsValid)
-            {
-                var errors = new List<string>();
-                if (result.MissingVariables.Count > 0)
-                {
-                    errors.Add($"Missing environment variables: {string.Join(", ", result.MissingVariables)}");
-                }
-                if (result.MissingTools.Count > 0)
-                {
-                    errors.Add($"Missing tools: {string.Join(", ", result.MissingTools)}");
-                }
-                result.ErrorMessage = string.Join("\n", errors);
-            }
-
-            return result;
+            return result.ExitCode == 0;
         }
+    }
+
+    /// <summary>
+    /// Result of checking tool availability.
+    /// </summary>
+    public class ToolCheck
+    {
+        public bool IsAvailable { get; set; }
+        public string? Path { get; set; }
     }
 }

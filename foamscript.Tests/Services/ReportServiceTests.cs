@@ -2,6 +2,7 @@ using Xunit;
 using FluentAssertions;
 using foamscript.Models;
 using foamscript.Services;
+using Moq;
 
 namespace foamscript.Tests.Services
 {
@@ -187,6 +188,110 @@ boundaryField
             {
                 if (File.Exists(csvPath)) File.Delete(csvPath);
             }
+        }
+
+        // ── Visualization → Report Data Integration ────────────────────────────
+
+        private static ReportService CreateReportServiceForBuildTests()
+        {
+            // Only ChartGenerator is needed — BuildHtmlReportData/BuildPdfReportData
+            // call _chartGenerator but not the other dependencies.
+            // Pass null! for unused deps to avoid PdfReportGenerator's static font init.
+            return new ReportService(
+                null!,              // ResultsService — not used by Build*ReportData
+                new ChartGenerator(),
+                null!,              // HtmlReportGenerator — not used
+                null!,              // PdfReportGenerator — not used (and has problematic static ctor)
+                null!);             // VisualizationService — not used
+        }
+
+        private static (ResultsSummary summary, PhysicsConfig config) CreateMinimalReportInputs()
+        {
+            var summary = new ResultsSummary
+            {
+                StudyDir = "/tmp/test",
+                IsSuccess = true,
+                Cases = new List<CaseResult>
+                {
+                    new() { CaseName = "AoA_0.0", AngleOfAttack = 0.0, Cd = 0.05, Cl = 0.2, Converged = true }
+                }
+            };
+            var config = new PhysicsConfig { Velocity = "27.0", Rpm = "925" };
+            return (summary, config);
+        }
+
+        [Fact]
+        public void BuildHtmlReportData_WithVisualization_SetsHasVisualizationAndBase64Images()
+        {
+            var svc = CreateReportServiceForBuildTests();
+            var (summary, config) = CreateMinimalReportInputs();
+            var fakePng = new byte[] { 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A }; // PNG magic bytes
+
+            var viz = new SliceVisualizationResult
+            {
+                PressureSlicePng = fakePng,
+                VelocitySlicePng = fakePng
+            };
+
+            var data = svc.BuildHtmlReportData(
+                Path.GetTempPath(), "TestStudy", summary,
+                new List<CaseResidualData>(), new List<MeshStatEntry>(), config, viz);
+
+            data.HasVisualization.Should().BeTrue();
+            data.PressureSliceImage.Should().StartWith("data:image/png;base64,");
+            data.VelocitySliceImage.Should().StartWith("data:image/png;base64,");
+
+            // Verify the base64 decodes back to the original bytes
+            var decoded = Convert.FromBase64String(data.PressureSliceImage.Replace("data:image/png;base64,", ""));
+            decoded.Should().BeEquivalentTo(fakePng);
+        }
+
+        [Fact]
+        public void BuildHtmlReportData_NullVisualization_HasVisualizationIsFalse()
+        {
+            var svc = CreateReportServiceForBuildTests();
+            var (summary, config) = CreateMinimalReportInputs();
+
+            var data = svc.BuildHtmlReportData(
+                Path.GetTempPath(), "TestStudy", summary,
+                new List<CaseResidualData>(), new List<MeshStatEntry>(), config, visualization: null);
+
+            data.HasVisualization.Should().BeFalse();
+            data.PressureSliceImage.Should().BeEmpty();
+            data.VelocitySliceImage.Should().BeEmpty();
+        }
+
+        [Fact]
+        public void BuildPdfReportData_WithVisualization_PassesPngBytes()
+        {
+            var svc = CreateReportServiceForBuildTests();
+            var (summary, config) = CreateMinimalReportInputs();
+            var fakePng = new byte[] { 0x89, 0x50, 0x4E, 0x47 };
+
+            var viz = new SliceVisualizationResult
+            {
+                PressureSlicePng = fakePng,
+                VelocitySlicePng = fakePng
+            };
+
+            var data = svc.BuildPdfReportData("TestStudy", summary,
+                new List<CaseResidualData>(), new List<MeshStatEntry>(), config, viz);
+
+            data.PressureSlicePng.Should().BeEquivalentTo(fakePng);
+            data.VelocitySlicePng.Should().BeEquivalentTo(fakePng);
+        }
+
+        [Fact]
+        public void BuildPdfReportData_NullVisualization_PngBytesAreNull()
+        {
+            var svc = CreateReportServiceForBuildTests();
+            var (summary, config) = CreateMinimalReportInputs();
+
+            var data = svc.BuildPdfReportData("TestStudy", summary,
+                new List<CaseResidualData>(), new List<MeshStatEntry>(), config, visualization: null);
+
+            data.PressureSlicePng.Should().BeNull();
+            data.VelocitySlicePng.Should().BeNull();
         }
 
         // ── Velocity Extraction ─────────────────────────────────────────────────

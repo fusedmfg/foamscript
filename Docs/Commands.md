@@ -16,7 +16,7 @@ Complete reference for all FoamScript commands with explanations and examples.
 
 ## validate
 
-Validates that the OpenFOAM environment is properly configured and all required tools are available.
+Setup wizard and health check. Auto-detects OpenFOAM installation, sources the bashrc to capture environment variables, and validates all 23 dependencies grouped by pipeline stage. On success, writes `~/.foamscript/config.json` so all other commands can automatically source the OpenFOAM environment.
 
 ### Usage
 
@@ -28,25 +28,40 @@ foamscript validate [OPTIONS]
 
 | Option | Short | Description | Default |
 |--------|-------|-------------|---------|
-| `--verbose` | `-v` | Show detailed environment information | `false` |
-| `--quiet` | `-q` | Suppress all output (exit code only) | `false` |
+| `--quiet` | `-q` | Only show failures (exit code only) | `false` |
 
-### What It Checks
+### What It Checks (23 checks, 7 groups)
 
-- **OpenFOAM Version**: Detects OpenFOAM installation and version
-- **Environment Variables**: Checks critical variables like `WM_PROJECT_DIR`, `FOAM_RUN`
-- **Required Tools**: Verifies availability of `blockMesh`, `snappyHexMesh`, `surfaceCheck`, `gmsh`
+| Group | Checks | Install Hint |
+|-------|--------|-------------|
+| **OpenFOAM** | Installation detection, bashrc sourcing, version, WM_PROJECT_DIR, WM_PROJECT_VERSION, FOAM_APPBIN, FOAM_LIBBIN | `source /path/to/bashrc` |
+| **Meshing Tools** | blockMesh, snappyHexMesh, surfaceFeatureExtract, surfaceOrient, surfaceCheck, decomposePar, reconstructParMesh, checkMesh | Included with OpenFOAM |
+| **Solver Tools** | simpleFoam, pimpleFoam, reconstructPar | Included with OpenFOAM |
+| **Parallel Execution** | mpirun | `sudo apt install openmpi-bin` |
+| **Geometry Processing** | gmsh | `sudo apt install gmsh` |
+| **Flow Visualization** | pvpython | `sudo apt install paraview` |
+| **Python Libraries** | matplotlib, numpy | `pip3 install matplotlib numpy` |
+
+All checks are **required** — any failure means FoamScript cannot run the full pipeline.
+
+### Config File
+
+On success, writes `~/.foamscript/config.json`:
+```json
+{
+  "openfoamBashrc": "/usr/lib/openfoam/openfoam2512/etc/bashrc",
+  "openfoamVersion": "v2512",
+  "configuredAt": "2026-03-16T10:47:15Z"
+}
+```
+
+This config is read at startup by all other commands (except `list-templates`) to source the OpenFOAM environment automatically. Users no longer need to manually run `source bashrc` before using FoamScript.
 
 ### Examples
 
-**Basic validation:**
+**First-time setup:**
 ```bash
 foamscript validate
-```
-
-**Verbose output (shows all environment variables and tool paths):**
-```bash
-foamscript validate --verbose
 ```
 
 **Quiet mode (useful in scripts):**
@@ -59,7 +74,7 @@ fi
 
 ### Exit Codes
 
-- `0` - All checks passed
+- `0` - All checks passed, config written
 - `-1` - One or more checks failed
 
 ---
@@ -635,12 +650,16 @@ When in doubt, check the file in your CAD software before conversion.
 
 ## Troubleshooting
 
+### "FoamScript is not configured"
+
+Run `foamscript validate` to auto-detect and configure the OpenFOAM environment. This writes `~/.foamscript/config.json` which is read by all other commands.
+
 ### "OpenFOAM not found"
 
-Run `foamscript validate --verbose` to diagnose:
-- Check if OpenFOAM is installed
-- Verify environment is sourced (run `. /opt/openfoam2512/etc/bashrc`)
-- Check `$WM_PROJECT_DIR` environment variable
+Run `foamscript validate` to diagnose. It will:
+- Auto-detect OpenFOAM installations in `/usr/lib/openfoam` and `/opt`
+- Source the bashrc and verify environment variables
+- Show install hints for any missing dependencies
 
 ### "Disc diameter outside expected range"
 

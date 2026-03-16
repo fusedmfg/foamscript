@@ -8,6 +8,13 @@ namespace foamscript.Services
     /// </summary>
     public class ProcessExecutor : IProcessExecutor
     {
+        private Dictionary<string, string>? _environmentVariables;
+
+        public void SetEnvironment(Dictionary<string, string> environmentVariables)
+        {
+            _environmentVariables = environmentVariables;
+        }
+
         public ProcessResult Execute(string command, string arguments = "")
         {
             var processInfo = new ProcessStartInfo
@@ -19,6 +26,15 @@ namespace foamscript.Services
                 UseShellExecute = false,
                 CreateNoWindow = true
             };
+
+            // Inject captured OpenFOAM environment variables
+            if (_environmentVariables != null)
+            {
+                foreach (var (key, value) in _environmentVariables)
+                {
+                    processInfo.EnvironmentVariables[key] = value;
+                }
+            }
 
             using var process = new Process { StartInfo = processInfo };
             process.Start();

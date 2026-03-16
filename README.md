@@ -46,7 +46,7 @@ foamscript new-study --config study.json
 
 | Command | Description |
 |---------|-------------|
-| `validate` | Validate OpenFOAM environment (tools, env vars) |
+| `validate` | Setup wizard: auto-detect OpenFOAM, validate all 23 dependencies, write config |
 | `convert` | Convert STEP/IGES → STL via gmsh with unit scaling |
 | `new-study` | Full pipeline: geometry → domain → templated cases for AoA sweep |
 | `mesh` | Mesh a case or study directory (auto-detects cores, parallel by default) |
@@ -63,12 +63,17 @@ See **[Commands.md](Docs/Commands.md)** for full reference with all options, JSO
 - OpenFOAM v2312+ (tested with v2512)
 - .NET 10.0 SDK
 - gmsh (for STEP/IGES → STL conversion)
+- openmpi (`mpirun` for parallel execution)
+- ParaView with pvpython (for flow visualization)
+- python3 with matplotlib and numpy (for flow visualization rendering)
+
+Run `foamscript validate` after installation to verify all 23 dependencies and auto-configure the OpenFOAM environment. This writes `~/.foamscript/config.json` so subsequent commands automatically source the correct bashrc.
 
 ### Build & Test
 
 ```bash
 dotnet build
-dotnet test    # 192 tests
+dotnet test    # 241 tests
 ```
 
 ### Deploy to Linux
@@ -109,13 +114,17 @@ foamscript/
 │   ├── PdfReportGenerator.cs    # PdfSharpCore PDF report with PNG charts
 │   ├── ResidualParser.cs        # OpenFOAM solver log convergence parser
 │   ├── CoreResolver.cs          # Auto-detect CPU cores + FOAMSCRIPT_MAX_CORES env var
-│   ├── EnvironmentService.cs    # OpenFOAM environment validation
+│   ├── EnvironmentService.cs    # Grouped validation checklist (23 checks)
+│   ├── OpenFoamEnvironment.cs   # Config loading, bashrc sourcing, env capture
 │   └── TemplateService.cs       # Scriban template rendering
 ├── Templates/           # OpenFOAM case + report templates (Scriban)
 │   ├── external_disc_rotatingwall_steady/
-│   └── report/report.html
+│   └── report/
+│       ├── report.html            # Scriban HTML report template
+│       ├── extract_slice.py       # pvpython slice data extraction
+│       └── render_slice.py        # matplotlib contour plot rendering
 ├── Docs/Commands.md     # Full command reference
-├── foamscript.Tests/    # xUnit + Moq + FluentAssertions (192 tests)
+├── foamscript.Tests/    # xUnit + Moq + FluentAssertions (241 tests)
 └── study.example.jsonc  # Example JSON config file
 ```
 

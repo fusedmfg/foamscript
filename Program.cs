@@ -62,6 +62,7 @@ namespace foamscript
                 // Application service modules.
                 builder.Services.AddSingleton<LoggingService>();
                 builder.Services.AddSingleton<IProcessExecutor, ProcessExecutor>();
+                builder.Services.AddSingleton<OpenFoamEnvironment>();
                 builder.Services.AddTransient<EnvironmentService>();
                 builder.Services.AddTransient<StlConversionService>();
                 builder.Services.AddTransient<DomainService>();
