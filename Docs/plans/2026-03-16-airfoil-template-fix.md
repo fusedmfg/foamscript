@@ -166,3 +166,10 @@ Per feedback rule — documentation must be updated alongside every code change:
 - If the file is needed, analyze whether it should be shared across templates or per-template
 - Determine if any values need parameterization
 - Understand how this interacts with the template rendering pipeline (does Scriban process `#include` directives? No — OpenFOAM does at runtime. So the file just needs to exist in the case directory.)
+
+**X11/MPI "Authorization required" errors:** When running parallel OpenFOAM commands over SSH, MPI processes emit `Authorization required, but no authorization protocol specified` errors (12 occurrences — 3 per MPI rank). This happens because MPI tries to access X11 display over an SSH session that has no display forwarding.
+
+- **Fix:** Set `DISPLAY=` (empty) or `unset DISPLAY` in the process environment before launching any `mpirun` command.
+- **Where:** `Services/ProcessExecutor.cs` or wherever the parallel execution environment is built. This affects ALL templates, not just airfoil — any parallel mesh or solve will hit this.
+- **Scope:** Check both `MeshService` and `SolverService` for how they invoke parallel commands. The environment variable should be stripped at the process executor level so it applies universally.
+- **Verification:** After fix, run a parallel command over SSH and confirm zero X11 errors in stderr.
