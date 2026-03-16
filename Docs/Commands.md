@@ -9,7 +9,7 @@ Complete reference for all FoamScript commands with explanations and examples.
 - [new-study](#new-study) - Create OpenFOAM study with angle of attack sweep
 - [mesh](#mesh) - Mesh a case or study directory
 - [solve](#solve) - Run solver on a case or study directory
-- [report](#report) - Generate AIAA-quality analysis report (HTML + PDF)
+- [report](#report) - Generate AIAA-quality analysis report (HTML + PDF + CSV)
 - [list-templates](#list-templates) - List available templates
 
 ---
@@ -140,16 +140,15 @@ The command displays:
 
 ### Notes
 
-- **Output is always in meters** (OpenFOAM convention)
+- **Output is always in meters** (OpenFOAM convention) — verify converted dimensions match expected geometry size
 - **Lower mesh-size = finer mesh** (more triangles, larger file, better accuracy)
 - **Feature angle preserves sharp edges** (use 20-45° for most cases)
-- For PDGA disc golf discs (diameter ~21-30cm), typical dimensions after conversion should be 0.21-0.30m
 
 ---
 
 ## new-study
 
-Creates a complete OpenFOAM study with multiple cases for angle of attack sweep. This is the main command for setting up parametric studies.
+Creates a complete OpenFOAM study with multiple cases for angle of attack sweep. This is the main command for setting up parametric studies. The `--template` flag selects the simulation type — each template defines its geometry type, solver, mesh/solve pipeline steps, and which parameters are required or optional.
 
 Parameters can be supplied via CLI options or a JSON config file (see [JSON Config File](#json-config-file)).
 
@@ -157,7 +156,7 @@ Parameters can be supplied via CLI options or a JSON config file (see [JSON Conf
 
 ```bash
 # CLI options
-foamscript new-study -n <name> -o <dir> -s <model> -a <angles> [OPTIONS]
+foamscript new-study --template <template> -n <name> -o <dir> -s <model> -a <angles> [OPTIONS]
 
 # JSON config file
 foamscript new-study --config study.json
@@ -167,6 +166,7 @@ foamscript new-study --config study.json
 
 | Option | Short | Description |
 |--------|-------|-------------|
+| `--template` | `-t` | Template name (run `list-templates` to see available) |
 | `--project-name` | `-n` | Project name (folder and case naming) |
 | `--output-dir` | `-o` | Parent directory for the project folder |
 | `--model-source` | `-s` | Source geometry file: STEP, IGES, or STL |
@@ -177,9 +177,8 @@ foamscript new-study --config study.json
 | Option | Short | Description | Default |
 |--------|-------|-------------|---------|
 | `--config` | `-c` | Path to JSON config file (replaces all CLI options) | - |
-| `--template` | `-t` | Template name or path | `external_disc_rotatingwall_steady` |
-| `--velocity` | `-v` | Free stream velocity magnitude (m/s) | `27.0` |
-| `--rpm` | `-r` | Disc rotation speed (RPM) | `925` |
+| `--velocity` | `-v` | Free stream velocity magnitude (m/s) | Template-defined |
+| `--rpm` | `-r` | Rotation speed (RPM) — only for rotating templates | Template-defined |
 | `--input-units` | `-u` | Source file units: mm, cm, m, in, ft | `mm` |
 | `--mesh-size` | `-m` | STL mesh size factor for STEP/IGES conversion | `0.05` |
 | `--feature-angle` | | Feature angle for edge preservation (degrees) | - |
@@ -200,46 +199,46 @@ foamscript new-study --config study.json
 
 ### Domain Geometry Parameters
 
-All scales are relative to the detected disc diameter.
+All scales are relative to the geometry's reference length (diameter for discs, chord for airfoils — determined by the template's `TEMPLATE.json`).
 
 | Option | Description | Default |
 |--------|-------------|---------|
-| `--rotor-radius-scale` | Rotor AMI cylinder radius (multiple of disc radius) | `1.25` |
-| `--rotor-height-scale` | Rotor AMI cylinder height (multiple of disc height) | `1.5` |
-| `--tunnel-upstream` | Wind tunnel upstream extent (disc diameters) | `5.0` |
-| `--tunnel-downstream` | Wind tunnel downstream extent (disc diameters) | `10.0` |
-| `--tunnel-radial` | Wind tunnel radial extent (disc diameters) | `5.0` |
+| `--rotor-radius-scale` | Rotor cylinder radius (multiple of reference radius) — rotating templates only | `1.25` |
+| `--rotor-height-scale` | Rotor cylinder height (multiple of geometry height) — rotating templates only | `1.5` |
+| `--tunnel-upstream` | Wind tunnel upstream extent (reference lengths) | `5.0` |
+| `--tunnel-downstream` | Wind tunnel downstream extent (reference lengths) | `10.0` |
+| `--tunnel-radial` | Wind tunnel radial extent (reference lengths) | `5.0` |
 | `--mesh-resolution` | Segments around generated cylinder geometries | `32` |
 
 ### How It Works
 
 1. **Creates study directory structure**
-2. **Processes geometry** (convert STEP/IGES → STL, scale to meters, validate)
-3. **Generates domain** (`rotor.stl` AMI rotating region, `tunnel.stl` stationary far-field)
-4. **For each angle of attack:**
-   - Calculates `Ux = V·cos(α)`, `Uz = V·sin(α)`, `ω = RPM × 2π/60`
+2. **Loads template metadata** from `TEMPLATE.json` — determines geometry type, required STL files, pipeline steps, and parameter defaults
+3. **Processes geometry** (convert STEP/IGES → STL, scale to meters, validate)
+4. **Generates domain** — tunnel STL for all templates; rotor STL only for rotating templates
+5. **For each angle of attack:**
+   - Calculates velocity components: `Ux = V·cos(α)`, `Uz = V·sin(α)`
+   - For rotating templates: `ω = RPM × 2π/60`
    - Derives turbulence parameters (`k`, `ω_turb`) from physics config
    - Renders Scriban template files with all parameters
-   - Copies geometry STL files to `constant/triSurface/`
+   - Copies required STL files to `constant/triSurface/`
 
 ### Directory Structure
+
+The exact structure depends on the template. Example for a disc study with rotating wall BC:
 
 ```
 {outputDir}/
 └── {projectName}/
     ├── geometry/                   # Master geometry (processed once)
     │   ├── disc.step              # Original source file
-    │   ├── disc.stl               # Converted disc (meters)
-    │   ├── rotor.stl              # Generated AMI cylinder
-    │   └── tunnel.stl             # Generated wind tunnel box
+    │   ├── disc.stl               # Converted geometry (meters)
+    │   ├── rotor.stl              # Generated rotor cylinder (rotating templates only)
+    │   └── tunnel.stl             # Generated wind tunnel
     ├── {projectName}_-5.0/        # Case for AoA = -5°
     │   ├── 0/                     # Initial conditions (U, p, k, omega, nut)
     │   ├── constant/
-    │   │   ├── triSurface/
-    │   │   │   ├── disc.stl
-    │   │   │   ├── rotor.stl
-    │   │   │   └── tunnel.stl
-    │   │   ├── dynamicMeshDict
+    │   │   ├── triSurface/        # STL files (per TEMPLATE.json requiredStlFiles)
     │   │   └── transportProperties
     │   └── system/                # blockMeshDict, snappyHexMeshDict, etc.
     ├── {projectName}_0.0/
@@ -248,46 +247,51 @@ All scales are relative to the detected disc diameter.
 
 ### Examples
 
-**Minimal — single angle with defaults:**
+**Disc study — rotating wall BC, steady-state:**
 ```bash
 foamscript new-study \
-  -n MyDisc \
-  -o ~/studies \
-  -s ~/my_disc.step \
-  -a 0
-```
-
-**AoA sweep with custom velocity and RPM:**
-```bash
-foamscript new-study \
+  --template external_disc_rotatingwall_steady \
   -n DiscAnalysis \
   -o ~/studies \
   -s ~/my_disc.step \
-  -a -10,-5,-2.5,0,2.5,5,10 \
-  --velocity 15 \
-  --rpm 1200 \
-  --input-units mm \
-  --cores 8
+  -a -5,0,5,10 \
+  --velocity 27 --rpm 925
 ```
 
-**Custom physics — high-altitude, lower viscosity simulation:**
+**Airfoil study — static geometry, steady-state:**
 ```bash
 foamscript new-study \
+  --template external_airfoil_static_steady \
+  -n AirfoilStudy \
+  -o ~/studies \
+  -s ~/airfoil.step \
+  -a -5,0,5,10 \
+  --velocity 30
+```
+
+**AoA sweep with custom physics:**
+```bash
+foamscript new-study \
+  --template external_disc_rotatingwall_steady \
   -n HighAlt \
   -o ~/studies \
   -s ~/disc.stl \
-  -a 0,5,10 \
+  -a -10,-5,0,5,10 \
+  --velocity 15 --rpm 1200 \
   --nu 1.8e-5 \
-  --turbulence-intensity 0.03
+  --turbulence-intensity 0.03 \
+  --cores 8
 ```
 
-**Custom mesh refinement for high-fidelity study:**
+**Custom mesh refinement:**
 ```bash
 foamscript new-study \
+  --template external_disc_rotating-ami_transient \
   -n HiFi \
   -o ~/studies \
   -s ~/disc.step \
   -a 0,5 \
+  --velocity 27 --rpm 925 \
   --refinement-min 4 \
   --refinement-max 6 \
   --end-time 2.0
@@ -340,8 +344,8 @@ An alternative to specifying all CLI options is to provide a JSON config file wi
 
 ### Notes
 
-- **Required fields**: `projectName`, `outputDir`, `modelSource`, `angles`
-- **All other fields are optional** — omitted physics/domain fields use the same defaults as the CLI options
+- **Required fields**: `projectName`, `outputDir`, `templateName`, `modelSource`, `angles`
+- **All other fields are optional** — omitted physics/domain fields use the same defaults as the CLI options; templates may provide defaults for `velocity` and `rpm`
 - **JSON keys are case-insensitive** — `projectName`, `ProjectName`, and `project_name` are all accepted
 - The `physics` and `domain` sections can be omitted entirely if defaults are acceptable
 - `featureAngle` accepts `null` or a numeric value in degrees
@@ -439,7 +443,7 @@ Parallel mode is enabled automatically when cores > 1. Set `FOAMSCRIPT_MAX_CORES
 2. `mpirun -np <cores> <solver> -case <dir> -parallel` — run solver
 3. `reconstructPar -case <dir>` — reassemble time directories
 
-After solving, force coefficients (Cd, Cl, CmPitch) are extracted from `postProcessing/forces/0/coefficient.dat` using time-window averaging.
+After solving, force coefficients are extracted from `postProcessing/forces/0/coefficient.dat` using dynamic header parsing and time-window averaging. The available coefficients depend on the OpenFOAM version and function object configuration.
 
 ### Examples
 
@@ -460,7 +464,7 @@ foamscript solve -d ~/studies/MyStudy/MyStudy_0.0 --cores 1
 
 ### Output
 
-- **Single case**: Displays simulation time, time-averaged force coefficients (Cd, Cl, Cm), and any warnings.
+- **Single case**: Displays simulation time, time-averaged force coefficients, and any warnings.
 - **Study**: Displays a summary table showing each case name, status, and force coefficients. All cases are always processed; any failures are reported in the summary.
 
 ### Notes
@@ -543,13 +547,13 @@ foamscript list-templates
 
 ### Output
 
-Shows each template name along with metadata from `TEMPLATE.md` (domain type, feature, solver).
+Shows each template name along with metadata from `TEMPLATE.json` (geometry type, solver, description). Templates without `TEMPLATE.json` fall back to `TEMPLATE.md` parsing.
 
 ---
 
 ## Common Workflows
 
-### Complete Study (STEP → Results)
+### Complete Disc Study (STEP → Results)
 
 ```bash
 # 1. Validate environment
@@ -557,14 +561,12 @@ foamscript validate
 
 # 2. Create parametric study with AoA sweep
 foamscript new-study \
+  --template external_disc_rotatingwall_steady \
   -n DiscAnalysis \
   -o ~/studies \
   -s ~/my_disc.step \
   -a -10,-5,-2.5,0,2.5,5,10 \
-  --velocity 27 \
-  --rpm 925 \
-  --input-units mm \
-  --cores 8
+  --velocity 27 --rpm 925
 
 # 3. Mesh all cases (auto-detects cores, runs parallel)
 foamscript mesh -d ~/studies/DiscAnalysis
@@ -576,6 +578,22 @@ foamscript solve -d ~/studies/DiscAnalysis
 foamscript report -d ~/studies/DiscAnalysis
 ```
 
+### Complete Airfoil Study
+
+```bash
+foamscript new-study \
+  --template external_airfoil_static_steady \
+  -n NACA0012 \
+  -o ~/studies \
+  -s ~/naca0012.step \
+  -a -5,-2.5,0,2.5,5,7.5,10 \
+  --velocity 30
+
+foamscript mesh -d ~/studies/NACA0012
+foamscript solve -d ~/studies/NACA0012
+foamscript report -d ~/studies/NACA0012
+```
+
 ### Using a Config File for Repeatable Studies
 
 ```bash
@@ -584,6 +602,7 @@ cat > ~/studies/disc_study.json << 'EOF'
 {
   "projectName": "DiscAnalysis",
   "outputDir": "~/studies",
+  "templateName": "external_disc_rotatingwall_steady",
   "modelSource": "~/my_disc.step",
   "angles": "-10,-5,-2.5,0,2.5,5,10",
   "velocity": 27.0,
@@ -605,10 +624,8 @@ foamscript report -d ~/studies/DiscAnalysis
 ### Standalone Geometry Conversion
 
 ```bash
-# Convert STEP to STL
-foamscript convert \
-  --input disc.step \
-  --output disc.stl \
+# Convert STEP to STL (positional arguments)
+foamscript convert disc.step disc.stl \
   --input-units mm \
   --mesh-size 0.05 \
   --validate
@@ -661,12 +678,12 @@ Run `foamscript validate` to diagnose. It will:
 - Source the bashrc and verify environment variables
 - Show install hints for any missing dependencies
 
-### "Disc diameter outside expected range"
+### "Geometry dimension outside expected range"
 
-This warning appears if converted geometry is not 0.21-0.30m:
+This warning appears if the template's validation rules detect unexpected geometry dimensions:
 - Verify `--input-units` is correct
 - Check source file units in CAD software
-- Use `--validate` to inspect actual dimensions
+- Use `foamscript convert ... --validate` to inspect actual dimensions
 
 ### "Template directory not found"
 
@@ -692,7 +709,7 @@ Check that:
 
 - Ensure the case is meshed first (`foamscript mesh -d <dir>`)
 - Check that `constant/polyMesh/` exists in the case directory
-- Verify OpenFOAM environment is sourced
+- Verify OpenFOAM environment is configured (`foamscript validate`)
 
 ### Force coefficients are zero or unexpected
 

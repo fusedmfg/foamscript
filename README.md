@@ -1,58 +1,69 @@
 # FoamScript
 
-.NET 10 CLI tool for automating OpenFOAM CFD case setup and meshing for disc golf disc aerodynamic analysis.
+.NET 10 CLI tool for automating OpenFOAM CFD workflows — parametric studies from STEP geometry to AIAA-quality reports.
 
 ## Quick Start
 
 ```bash
-# Validate OpenFOAM environment
+# Validate OpenFOAM environment (writes ~/.foamscript/config.json)
 foamscript validate
 
-# Create parametric study with angle of attack sweep
+# Disc golf aerodynamics (rotating wall boundary condition)
 foamscript new-study \
-  -n DiscAnalysis \
-  -o ~/OpenFOAM/$USER-v2512/run \
-  -s ~/models/disc.step \
-  -a -5,0,5,10 \
-  --velocity 20 --rpm 1000 --input-units mm --cores 4
+  --template external_disc_rotatingwall_steady \
+  --project-name DiscAnalysis \
+  --output-dir ~/OpenFOAM/$USER-v2512/run \
+  --model-source ~/models/disc.step \
+  --angles -5,0,5,10 \
+  --velocity 27 --rpm 925
 
-# Mesh all cases (auto-detects CPU cores, runs parallel)
+# Airfoil analysis (static geometry, steady-state)
+foamscript new-study \
+  --template external_airfoil_static_steady \
+  --project-name AirfoilStudy \
+  --output-dir ~/OpenFOAM/$USER-v2512/run \
+  --model-source ~/models/airfoil.step \
+  --angles -5,0,5,10 \
+  --velocity 30
+
+# Mesh, solve, report (auto-detects CPU cores, runs parallel)
 foamscript mesh -d ~/OpenFOAM/$USER-v2512/run/DiscAnalysis
-
-# Solve all cases
 foamscript solve -d ~/OpenFOAM/$USER-v2512/run/DiscAnalysis
-
-# Generate AIAA-quality analysis report (HTML + PDF)
 foamscript report -d ~/OpenFOAM/$USER-v2512/run/DiscAnalysis
-
-# Or use a JSON config file
-foamscript new-study --config study.json
 ```
 
 ## Features
 
-- **Full Pipeline**: STEP/IGES → STL → domain generation → Scriban-templated case creation → meshing → solving → report generation
-- **AIAA-Quality Reports**: Publication-standard HTML + PDF reports with aerodynamic polars, drag polar, convergence history, mesh statistics, and coefficient tables
+- **Full Pipeline**: STEP/IGES → STL → domain generation → templated case creation → meshing → solving → report generation
+- **Template-Driven**: Each template (`TEMPLATE.json`) defines geometry type, mesh/solve steps, post-processing, and report layout — `--template` selects the workflow
+- **AIAA-Quality Reports**: Publication-standard HTML + PDF + CSV reports with aerodynamic polars, convergence history, flow visualization, mesh statistics, and coefficient tables
+- **Pre-Flight Environment Guard**: All OpenFOAM-dependent commands auto-verify the environment before running; `foamscript validate` checks 23 dependencies across 7 categories
 - **Configurable Physics**: Turbulence intensity, viscosity, end time, refinement levels — all via CLI or JSON (AIAA defaults: TI 1%, PBiCGStab+DILU, refinement 5/6, 8 boundary layers)
-- **Configurable Domain**: Tunnel sizing, rotor scaling, mesh resolution — defaults follow CFD convention (5D upstream, 10D downstream, 5D radial)
 - **Auto-Parallel**: Detects CPU cores automatically; `--cores N` to override, `FOAMSCRIPT_MAX_CORES` env var to cap
-- **Parallel Meshing**: blockMesh → surfaceFeatureExtract → decomposePar → snappyHexMesh (MPI) → reconstructParMesh
-- **Parallel Solving**: decomposePar → simpleFoam (MPI) → reconstructPar
-- **Post-Processing**: Force coefficient extraction (Cd, Cl, CmPitch) with time-window averaging and Cl/Cd ratio
 - **Parametric Studies**: Angle of attack sweeps with automatic velocity decomposition and turbulence parameter calculation
-- **Template System**: Scriban-rendered OpenFOAM case files; template naming: `{domain}_{feature}_{motion}_{solver-type}`
+- **Flow Visualization**: pvpython slice extraction + matplotlib contour rendering with AIAA geometry-referenced framing
+
+## Templates
+
+| Template | Geometry | Description |
+|----------|----------|-------------|
+| `external_disc_rotatingwall_steady` | Disc | Rotating wall BC, simpleFoam steady-state |
+| `external_airfoil_static_steady` | Airfoil | Static geometry, simpleFoam steady-state |
+| `external_disc_rotating-ami_transient` | Disc | AMI rotating mesh, pimpleFoam transient |
+
+Run `foamscript list-templates` to see all available templates with their metadata.
 
 ## Commands
 
 | Command | Description |
 |---------|-------------|
-| `validate` | Setup wizard: auto-detect OpenFOAM, validate all 23 dependencies, write config |
+| `validate` | Auto-detect OpenFOAM, validate 23 dependencies across 7 groups, write `~/.foamscript/config.json` |
 | `convert` | Convert STEP/IGES → STL via gmsh with unit scaling |
-| `new-study` | Full pipeline: geometry → domain → templated cases for AoA sweep |
+| `new-study` | Full pipeline: geometry → domain → templated cases for AoA sweep (`--template` required) |
 | `mesh` | Mesh a case or study directory (auto-detects cores, parallel by default) |
 | `solve` | Solve a case or study directory (auto-detects cores, parallel by default) |
-| `report` | Generate AIAA-quality HTML + PDF analysis report from a completed study |
-| `list-templates` | List available OpenFOAM case templates |
+| `report` | Generate AIAA-quality HTML + PDF + CSV analysis report from a completed study |
+| `list-templates` | List available OpenFOAM case templates with metadata |
 
 See **[Commands.md](Docs/Commands.md)** for full reference with all options, JSON config format, and examples.
 
@@ -92,7 +103,6 @@ foamscript/
 │   ├── ICommandHandler.cs
 │   ├── ValidateHandler.cs
 │   ├── ConvertHandler.cs
-│   ├── GenerateDomainHandler.cs
 │   ├── NewStudyHandler.cs
 │   ├── MeshHandler.cs
 │   ├── SolveHandler.cs
@@ -100,25 +110,29 @@ foamscript/
 │   └── ListTemplatesHandler.cs
 ├── Models/              # CLI models (CommandLineParser) + result/config POCOs
 ├── Services/            # Business logic
-│   ├── AppService.cs            # CLI verb routing (thin dispatcher)
-│   ├── CaseService.cs           # Study creation, template context calculation
-│   ├── StlConversionService.cs  # STEP→STL conversion, validation, scaling
-│   ├── DomainService.cs         # Domain generation (rotor/tunnel STL)
-│   ├── GeometryService.cs       # Facade over StlConversion + Domain services
-│   ├── MeshService.cs           # blockMesh, snappyHexMesh, parallel workflow
-│   ├── SolverService.cs         # Solver execution, force coefficient extraction, log persistence
-│   ├── ResultsService.cs        # Results aggregation from coefficient.dat files
-│   ├── ReportService.cs         # Report orchestrator (data collection + chart + render)
-│   ├── ChartGenerator.cs        # ScottPlot AIAA-styled charts (polars, convergence)
-│   ├── HtmlReportGenerator.cs   # Scriban HTML report with embedded SVG charts
-│   ├── PdfReportGenerator.cs    # PdfSharpCore PDF report with PNG charts
-│   ├── ResidualParser.cs        # OpenFOAM solver log convergence parser
-│   ├── CoreResolver.cs          # Auto-detect CPU cores + FOAMSCRIPT_MAX_CORES env var
-│   ├── EnvironmentService.cs    # Grouped validation checklist (23 checks)
-│   ├── OpenFoamEnvironment.cs   # Config loading, bashrc sourcing, env capture
-│   └── TemplateService.cs       # Scriban template rendering
+│   ├── AppService.cs              # CLI verb routing + pre-flight env guard
+│   ├── CaseService.cs             # Study creation, template context calculation
+│   ├── TemplateMetadataService.cs # TEMPLATE.json loading and validation
+│   ├── StlConversionService.cs    # STEP→STL conversion, validation, scaling
+│   ├── DomainService.cs           # Domain generation (rotor/tunnel STL)
+│   ├── GeometryService.cs         # Facade over StlConversion + Domain services
+│   ├── MeshService.cs             # Template-driven mesh pipeline execution
+│   ├── SolverService.cs           # Template-driven solver execution + log persistence
+│   ├── ResultsService.cs          # Metadata-driven coefficient extraction
+│   ├── ReportService.cs           # Report orchestrator (data + charts + render)
+│   ├── ChartGenerator.cs          # ScottPlot AIAA-styled charts (polars, convergence)
+│   ├── HtmlReportGenerator.cs     # Scriban HTML report with embedded SVG charts
+│   ├── PdfReportGenerator.cs      # PDFsharp PDF report with PNG charts
+│   ├── VisualizationService.cs    # pvpython + matplotlib flow visualization
+│   ├── ResidualParser.cs          # OpenFOAM solver log convergence parser
+│   ├── CoreResolver.cs            # Auto-detect CPU cores + FOAMSCRIPT_MAX_CORES env var
+│   ├── EnvironmentService.cs      # Grouped validation checklist (23 checks, 7 groups)
+│   ├── OpenFoamEnvironment.cs     # Config loading, bashrc sourcing, env capture
+│   └── TemplateService.cs         # Scriban template rendering
 ├── Templates/           # OpenFOAM case + report templates (Scriban)
-│   ├── external_disc_rotatingwall_steady/
+│   ├── external_disc_rotatingwall_steady/   # Disc with rotating wall BC
+│   ├── external_airfoil_static_steady/      # 2D airfoil steady-state
+│   ├── external_disc_rotating-ami_transient/ # Disc with AMI transient
 │   └── report/
 │       ├── report.html            # Scriban HTML report template
 │       ├── extract_slice.py       # pvpython slice data extraction
@@ -130,13 +144,13 @@ foamscript/
 
 ## Architecture
 
-- **CommandLineParser** for declarative CLI verb/option parsing
-- **Command handler pattern** — each CLI verb has a dedicated handler class (`ICommandHandler<T>`), keeping `AppService` as a thin dispatcher (~70 LOC)
+- **Template metadata system** — each template has a `TEMPLATE.json` defining geometry type, reference dimensions, pipeline steps, and post-processing; `TemplateMetadataService` loads and validates
+- **Command handler pattern** — each CLI verb has a dedicated handler class (`ICommandHandler<T>`), keeping `AppService` as a thin dispatcher with pre-flight env guard
+- **Environment management** — `OpenFoamEnvironment` sources bashrc, captures env vars, and injects them into all spawned processes via `ProcessExecutor.SetEnvironment()`
 - **Dependency injection** via `Microsoft.Extensions.Hosting`
-- **Service layer split** — `StlConversionService` (STEP→STL), `DomainService` (geometry generation), `MeshService` (OpenFOAM meshing), `SolverService` (solver execution + log persistence), `ResultsService` (coefficient extraction), `ReportService` (AIAA report orchestration with `ChartGenerator`, `HtmlReportGenerator`, `PdfReportGenerator`)
 - **`IProcessExecutor` abstraction** wraps all external process calls — enables full unit test mocking without OpenFOAM installed
 - **Result object pattern** — all service calls return typed results (`IsSuccess`, `ErrorMessage`)
-- **Scriban templating** — OpenFOAM files rendered at case creation with pre-calculated physics context
+- **Scriban templating** — OpenFOAM case files rendered at study creation with pre-calculated physics context
 
 ## License
 
