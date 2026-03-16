@@ -158,4 +158,4 @@ Per feedback rule — documentation must be updated alongside every code change:
 
 1. **Split patches vs single airFlow patch in blockMeshDict?** — Recommendation: keep split (cleaner). Already validated at refinement 2,2.
 2. **Serial vs parallel snappyHexMesh for airfoil?** — Recommendation: serial. Tutorial runs serial. Avoids 2D parallel issues. Only decompose for the solver.
-3. **Fallback refinement if neither CLI nor template specifies?** — Recommendation: error out. Force templates to declare their defaults. Don't silently apply a number.
+3. **Fallback refinement if neither CLI nor template specifies?** — Fallback to 0 (OpenFOAM's minimum allowed refinement level). This is the safest default — produces the coarsest mesh, runs fastest, and makes it obvious the user needs to configure refinement for their use case.
