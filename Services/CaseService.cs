@@ -99,8 +99,8 @@ namespace foamscript.Services
                 {
                     var caseInfo = CreateCase(result.StudyDir, config.ProjectName, templatePath, angle,
                         config.Velocity, omega, config.Cores, geometryDir, refLength, aref,
-                        metadata.RequiredStlFiles, metadata.RequiresRotorZone, config.Physics, config.Domain,
-                        spanHalf: bbox.Height / 2.0 * 1.1);  // 10% margin beyond STL for snappyHexMesh
+                        metadata.RequiredStlFiles, config.Physics, config.Domain,
+                        spanHalf: bbox.Height / 2.0 * 0.8);  // STL must protrude through symmetryPlane faces
                     result.Cases.Add(caseInfo);
                 }
 
@@ -229,7 +229,7 @@ namespace foamscript.Services
         private CaseInfo CreateCase(string studyDir, string studyName, string templatePath,
             double angle, double velocity, double omega, int cores,
             string geometryDir, double refLength, double aref,
-            string[] requiredStlFiles, bool requiresRotorZone,
+            string[] requiredStlFiles,
             StudyPhysicsConfig physics, StudyDomainConfig domain,
             double spanHalf = 0.0)
         {
@@ -251,7 +251,7 @@ namespace foamscript.Services
 
             // Calculate all template parameters
             var context = CalculateTemplateContext(caseInfo.Ux, caseInfo.Uz, omega, cores,
-                refLength, aref, requiresRotorZone, physics, domain, spanHalf);
+                refLength, aref, physics, domain, spanHalf);
 
             // Process template with Scriban
             _templateService.ProcessTemplate(templatePath, caseDir, context);
@@ -266,7 +266,7 @@ namespace foamscript.Services
         /// Calculates all template context parameters for Scriban rendering.
         /// </summary>
         internal static object CalculateTemplateContext(double ux, double uz, double omegaRotation,
-            int cores, double refLength, double aref, bool requiresRotorZone,
+            int cores, double refLength, double aref,
             StudyPhysicsConfig physics, StudyDomainConfig domain,
             double spanHalf = 0.0)
         {
@@ -282,32 +282,6 @@ namespace foamscript.Services
             var domainUpstream = domain.TunnelUpstream * refLength * margin;
             var domainDownstream = domain.TunnelDownstream * refLength * margin;
             var domainRadial = domain.TunnelRadial * refLength * margin;
-
-            // Compute safe initial deltaT targeting Co ≈ 0.125 at finest refinement level
-            var domainLength = domainUpstream + domainDownstream;
-            var nxCells = Math.Ceiling(domainLength / refLength * 4);
-            var baseCellSize = domainLength / nxCells;
-            var fineCellSize = baseCellSize / Math.Pow(2, physics.RefinementLevelMax ?? 0);
-            var deltaT = 0.125 * fineCellSize / Math.Max(velocityMagnitude, 1.0);
-
-            // Cap maxDeltaT
-            var maxDeltaTFlow = physics.EndTime / 100.0;
-            double maxDeltaT;
-
-            if (requiresRotorZone)
-            {
-                // Mesh motion velocity at rotor boundary (rotor radius ≈ 1.5× geometry radius)
-                var rotorRadius = refLength * 0.75;
-                var meshMotionVelocity = Math.Abs(omegaRotation) * rotorRadius;
-                var maxDeltaTMeshMotion = meshMotionVelocity > 0
-                    ? 0.5 * fineCellSize / meshMotionVelocity
-                    : maxDeltaTFlow;
-                maxDeltaT = Math.Min(maxDeltaTFlow, maxDeltaTMeshMotion);
-            }
-            else
-            {
-                maxDeltaT = maxDeltaTFlow;
-            }
 
             return new
             {
@@ -334,8 +308,6 @@ namespace foamscript.Services
                 domain_upstream = domainUpstream,
                 domain_downstream = domainDownstream,
                 domain_radial = domainRadial,
-                delta_t = deltaT,
-                max_delta_t = maxDeltaT,
                 max_iterations = physics.MaxIterations,
                 write_interval = physics.WriteInterval,
                 nu_tilda = 3.0 * physics.Nu,  // Spalart-Allmaras initial value (~3x molecular viscosity)

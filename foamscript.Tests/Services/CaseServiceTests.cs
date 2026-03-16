@@ -150,6 +150,43 @@ endsolid disc
                 .Setup(x => x.Execute("test", $"-f {path}"))
                 .Returns(new ProcessResult { ExitCode = 0, Output = "" });
 
+        // ── CalculateTemplateContext — Unit Tests ──────────────────────────────────
+
+        [Fact]
+        public void CalculateTemplateContext_DoesNotContain_LegacyDeltaTProperties()
+        {
+            var physics = new StudyPhysicsConfig();
+            var domain = new StudyDomainConfig();
+
+            var context = CaseService.CalculateTemplateContext(
+                ux: 20.0, uz: 0.0, omegaRotation: 100.0,
+                cores: 4, refLength: 0.211, aref: 0.035,
+                physics: physics, domain: domain);
+
+            // delta_t and max_delta_t were removed — they belonged to the abandoned AMI/transient approach
+            var properties = context.GetType().GetProperties();
+            var propertyNames = properties.Select(p => p.Name).ToArray();
+            propertyNames.Should().NotContain("delta_t");
+            propertyNames.Should().NotContain("max_delta_t");
+        }
+
+        [Fact]
+        public void CalculateTemplateContext_StillContains_OmegaRotation()
+        {
+            var physics = new StudyPhysicsConfig();
+            var domain = new StudyDomainConfig();
+
+            var context = CaseService.CalculateTemplateContext(
+                ux: 20.0, uz: 0.0, omegaRotation: 100.0,
+                cores: 4, refLength: 0.211, aref: 0.035,
+                physics: physics, domain: domain);
+
+            // omega_rotation must survive — used by disc template's rotatingWallVelocity BC
+            var omegaProp = context.GetType().GetProperty("omega_rotation");
+            omegaProp.Should().NotBeNull();
+            ((double)omegaProp!.GetValue(context)!).Should().BeApproximately(100.0, 1e-10);
+        }
+
         // ── CreateStudy — Input Validation ──────────────────────────────────────────
 
         [Fact]
