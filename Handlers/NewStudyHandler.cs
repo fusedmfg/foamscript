@@ -166,16 +166,16 @@ namespace foamscript.Handlers
                             switch (paramName.ToLowerInvariant())
                             {
                                 case "velocity" when model.Velocity == null:
-                                    config.Velocity = Convert.ToDouble(paramDef.Default);
+                                    config.Velocity = GetDoubleFromDefault(paramDef.Default);
                                     break;
                                 case "rpm" when model.Rpm == null:
-                                    config.Rpm = Convert.ToDouble(paramDef.Default);
+                                    config.Rpm = GetDoubleFromDefault(paramDef.Default);
                                     break;
                                 case "refinementmin" when model.RefinementLevelMin == null:
-                                    config.Physics.RefinementLevelMin = Convert.ToInt32(paramDef.Default);
+                                    config.Physics.RefinementLevelMin = GetIntFromDefault(paramDef.Default);
                                     break;
                                 case "refinementmax" when model.RefinementLevelMax == null:
-                                    config.Physics.RefinementLevelMax = Convert.ToInt32(paramDef.Default);
+                                    config.Physics.RefinementLevelMax = GetIntFromDefault(paramDef.Default);
                                     break;
                             }
                         }
@@ -339,6 +339,26 @@ namespace foamscript.Handlers
             }
 
             return Path.GetFullPath(resolvedPath);
+        }
+
+        /// <summary>
+        /// Extracts a double from a TEMPLATE.json default value (may be JsonElement or boxed number).
+        /// </summary>
+        private static double GetDoubleFromDefault(object? value)
+        {
+            if (value is JsonElement je)
+                return je.GetDouble();
+            return Convert.ToDouble(value);
+        }
+
+        /// <summary>
+        /// Extracts an int from a TEMPLATE.json default value (may be JsonElement or boxed number).
+        /// </summary>
+        private static int GetIntFromDefault(object? value)
+        {
+            if (value is JsonElement je)
+                return je.GetInt32();
+            return Convert.ToInt32(value);
         }
     }
 }
