@@ -20,8 +20,8 @@
   "parameters": {
     "velocity": { "required": true, "description": "Freestream velocity (m/s)" },
     "angles": { "required": true, "description": "Angle(s) of attack (degrees)" },
-    "refinementMin": { "required": false, "default": 5, "description": "Minimum refinement level" },
-    "refinementMax": { "required": false, "default": 6, "description": "Maximum refinement level" }
+    "refinementMin": { "required": false, "default": 2, "description": "Minimum refinement level" },
+    "refinementMax": { "required": false, "default": 2, "description": "Maximum refinement level" }
   },
   "domain": {
     "upstream": 5.0,

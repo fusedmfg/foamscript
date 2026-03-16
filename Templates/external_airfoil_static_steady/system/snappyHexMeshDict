@@ -13,6 +13,7 @@ FoamFile
     object      snappyHexMeshDict;
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+// Based on OpenFOAM v2512 mesh/snappyHexMesh/airfoilWithLayers tutorial
 
 castellatedMesh true;
 snap            true;
@@ -21,26 +22,19 @@ addLayers       true;
 geometry
 {
     airfoil.stl   { type triSurfaceMesh; name airfoil; }
-
-    // Wake refinement box downstream of airfoil
-    wake
-    {
-        type box;
-        min  (0 -{{ domain_span_half * 1.1 }} -{{ ref_length * 0.5 }});
-        max  ({{ domain_downstream * 0.5 }}  {{ domain_span_half * 1.1 }}  {{ ref_length * 0.5 }});
-    }
 }
 
 castellatedMeshControls
 {
     maxLocalCells   1000000;
-    maxGlobalCells  10000000;
-    minRefinementCells 10;
-    nCellsBetweenLevels 3;
+    maxGlobalCells  20000000;
+    minRefinementCells 0;
+    maxLoadUnbalance 0.10;
+    nCellsBetweenLevels 4;
 
     features
     (
-        { file "airfoil.eMesh"; level {{ feature_level }}; }
+        { file "airfoil.eMesh"; level 0; }
     );
 
     refinementSurfaces
@@ -54,16 +48,11 @@ castellatedMeshControls
 
     refinementRegions
     {
-        wake
-        {
-            mode    inside;
-            levels  ((1e15 {{ refinement_level_min }}));
-        }
     }
 
     resolveFeatureAngle 30;
+    planarAngle 30;
 
-    // Point inside the domain, away from airfoil geometry
     locationInMesh ({{ domain_downstream * 0.8 }} 0 {{ domain_radial * 0.8 }});
 
     allowFreeStandingZoneFaces true;
@@ -72,12 +61,14 @@ castellatedMeshControls
 snapControls
 {
     nSmoothPatch    3;
-    tolerance       2.0;
-    nSolveIter      300;
+    tolerance       1.0;
+    nSolveIter      30;
     nRelaxIter      5;
     nFeatureSnapIter 10;
-    implicitFeatureSnap true;
+    implicitFeatureSnap false;
     explicitFeatureSnap true;
+    multiRegionFeatureSnap false;
+    strictRegionSnap true;
 }
 
 addLayersControls
@@ -86,46 +77,43 @@ addLayersControls
     {
         airfoil
         {
-            nSurfaceLayers  8;
+            nSurfaceLayers  20;
         }
     }
     relativeSizes       true;
-    expansionRatio      1.2;
-    firstLayerThickness 0.2;
+    expansionRatio      1.5;
+    finalLayerThickness 0.3;
     minThickness        0.1;
-    nGrow               0;
+    nGrow               -1;
     featureAngle        180;
-    maxFaceThicknessRatio 0.5;
-    nSmoothSurfaceNormals 5;
+    maxFaceThicknessRatio 1000;
+    nSmoothSurfaceNormals 1;
     nSmoothThickness    10;
     minMedialAxisAngle  90;
-    maxThicknessToMedialRatio 0.5;
-    nMedialAxisIter     100;
+    maxThicknessToMedialRatio 0.3;
     nSmoothNormals      3;
-    slipFeatureAngle    30;
+    slipFeatureAngle    10;
     nRelaxIter          5;
     nBufferCellsNoExtrude 0;
     nLayerIter          50;
-    nRelaxedIter        20;
+    nRelaxedIter        0;
 }
 
 meshQualityControls
 {
-    maxNonOrtho 65;
-    maxBoundarySkewness 20;
-    maxInternalSkewness 4;
-    maxConcave 80;
-    minVol 1e-13;
-    minTetQuality 1e-15;
-    minArea -1;
-    minTwist 0.02;
-    minDeterminant 0.001;
-    minFaceWeight 0.05;
-    minVolRatio 0.01;
-    minTriangleTwist -1;
+    #include "meshQualityDict"
+
+    minDeterminant 1e-8;
+
+    relaxed
+    {
+        maxNonOrtho 75;
+        minTetQuality -1e30;
+        minTwist    -1;
+    }
+
     nSmoothScale 4;
     errorReduction 0.75;
-    relaxed { maxNonOrtho 75; }
 }
 
 mergeTolerance 1e-6;
