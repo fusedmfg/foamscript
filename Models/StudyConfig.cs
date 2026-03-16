@@ -44,11 +44,11 @@ namespace foamscript.Models
         /// <summary>Write interval for steady-state output (every N iterations). Default: 100.</summary>
         public int WriteInterval { get; set; } = 100;
 
-        /// <summary>snappyHexMesh minimum refinement level around geometry. Default: 5.</summary>
-        public int RefinementLevelMin { get; set; } = 5;
+        /// <summary>snappyHexMesh minimum refinement level around geometry. Template-defined (fallback: 0).</summary>
+        public int? RefinementLevelMin { get; set; }
 
-        /// <summary>snappyHexMesh maximum refinement level around geometry. Default: 6.</summary>
-        public int RefinementLevelMax { get; set; } = 6;
+        /// <summary>snappyHexMesh maximum refinement level around geometry. Template-defined (fallback: 0).</summary>
+        public int? RefinementLevelMax { get; set; }
     }
 
     /// <summary>

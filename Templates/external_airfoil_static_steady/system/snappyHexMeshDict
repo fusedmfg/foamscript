@@ -14,33 +14,35 @@ FoamFile
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
+// Based on airfoilWithLayers tutorial (parameterized refinement + domain)
+
 castellatedMesh true;
 snap            true;
 addLayers       true;
 
 geometry
 {
-    airfoil.stl   { type triSurfaceMesh; name airfoil; }
-
-    // Wake refinement box downstream of airfoil
-    wake
+    airfoil.stl
     {
-        type box;
-        min  (0 -{{ domain_span_half * 1.1 }} -{{ ref_length * 0.5 }});
-        max  ({{ domain_downstream * 0.5 }}  {{ domain_span_half * 1.1 }}  {{ ref_length * 0.5 }});
+        name airfoil;
+        type triSurfaceMesh;
     }
 }
 
 castellatedMeshControls
 {
-    maxLocalCells   1000000;
-    maxGlobalCells  10000000;
-    minRefinementCells 10;
-    nCellsBetweenLevels 3;
+    maxLocalCells       1000000;
+    maxGlobalCells      20000000;
+    minRefinementCells  0;
+    maxLoadUnbalance    0.10;
+    nCellsBetweenLevels 4;
 
     features
     (
-        { file "airfoil.eMesh"; level {{ feature_level }}; }
+        {
+            file "airfoil.eMesh";
+            level {{ feature_level }};
+        }
     );
 
     refinementSurfaces
@@ -48,84 +50,101 @@ castellatedMeshControls
         airfoil
         {
             level ({{ refinement_level_min }} {{ refinement_level_max }});
-            patchInfo { type wall; }
-        }
-    }
-
-    refinementRegions
-    {
-        wake
-        {
-            mode    inside;
-            levels  ((1e15 {{ refinement_level_min }}));
         }
     }
 
     resolveFeatureAngle 30;
+    planarAngle         30;
 
-    // Point inside the domain, away from airfoil geometry
+    refinementRegions
+    {
+    }
+
     locationInMesh ({{ domain_downstream * 0.8 }} 0 {{ domain_radial * 0.8 }});
-
     allowFreeStandingZoneFaces true;
+}
+
+// Internal macro for mesh-motion solver (from tutorial)
+_meshMotionSolver
+{
+    solver  displacementPointSmoothing;
+    displacementPointSmoothingCoeffs
+    {
+        pointSmoother           laplacian;
+        nPointSmootherIter      10;
+    }
 }
 
 snapControls
 {
-    nSmoothPatch    3;
-    tolerance       2.0;
-    nSolveIter      300;
-    nRelaxIter      5;
-    nFeatureSnapIter 10;
-    implicitFeatureSnap true;
+    nSmoothPatch        3;
+    tolerance           1.0;
+    nSolveIter          30;
+    nRelaxIter          5;
+
+    nFeatureSnapIter    10;
+    implicitFeatureSnap false;
     explicitFeatureSnap true;
+    multiRegionFeatureSnap false;
+    strictRegionSnap    true;
+
+    ${_meshMotionSolver}
 }
 
 addLayersControls
 {
+    relativeSizes       true;
+    expansionRatio      1.5;
+    finalLayerThickness 0.3;
+    minThickness        0.1;
+
     layers
     {
         airfoil
         {
-            nSurfaceLayers  8;
+            nSurfaceLayers  20;
         }
     }
-    relativeSizes       true;
-    expansionRatio      1.2;
-    firstLayerThickness 0.2;
-    minThickness        0.1;
-    nGrow               0;
-    featureAngle        180;
-    maxFaceThicknessRatio 0.5;
-    nSmoothSurfaceNormals 5;
-    nSmoothThickness    10;
-    minMedialAxisAngle  90;
-    maxThicknessToMedialRatio 0.5;
-    nMedialAxisIter     100;
-    nSmoothNormals      3;
-    slipFeatureAngle    30;
-    nRelaxIter          5;
-    nBufferCellsNoExtrude 0;
-    nLayerIter          50;
-    nRelaxedIter        20;
+
+    nGrow                   -1;
+    featureAngle            180;
+    maxFaceThicknessRatio   1000;
+    nSmoothSurfaceNormals   1;
+    nSmoothThickness        10;
+    minMedialAxisAngle      90;
+    maxThicknessToMedialRatio 0.3;
+    nSmoothNormals          3;
+    slipFeatureAngle        10;
+    nRelaxIter              5;
+    nBufferCellsNoExtrude   0;
+    nLayerIter              50;
+    nRelaxedIter            0;
 }
 
 meshQualityControls
 {
-    maxNonOrtho 65;
+    maxNonOrtho         65;
     maxBoundarySkewness 20;
     maxInternalSkewness 4;
-    maxConcave 80;
-    minVol 1e-13;
-    minTetQuality 1e-15;
-    minArea -1;
-    minTwist 0.02;
-    minDeterminant 0.001;
-    minFaceWeight 0.05;
-    minVolRatio 0.01;
-    minTriangleTwist -1;
-    nSmoothScale 4;
-    errorReduction 0.75;
-    relaxed { maxNonOrtho 75; }
+    maxConcave          80;
+    minVol              1e-13;
+    minTetQuality       1e-15;
+    minArea             -1;
+    minTwist            0.02;
+    minDeterminant      1e-8;
+    minFaceWeight       0.05;
+    minVolRatio         0.01;
+    minTriangleTwist    -1;
+
+    relaxed
+    {
+        maxNonOrtho     75;
+        minTetQuality   -1e30;
+        minTwist        -1;
+    }
+
+    nSmoothScale    4;
+    errorReduction  0.75;
 }
 
 mergeTolerance 1e-6;

@@ -71,11 +71,11 @@ namespace foamscript.Models
         [Option("write-interval", Required = false, Default = 100, HelpText = "Write results every N iterations (default: 100)")]
         public int WriteInterval { get; set; } = 100;
 
-        [Option("refinement-min", Required = false, Default = 5, HelpText = "snappyHexMesh minimum refinement level (default: 5)")]
-        public int RefinementLevelMin { get; set; } = 5;
+        [Option("refinement-min", Required = false, HelpText = "snappyHexMesh minimum refinement level (template-defined, fallback: 0)")]
+        public int? RefinementLevelMin { get; set; }
 
-        [Option("refinement-max", Required = false, Default = 6, HelpText = "snappyHexMesh maximum refinement level (default: 6)")]
-        public int RefinementLevelMax { get; set; } = 6;
+        [Option("refinement-max", Required = false, HelpText = "snappyHexMesh maximum refinement level (template-defined, fallback: 0)")]
+        public int? RefinementLevelMax { get; set; }
 
         // ── Domain geometry parameters ────────────────────────────────────────
 

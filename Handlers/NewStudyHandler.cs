@@ -74,7 +74,7 @@ namespace foamscript.Handlers
                         MaxIterations = model.MaxIterations,
                         WriteInterval = model.WriteInterval,
                         RefinementLevelMin = model.RefinementLevelMin,
-                        RefinementLevelMax = model.RefinementLevelMax
+                        RefinementLevelMax = model.RefinementLevelMax,
                     },
                     Domain = new StudyDomainConfig
                     {
@@ -97,7 +97,8 @@ namespace foamscript.Handlers
             var validationErrors = new List<string>();
             if (config.Velocity <= 0) validationErrors.Add($"Velocity must be positive (got {config.Velocity})");
             if (config.Physics.Nu <= 0) validationErrors.Add($"Kinematic viscosity (nu) must be positive (got {config.Physics.Nu})");
-            if (config.Physics.RefinementLevelMin > config.Physics.RefinementLevelMax)
+            if (config.Physics.RefinementLevelMin.HasValue && config.Physics.RefinementLevelMax.HasValue &&
+                config.Physics.RefinementLevelMin.Value > config.Physics.RefinementLevelMax.Value)
                 validationErrors.Add($"Refinement min ({config.Physics.RefinementLevelMin}) cannot exceed max ({config.Physics.RefinementLevelMax})");
             if (config.Rpm < 0) validationErrors.Add($"RPM must be non-negative (got {config.Rpm})");
 
@@ -169,6 +170,12 @@ namespace foamscript.Handlers
                                     break;
                                 case "rpm" when model.Rpm == null:
                                     config.Rpm = Convert.ToDouble(paramDef.Default);
+                                    break;
+                                case "refinementmin" when model.RefinementLevelMin == null:
+                                    config.Physics.RefinementLevelMin = Convert.ToInt32(paramDef.Default);
+                                    break;
+                                case "refinementmax" when model.RefinementLevelMax == null:
+                                    config.Physics.RefinementLevelMax = Convert.ToInt32(paramDef.Default);
                                     break;
                             }
                         }

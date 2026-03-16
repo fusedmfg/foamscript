@@ -287,7 +287,7 @@ namespace foamscript.Services
             var domainLength = domainUpstream + domainDownstream;
             var nxCells = Math.Ceiling(domainLength / refLength * 4);
             var baseCellSize = domainLength / nxCells;
-            var fineCellSize = baseCellSize / Math.Pow(2, physics.RefinementLevelMax);
+            var fineCellSize = baseCellSize / Math.Pow(2, physics.RefinementLevelMax ?? 0);
             var deltaT = 0.125 * fineCellSize / Math.Max(velocityMagnitude, 1.0);
 
             // Cap maxDeltaT
@@ -326,9 +326,9 @@ namespace foamscript.Services
                 end_time = physics.EndTime,
                 mag_u_inf = velocityMagnitude,
                 n_outer_correctors = physics.NOuterCorrectors,
-                refinement_level_min = physics.RefinementLevelMin,
-                refinement_level_max = physics.RefinementLevelMax,
-                feature_level = physics.RefinementLevelMax,
+                refinement_level_min = physics.RefinementLevelMin ?? 0,
+                refinement_level_max = physics.RefinementLevelMax ?? 0,
+                feature_level = physics.RefinementLevelMax ?? 0,
                 cores = cores,
                 aref = aref,
                 domain_upstream = domainUpstream,
