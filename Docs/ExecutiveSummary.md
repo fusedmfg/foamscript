@@ -1,7 +1,7 @@
 # FoamScript Executive Summary
 
-**Last Updated:** March 14, 2026
-**Version:** 0.4.1 (Clean Build + Security Hardening)
+**Last Updated:** March 16, 2026
+**Version:** 0.5.0 (Template Generalization + Environment Redesign)
 **Repository:** [fusedmfg/foamscript](https://github.com/fusedmfg/foamscript)
 
 *This is a living document revised alongside development. It serves two purposes: (1) document what FoamScript is and how it solves OpenFOAM complexity, and (2) provide an honest narrative on developing this application using a human/AI pair-coding approach.*
@@ -32,7 +32,8 @@ Each step involves hand-editing OpenFOAM dictionary files, running shell command
 FoamScript collapses this entire workflow into four commands:
 
 ```
-foamscript new-study --model-source disc.step --angles 0,5,10 --velocity 27 --rpm 925
+foamscript new-study --template external_disc_rotatingwall_steady \
+  --model-source disc.step --angles 0,5,10 --velocity 27 --rpm 925
 foamscript mesh -d ./DiscStudy
 foamscript solve -d ./DiscStudy
 foamscript report -d ./DiscStudy
@@ -44,14 +45,14 @@ foamscript report -d ./DiscStudy
 |---------|-------------|
 | **STEP-to-STL Conversion** | Automated CAD conversion via gmsh with unit detection and scaling |
 | **Domain Generation** | Auto-sized wind tunnel from geometry bounding box (10x/5x/5x extents) |
-| **Template System** | Scriban-powered OpenFOAM dictionary generation from parameterized templates |
-| **Parallel Meshing** | blockMesh → surfaceOrient → surfaceFeatureExtract → decomposePar → snappyHexMesh (MPI) → reconstruct |
-| **Template-Aware Solving** | Auto-detects solver (simpleFoam/pimpleFoam) from controlDict |
+| **Template Metadata System** | Each template has `TEMPLATE.json` defining geometry type, solver, pipeline steps, required parameters, and post-processing; `--template` selects the workflow |
+| **Parallel Meshing** | Template-driven pipeline: blockMesh → surfaceOrient → surfaceFeatureExtract → decomposePar → snappyHexMesh (MPI) → reconstruct |
+| **Template-Driven Solving** | Solver, decomposition, and reconstruction steps defined per-template in `TEMPLATE.json` |
 | **Parametric Studies** | Generate and process multiple angle-of-attack cases automatically |
 | **Auto-Detection** | Single `-d` flag intelligently detects case vs. study directories |
 | **Auto-Parallel** | CPU cores auto-detected; `--cores N` to override, `FOAMSCRIPT_MAX_CORES` env var to cap |
 | **AIAA-Quality Reports** | Publication-standard HTML + PDF reports with aerodynamic polars, convergence history, mesh statistics, coefficient tables, and geometry-referenced flow visualizations |
-| **Flow Visualization** | Pressure and velocity contour slices via ParaView (pvpython) + matplotlib (python3, numpy). Requires: `pvpython` (ParaView), `python3` with `matplotlib` and `numpy`. AIAA-standard geometry-referenced framing. Gracefully skipped if dependencies unavailable |
+| **Flow Visualization** | Pressure and velocity contour slices via ParaView (pvpython) + matplotlib (python3, numpy). AIAA-standard geometry-referenced framing. All visualization dependencies are required and validated by `foamscript validate` |
 | **AIAA CSV Data Export** | Machine-readable coefficient data with reference conditions header, always generated alongside reports |
 | **Environment Validation** | Config-based OpenFOAM management (`~/.foamscript/config.json`), auto-bashrc sourcing, pre-flight env injection, 23-check grouped validation with install hints. All dependencies required: OpenFOAM, gmsh, mpirun, pvpython, python3, matplotlib, numpy |
 
@@ -127,7 +128,7 @@ Cl/Cd ratio converged to <0.3% across all levels. Default set to Medium (5,6).
 
 | # | Template | Application | Status |
 |---|----------|-------------|--------|
-| 1 | `external_airfoil_static_steady` | 2D airfoil, steady-state, incompressible | [Issue #1](https://github.com/fusedmfg/foamscript/issues/1) — Open |
+| 1 | `external_airfoil_static_steady` | 2D airfoil, steady-state, incompressible | [Issue #1](https://github.com/fusedmfg/foamscript/issues/1) — **Done (v0.5.0)** |
 | 2 | `external_airfoil_static_transient` | 2D airfoil, transient, incompressible | [Issue #2](https://github.com/fusedmfg/foamscript/issues/2) — Open |
 | 3 | `turbomachinery_propeller_rotating-mrf_steady` | Propeller, MRF, steady | [Issue #3](https://github.com/fusedmfg/foamscript/issues/3) — Open |
 | 4 | `turbomachinery_propeller_rotating-ami_transient` | Propeller, AMI, transient | [Issue #4](https://github.com/fusedmfg/foamscript/issues/4) — Open |
@@ -162,17 +163,17 @@ FoamScript was built using **Claude Code** (Anthropic's AI coding agent) as the 
 ┌─────────────────────────────────────────────────┐
 │           PROJECT STATISTICS AT A GLANCE         │
 ├─────────────────────────────────────────────────┤
-│  Development Period    28 days (Feb 15-Mar 14)   │
-│  Active Days           13                        │
-│  Total Commits         112                       │
-│  AI Co-Authored        98 / 112 (87.5%)          │
-│  Total C# Lines        10,976                    │
-│  Production Code       6,318 lines               │
-│  Test Code             4,658 lines               │
-│  Test/Production Ratio 73.7%                     │
-│  Passing Tests         201                       │
-│  Template Files        42                        │
-│  GitHub Issues         40 (28 closed, 12 open)   │
+│  Development Period    30 days (Feb 15-Mar 16)   │
+│  Active Days           15                        │
+│  Total Commits         152                       │
+│  AI Co-Authored        130 / 152 (85.5%)         │
+│  Total C# Lines        12,468                    │
+│  Production Code       6,880 lines               │
+│  Test Code             5,588 lines               │
+│  Test/Production Ratio 81.2%                     │
+│  Passing Tests         241                       │
+│  Template Files        64                        │
+│  GitHub Issues         39 (29 closed, 10 open)   │
 └─────────────────────────────────────────────────┘
 ```
 
@@ -430,12 +431,12 @@ Based on the development history, approximately **70-75% of AI compute was produ
 
 | Metric | Value | Assessment |
 |--------|-------|------------|
-| Production LOC | 6,318 | Substantial for CLI tool scope |
-| Test LOC | 4,658 | Strong investment |
-| Test/Prod Ratio | 73.7% | Above industry average (~40-60% typical) |
+| Production LOC | 6,880 | Substantial for CLI tool scope |
+| Test LOC | 5,588 | Strong investment |
+| Test/Prod Ratio | 81.2% | Well above industry average (~40-60% typical) |
 | Passing Tests | 241 | Zero failures |
-| Template Files | 42 | Comprehensive OpenFOAM coverage |
-| GitHub Issues | 40 total (28 closed, 12 open) | Comprehensive tracking |
+| Template Files | 64 | 3 geometry templates + report templates |
+| GitHub Issues | 39 total (29 closed, 10 open) | Comprehensive tracking |
 | Build Status | Clean | Zero warnings |
 | Pipeline Validated | Yes | SimFlow match + grid convergence |
 
@@ -598,6 +599,6 @@ The largest cost-optimization opportunity is eliminating rate-limit downtime. Up
 
 ---
 
-*Last updated: March 14, 2026.*
+*Last updated: March 16, 2026.*
 *This is a living document revised alongside development.*
 *AI assistance provided by Anthropic Claude (Sonnet 4.5, Sonnet 4.6, Opus 4.6) via Claude Code.*

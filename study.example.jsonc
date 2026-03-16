@@ -1,18 +1,18 @@
 {
   // ── Required ────────────────────────────────────────────────────────────────
-  // These four fields must be provided in every config file.
+  // These five fields must be provided in every config file.
 
   "projectName": "MyDiscStudy",           // Folder name and prefix for all case directories
   "outputDir": "/home/user/studies",      // Parent directory where the project folder is created
+  "templateName": "external_disc_rotatingwall_steady", // Template name (run 'foamscript list-templates')
   "modelSource": "/home/user/disc.step",  // Path to geometry file: .step, .stp, .iges, .igs, or .stl
   "angles": "-10,-5,-2.5,0,2.5,5,10",    // Comma-separated angles of attack in degrees
 
   // ── Study options ────────────────────────────────────────────────────────────
-  // All optional. Values shown below are the defaults.
+  // All optional. Templates may provide defaults for velocity and rpm.
 
-  "templateName": "external_disc_rotatingwall_steady", // Template name or full path (run 'foamscript list-templates')
-  "velocity": 20.0,        // Freestream velocity magnitude (m/s)
-  "rpm": 1000.0,           // Disc rotation speed (RPM)
+  "velocity": 27.0,        // Freestream velocity magnitude (m/s) — template may provide default
+  "rpm": 925.0,            // Rotation speed (RPM) — only for rotating templates
   "inputUnits": "mm",      // Source geometry units: mm | cm | m | in | ft  (STEP/IGES only)
   "meshSize": 0.05,        // gmsh mesh size factor for STEP/IGES conversion (lower = finer)
   "featureAngle": null,    // Edge preservation angle in degrees, or null to disable
@@ -24,7 +24,7 @@
   "physics": {
     "nu": 1.5e-5,               // Kinematic viscosity (m²/s) — air at ~20°C sea level
     "turbulenceIntensity": 0.01, // Freestream turbulence intensity (0.01 = 1%, AIAA default)
-    "maxIterations": 1000,       // Maximum solver iterations (steady-state simpleFoam)
+    "maxIterations": 500,        // Maximum solver iterations (steady-state simpleFoam)
     "endTime": 1.0,              // Simulation end time in seconds (transient pimpleFoam only)
     "refinementLevelMin": 5,    // snappyHexMesh minimum refinement level around geometry
     "refinementLevelMax": 6     // snappyHexMesh maximum refinement level around geometry
@@ -32,14 +32,15 @@
 
   // ── Domain geometry parameters ───────────────────────────────────────────────
   // Controls the size of the rotor zone and wind tunnel. All optional.
-  // All scales and extents are relative to the detected disc diameter.
+  // Scales and extents are relative to the geometry's reference length
+  // (diameter for discs, chord for airfoils — determined by TEMPLATE.json).
 
   "domain": {
-    "rotorRadiusScale": 1.25,  // Rotor cylinder radius = disc_radius × scale (~25% clearance)
-    "rotorHeightScale": 1.5,   // Rotor cylinder height = disc_height × scale
-    "tunnelUpstream": 5.0,     // Wind tunnel upstream extent in disc diameters  (-x direction)
-    "tunnelDownstream": 10.0,  // Wind tunnel downstream extent in disc diameters (+x direction)
-    "tunnelRadial": 5.0,       // Wind tunnel radial extent in disc diameters    (+/-y and +/-z)
+    "rotorRadiusScale": 1.25,  // Rotor cylinder radius = ref_radius × scale (rotating templates only)
+    "rotorHeightScale": 1.5,   // Rotor cylinder height = geometry_height × scale (rotating templates only)
+    "tunnelUpstream": 5.0,     // Wind tunnel upstream extent in reference lengths  (-x direction)
+    "tunnelDownstream": 10.0,  // Wind tunnel downstream extent in reference lengths (+x direction)
+    "tunnelRadial": 5.0,       // Wind tunnel radial extent in reference lengths    (+/-y and +/-z)
     "meshResolution": 32       // Number of vertices around generated cylinder geometries
   }
 }
