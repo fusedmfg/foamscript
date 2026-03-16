@@ -9,10 +9,10 @@ namespace foamscript.Services;
 /// </summary>
 public static class VtkSliceRenderer
 {
-    private const int ImageWidth = 1600;
-    private const int ImageHeight = 900;
-    private const int GridNx = 300;
-    private const int GridNz = 200;
+    private const int ImageWidth = 2400;
+    private const int ImageHeight = 1200;
+    private const int GridNx = 500;
+    private const int GridNz = 350;
 
     public static SliceVisualizationResult Render(
         VtkSliceParser.SliceData sliceData,
@@ -62,6 +62,10 @@ public static class VtkSliceRenderer
         var hm = plot.Add.Heatmap(grid);
         hm.Colormap = colormap;
         hm.Position = new CoordinateRect(xMin, xMax, zMin, zMax);
+
+        // Add colorbar with unit label so the reader knows what colors mean
+        var cb = plot.Add.ColorBar(hm);
+        cb.Label = unit;
 
         plot.Title(title);
         plot.XLabel("x (m)");
