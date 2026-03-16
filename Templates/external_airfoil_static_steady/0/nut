@@ -50,14 +50,9 @@ boundaryField
         freestreamValue $internalField;
     }
 
-    front
+    frontAndBack
     {
-        type            symmetryPlane;
-    }
-
-    back
-    {
-        type            symmetryPlane;
+        type            empty;
     }
 }
 
