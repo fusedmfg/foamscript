@@ -126,9 +126,12 @@ namespace foamscript.Services
                     return null;
                 }
 
-                // Step 5: Render with ScottPlot (geometry bounds = null; renderer has data-driven fallback)
+                // Step 5: Read geometry bounding box from STL for AIAA-standard view framing
+                var geometryBounds = FindGeometryBounds(caseDir);
+
+                // Step 6: Render with ScottPlot
                 Console.WriteLine("  Rendering flow visualizations...");
-                var result = VtkSliceRenderer.Render(sliceData, geometryBounds: null);
+                var result = VtkSliceRenderer.Render(sliceData, geometryBounds);
 
                 // Write PNGs to output directory
                 Directory.CreateDirectory(outputDir);
@@ -149,6 +152,69 @@ namespace foamscript.Services
             {
                 // Clean up surfaceSampling dict
                 try { File.Delete(dictPath); } catch { /* Non-critical */ }
+            }
+        }
+        /// <summary>
+        /// Finds the geometry STL in constant/triSurface/ and computes its bounding box.
+        /// Returns null if no geometry STL found (falls back to data-extent framing).
+        /// Skips tunnel.stl — looks for the actual geometry (disc.stl, airfoil.stl, etc.).
+        /// </summary>
+        private static BoundingBox? FindGeometryBounds(string caseDir)
+        {
+            var triSurfDir = Path.Combine(caseDir, "constant", "triSurface");
+            if (!Directory.Exists(triSurfDir))
+                return null;
+
+            // Find geometry STL (skip tunnel.stl which is the wind tunnel domain)
+            var stlFiles = Directory.GetFiles(triSurfDir, "*.stl")
+                .Where(f => !Path.GetFileName(f).Equals("tunnel.stl", StringComparison.OrdinalIgnoreCase))
+                .ToArray();
+
+            if (stlFiles.Length == 0)
+                return null;
+
+            var stlFile = stlFiles[0];
+            try
+            {
+                var lines = File.ReadAllLines(stlFile);
+                double minX = double.MaxValue, maxX = double.MinValue;
+                double minY = double.MaxValue, maxY = double.MinValue;
+                double minZ = double.MaxValue, maxZ = double.MinValue;
+
+                foreach (var line in lines)
+                {
+                    var trimmed = line.Trim();
+                    if (trimmed.StartsWith("vertex"))
+                    {
+                        var parts = trimmed.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+                        if (parts.Length >= 4 &&
+                            double.TryParse(parts[1], System.Globalization.NumberStyles.Float,
+                                System.Globalization.CultureInfo.InvariantCulture, out var x) &&
+                            double.TryParse(parts[2], System.Globalization.NumberStyles.Float,
+                                System.Globalization.CultureInfo.InvariantCulture, out var y) &&
+                            double.TryParse(parts[3], System.Globalization.NumberStyles.Float,
+                                System.Globalization.CultureInfo.InvariantCulture, out var z))
+                        {
+                            minX = Math.Min(minX, x); maxX = Math.Max(maxX, x);
+                            minY = Math.Min(minY, y); maxY = Math.Max(maxY, y);
+                            minZ = Math.Min(minZ, z); maxZ = Math.Max(maxZ, z);
+                        }
+                    }
+                }
+
+                if (minX == double.MaxValue)
+                    return null;
+
+                return new BoundingBox
+                {
+                    MinX = minX, MaxX = maxX,
+                    MinY = minY, MaxY = maxY,
+                    MinZ = minZ, MaxZ = maxZ
+                };
+            }
+            catch
+            {
+                return null; // Non-critical — fall back to data-extent framing
             }
         }
     }
