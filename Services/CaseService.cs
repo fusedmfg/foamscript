@@ -100,7 +100,7 @@ namespace foamscript.Services
                     var caseInfo = CreateCase(result.StudyDir, config.ProjectName, templatePath, angle,
                         config.Velocity, omega, config.Cores, geometryDir, refLength, aref,
                         metadata.RequiredStlFiles, metadata.RequiresRotorZone, config.Physics, config.Domain,
-                        spanHalf: bbox.Height / 2.0);
+                        spanHalf: bbox.Height / 2.0 * 1.1);  // 10% margin beyond STL for snappyHexMesh
                     result.Cases.Add(caseInfo);
                 }
 
