@@ -26,7 +26,7 @@ namespace foamscript.Tests.Services
         {
             SetupFullyValidEnvironment();
 
-            var result = _service.ValidateEnvironment();
+            var result = _service.ValidateEnvironment("/nonexistent/config.json");
 
             result.IsValid.Should().BeTrue();
             result.TotalChecks.Should().Be(result.PassedChecks);
@@ -39,7 +39,7 @@ namespace foamscript.Tests.Services
         {
             SetupFullyValidEnvironment();
 
-            var result = _service.ValidateEnvironment();
+            var result = _service.ValidateEnvironment("/nonexistent/config.json");
 
             // OpenFOAM, Meshing, Solver, Parallel, Geometry, Visualization, Python
             result.Groups.Should().HaveCount(7);
@@ -54,7 +54,8 @@ namespace foamscript.Tests.Services
                 .Setup(x => x.Execute("bash", It.Is<string>(s => s.Contains("find /usr/lib/openfoam"))))
                 .Returns(new ProcessResult { ExitCode = 0, Output = "" });
 
-            var result = _service.ValidateEnvironment();
+            // Pass non-existent config path to force auto-detection
+            var result = _service.ValidateEnvironment("/nonexistent/config.json");
 
             result.IsValid.Should().BeFalse();
             result.Groups.Should().HaveCount(1);
@@ -79,7 +80,8 @@ namespace foamscript.Tests.Services
                 .Setup(x => x.Execute("bash", It.Is<string>(s => s.Contains("source") && s.Contains("env"))))
                 .Returns(new ProcessResult { ExitCode = 1, Output = "", Error = "source failed" });
 
-            var result = _service.ValidateEnvironment();
+            // Pass non-existent config path to force auto-detection
+            var result = _service.ValidateEnvironment("/nonexistent/config.json");
 
             result.IsValid.Should().BeFalse();
             var bashrcCheck = result.Groups[0].Checks.FirstOrDefault(c => c.Name == "Bashrc sourced");
@@ -97,7 +99,7 @@ namespace foamscript.Tests.Services
                 .Setup(x => x.Execute("bash", It.Is<string>(s => s.Contains("which gmsh"))))
                 .Returns(new ProcessResult { ExitCode = 1, Output = "" });
 
-            var result = _service.ValidateEnvironment();
+            var result = _service.ValidateEnvironment("/nonexistent/config.json");
 
             result.IsValid.Should().BeFalse();
             var geometryGroup = result.Groups.First(g => g.Name == "Geometry Processing");
@@ -116,7 +118,7 @@ namespace foamscript.Tests.Services
                 .Setup(x => x.Execute("bash", It.Is<string>(s => s.Contains("which pvpython"))))
                 .Returns(new ProcessResult { ExitCode = 1, Output = "" });
 
-            var result = _service.ValidateEnvironment();
+            var result = _service.ValidateEnvironment("/nonexistent/config.json");
 
             result.IsValid.Should().BeFalse();
             var vizGroup = result.Groups.First(g => g.Name == "Flow Visualization");
@@ -135,7 +137,7 @@ namespace foamscript.Tests.Services
                 .Setup(x => x.Execute("bash", It.Is<string>(s => s.Contains("import matplotlib"))))
                 .Returns(new ProcessResult { ExitCode = 1, Output = "" });
 
-            var result = _service.ValidateEnvironment();
+            var result = _service.ValidateEnvironment("/nonexistent/config.json");
 
             result.IsValid.Should().BeFalse();
             var pyGroup = result.Groups.First(g => g.Name == "Python Libraries");
@@ -157,7 +159,7 @@ namespace foamscript.Tests.Services
                 .Setup(x => x.Execute("bash", It.Is<string>(s => s.Contains("which pvpython"))))
                 .Returns(new ProcessResult { ExitCode = 1, Output = "" });
 
-            var result = _service.ValidateEnvironment();
+            var result = _service.ValidateEnvironment("/nonexistent/config.json");
 
             result.IsValid.Should().BeFalse();
             result.PassedChecks.Should().Be(result.TotalChecks - 2);

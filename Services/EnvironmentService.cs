@@ -85,7 +85,7 @@ namespace foamscript.Services
         /// Auto-detects OpenFOAM, sources bashrc, checks all tools using the sourced env.
         /// Writes ~/.foamscript/config.json on success.
         /// </summary>
-        public EnvironmentValidationResult ValidateEnvironment()
+        public EnvironmentValidationResult ValidateEnvironment(string? configPath = null)
         {
             var result = new EnvironmentValidationResult();
 
@@ -93,7 +93,7 @@ namespace foamscript.Services
             var openfoamGroup = new CheckGroup { Name = "OpenFOAM" };
 
             // Try to load existing config first, fall back to auto-detection
-            var config = OpenFoamEnvironment.LoadConfig();
+            var config = OpenFoamEnvironment.LoadConfig(configPath);
             string? bashrcPath = config?.OpenFoamBashrc;
 
             if (string.IsNullOrEmpty(bashrcPath) || !File.Exists(bashrcPath))
