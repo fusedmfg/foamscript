@@ -1,46 +1,36 @@
 namespace foamscript.Models
 {
     /// <summary>
-    /// Result of OpenFOAM environment validation.
+    /// Result of grouped environment validation with pass/fail counts.
     /// </summary>
     public class EnvironmentValidationResult
     {
         public bool IsValid { get; set; }
-        public string? Version { get; set; }
-        public string? ErrorMessage { get; set; }
-        public List<string> MissingTools { get; set; } = new();
-        public List<string> MissingVariables { get; set; } = new();
-        public Dictionary<string, string> EnvironmentVariables { get; set; } = new();
-        public Dictionary<string, string> AvailableTools { get; set; } = new();
-        public Dictionary<string, string> OptionalTools { get; set; } = new();
-        public List<string> MissingOptionalTools { get; set; } = new();
-
-        /// <summary>
-        /// List of detected OpenFOAM installation paths (for diagnostics).
-        /// </summary>
-        public List<string> DetectedInstallations { get; set; } = new();
-
-        /// <summary>
-        /// Path to detected bashrc file (if found).
-        /// </summary>
+        public string? OpenFoamVersion { get; set; }
         public string? DetectedBashrcPath { get; set; }
+        public List<string> DetectedInstallations { get; set; } = new();
+        public List<CheckGroup> Groups { get; set; } = new();
+        public int TotalChecks => Groups.Sum(g => g.Checks.Count);
+        public int PassedChecks => Groups.Sum(g => g.Checks.Count(c => c.Passed));
     }
 
     /// <summary>
-    /// Result of checking an environment variable.
+    /// A group of related validation checks (e.g., "Meshing Tools").
     /// </summary>
-    public class EnvironmentVariableCheck
+    public class CheckGroup
     {
-        public bool IsValid { get; set; }
-        public string? Value { get; set; }
+        public string Name { get; set; } = "";
+        public List<CheckItem> Checks { get; set; } = new();
     }
 
     /// <summary>
-    /// Result of checking tool availability.
+    /// A single validation check with pass/fail status and install hint on failure.
     /// </summary>
-    public class ToolCheck
+    public class CheckItem
     {
-        public bool IsAvailable { get; set; }
-        public string? Path { get; set; }
+        public bool Passed { get; set; }
+        public string Name { get; set; } = "";
+        public string? Detail { get; set; }
+        public string? InstallHint { get; set; }
     }
 }

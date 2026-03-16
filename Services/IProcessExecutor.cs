@@ -9,5 +9,6 @@ namespace foamscript.Services
     public interface IProcessExecutor
     {
         ProcessResult Execute(string command, string arguments = "");
+        void SetEnvironment(Dictionary<string, string> environmentVariables);
     }
 }

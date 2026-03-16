@@ -9,317 +9,173 @@ namespace foamscript.Tests.Services
     public class EnvironmentServiceTests
     {
         private readonly Mock<IProcessExecutor> _mockProcessExecutor;
+        private readonly OpenFoamEnvironment _openFoamEnvironment;
         private readonly EnvironmentService _service;
+
+        private const string BashrcPath = "/usr/lib/openfoam/openfoam2512/etc/bashrc";
 
         public EnvironmentServiceTests()
         {
             _mockProcessExecutor = new Mock<IProcessExecutor>();
-            _service = new EnvironmentService(_mockProcessExecutor.Object);
+            _openFoamEnvironment = new OpenFoamEnvironment(_mockProcessExecutor.Object);
+            _service = new EnvironmentService(_mockProcessExecutor.Object, _openFoamEnvironment);
         }
 
         [Fact]
-        public void DetectOpenFOAMVersion_WhenVersionCommandSucceeds_ReturnsVersion()
+        public void ValidateEnvironment_WhenAllChecksPass_ReturnsValid()
         {
-            // Arrange
-            _mockProcessExecutor
-                .Setup(x => x.Execute("bash", "-c \"echo $WM_PROJECT_VERSION\""))
-                .Returns(new ProcessResult { ExitCode = 0, Output = "v2512\n" });
+            SetupFullyValidEnvironment();
 
-            // Act
-            var result = _service.DetectOpenFOAMVersion();
-
-            // Assert
-            result.Should().Be("v2512");
-        }
-
-        [Fact]
-        public void DetectOpenFOAMVersion_WhenVersionNotSet_ReturnsNull()
-        {
-            // Arrange
-            _mockProcessExecutor
-                .Setup(x => x.Execute("bash", "-c \"echo $WM_PROJECT_VERSION\""))
-                .Returns(new ProcessResult { ExitCode = 0, Output = "\n" });
-
-            // Act
-            var result = _service.DetectOpenFOAMVersion();
-
-            // Assert
-            result.Should().BeNull();
-        }
-
-        [Fact]
-        public void CheckEnvironmentVariable_WhenVariableExists_ReturnsTrue()
-        {
-            // Arrange
-            _mockProcessExecutor
-                .Setup(x => x.Execute("bash", "-c \"echo $WM_PROJECT_DIR\""))
-                .Returns(new ProcessResult { ExitCode = 0, Output = "/opt/openfoam2512\n" });
-
-            // Act
-            var result = _service.CheckEnvironmentVariable("WM_PROJECT_DIR");
-
-            // Assert
-            result.IsValid.Should().BeTrue();
-            result.Value.Should().Be("/opt/openfoam2512");
-        }
-
-        [Fact]
-        public void CheckEnvironmentVariable_WhenVariableNotSet_ReturnsFalse()
-        {
-            // Arrange
-            _mockProcessExecutor
-                .Setup(x => x.Execute("bash", "-c \"echo $WM_PROJECT_DIR\""))
-                .Returns(new ProcessResult { ExitCode = 0, Output = "\n" });
-
-            // Act
-            var result = _service.CheckEnvironmentVariable("WM_PROJECT_DIR");
-
-            // Assert
-            result.IsValid.Should().BeFalse();
-            result.Value.Should().BeNull();
-        }
-
-        [Fact]
-        public void CheckToolAvailable_WhenToolExists_ReturnsTrue()
-        {
-            // Arrange
-            _mockProcessExecutor
-                .Setup(x => x.Execute("which", "blockMesh"))
-                .Returns(new ProcessResult { ExitCode = 0, Output = "/opt/openfoam2512/bin/blockMesh\n" });
-
-            // Act
-            var result = _service.CheckToolAvailable("blockMesh");
-
-            // Assert
-            result.IsAvailable.Should().BeTrue();
-            result.Path.Should().Be("/opt/openfoam2512/bin/blockMesh");
-        }
-
-        [Fact]
-        public void CheckToolAvailable_WhenToolNotFound_ReturnsFalse()
-        {
-            // Arrange
-            _mockProcessExecutor
-                .Setup(x => x.Execute("which", "blockMesh"))
-                .Returns(new ProcessResult { ExitCode = 1, Output = "" });
-
-            // Act
-            var result = _service.CheckToolAvailable("blockMesh");
-
-            // Assert
-            result.IsAvailable.Should().BeFalse();
-            result.Path.Should().BeNull();
-        }
-
-        [Fact]
-        public void ValidateEnvironment_WhenAllChecksPass_ReturnsSuccessResult()
-        {
-            // Arrange
-            SetupSuccessfulEnvironment();
-
-            // Act
             var result = _service.ValidateEnvironment();
 
-            // Assert
             result.IsValid.Should().BeTrue();
-            result.Version.Should().Be("v2512");
-            result.MissingTools.Should().BeEmpty();
-            result.MissingVariables.Should().BeEmpty();
-            result.OptionalTools.Should().ContainKey("pvpython");
-            result.OptionalTools.Should().ContainKey("matplotlib");
+            result.TotalChecks.Should().Be(result.PassedChecks);
+            result.OpenFoamVersion.Should().Be("v2512");
+            result.Groups.Should().NotBeEmpty();
         }
 
         [Fact]
-        public void ValidateEnvironment_WhenOptionalToolsMissing_StillReturnsValid()
+        public void ValidateEnvironment_WhenAllChecksPass_HasCorrectGroupCount()
         {
-            // Arrange — all required tools present, but pvpython/python3 missing
-            SetupEnvironmentWithMissingOptionalTools();
+            SetupFullyValidEnvironment();
 
-            // Act
             var result = _service.ValidateEnvironment();
 
-            // Assert — IsValid should still be true
-            result.IsValid.Should().BeTrue();
-            result.MissingOptionalTools.Should().Contain("pvpython");
-            result.MissingOptionalTools.Should().Contain("python3");
+            // OpenFOAM, Meshing, Solver, Parallel, Geometry, Visualization, Python
+            result.Groups.Should().HaveCount(7);
         }
 
         [Fact]
-        public void ValidateEnvironment_WhenOpenFOAMNotSourced_ReturnsFailureResult()
+        public void ValidateEnvironment_WhenNoInstallationFound_ReturnsInvalidWithHint()
         {
-            // Arrange - No version detected
+            // No existing config
+            // No installations found
             _mockProcessExecutor
-                .Setup(x => x.Execute("bash", "-c \"echo $WM_PROJECT_VERSION\""))
-                .Returns(new ProcessResult { ExitCode = 0, Output = "\n" });
-
-            // And no installations found
-            _mockProcessExecutor
-                .Setup(x => x.Execute("bash", "-c \"find /usr/lib/openfoam /opt -maxdepth 3 -type f -path '*/etc/bashrc' 2>/dev/null | xargs dirname | xargs dirname || true\""))
+                .Setup(x => x.Execute("bash", It.Is<string>(s => s.Contains("find /usr/lib/openfoam"))))
                 .Returns(new ProcessResult { ExitCode = 0, Output = "" });
 
-            // Act
             var result = _service.ValidateEnvironment();
 
-            // Assert
             result.IsValid.Should().BeFalse();
-            result.Version.Should().BeNull();
-            result.ErrorMessage.Should().Contain("OpenFOAM environment not detected");
-            result.DetectedInstallations.Should().BeEmpty();
+            result.Groups.Should().HaveCount(1);
+            result.Groups[0].Name.Should().Be("OpenFOAM");
+            result.Groups[0].Checks[0].Passed.Should().BeFalse();
+            result.Groups[0].Checks[0].InstallHint.Should().Contain("openfoam.org");
         }
 
         [Fact]
-        public void ValidateEnvironment_WhenToolsMissing_ReturnsFailureWithMissingTools()
+        public void ValidateEnvironment_WhenBashrcSourceFails_ReturnsInvalidEarly()
         {
-            // Arrange
-            SetupEnvironmentWithMissingTools();
+            // Installation detected
+            _mockProcessExecutor
+                .Setup(x => x.Execute("bash", It.Is<string>(s => s.Contains("find /usr/lib/openfoam"))))
+                .Returns(new ProcessResult { ExitCode = 0, Output = "/usr/lib/openfoam/openfoam2512\n" });
+            _mockProcessExecutor
+                .Setup(x => x.Execute("bash", It.Is<string>(s => s.Contains("find /usr/lib/openfoam/openfoam2512") && s.Contains("bashrc"))))
+                .Returns(new ProcessResult { ExitCode = 0, Output = BashrcPath + "\n" });
 
-            // Act
+            // Source fails
+            _mockProcessExecutor
+                .Setup(x => x.Execute("bash", It.Is<string>(s => s.Contains("source") && s.Contains("env"))))
+                .Returns(new ProcessResult { ExitCode = 1, Output = "", Error = "source failed" });
+
             var result = _service.ValidateEnvironment();
 
-            // Assert
             result.IsValid.Should().BeFalse();
-            result.MissingTools.Should().Contain("snappyHexMesh");
-            result.MissingTools.Should().Contain("gmsh");
+            var bashrcCheck = result.Groups[0].Checks.FirstOrDefault(c => c.Name == "Bashrc sourced");
+            bashrcCheck.Should().NotBeNull();
+            bashrcCheck!.Passed.Should().BeFalse();
         }
 
-        private void SetupSuccessfulEnvironment()
+        [Fact]
+        public void ValidateEnvironment_WhenToolMissing_ReturnsInvalidWithInstallHint()
         {
-            // Version
-            _mockProcessExecutor
-                .Setup(x => x.Execute("bash", "-c \"echo $WM_PROJECT_VERSION\""))
-                .Returns(new ProcessResult { ExitCode = 0, Output = "v2512\n" });
+            SetupFullyValidEnvironment();
 
-            // Environment variables - specific setups
+            // Override: gmsh not found
             _mockProcessExecutor
-                .Setup(x => x.Execute("bash", "-c \"echo $WM_PROJECT_DIR\""))
-                .Returns(new ProcessResult { ExitCode = 0, Output = "/opt/openfoam2512\n" });
+                .Setup(x => x.Execute("bash", It.Is<string>(s => s.Contains("which gmsh"))))
+                .Returns(new ProcessResult { ExitCode = 1, Output = "" });
 
-            _mockProcessExecutor
-                .Setup(x => x.Execute("bash", "-c \"echo $FOAM_APPBIN\""))
-                .Returns(new ProcessResult { ExitCode = 0, Output = "/opt/openfoam2512/platforms/linux64GccDPInt32Opt/bin\n" });
+            var result = _service.ValidateEnvironment();
 
-            _mockProcessExecutor
-                .Setup(x => x.Execute("bash", "-c \"echo $FOAM_LIBBIN\""))
-                .Returns(new ProcessResult { ExitCode = 0, Output = "/opt/openfoam2512/platforms/linux64GccDPInt32Opt/lib\n" });
-
-            // Tools
-            string[] tools = { "blockMesh", "snappyHexMesh", "surfaceFeatureExtract",
-                              "decomposePar", "pimpleFoam", "reconstructPar", "checkMesh", "gmsh" };
-
-            foreach (var tool in tools)
-            {
-                _mockProcessExecutor
-                    .Setup(x => x.Execute("which", tool))
-                    .Returns(new ProcessResult { ExitCode = 0, Output = $"/usr/bin/{tool}\n" });
-            }
-
-            // Optional tools
-            _mockProcessExecutor
-                .Setup(x => x.Execute("which", "pvpython"))
-                .Returns(new ProcessResult { ExitCode = 0, Output = "/usr/bin/pvpython\n" });
-            _mockProcessExecutor
-                .Setup(x => x.Execute("which", "python3"))
-                .Returns(new ProcessResult { ExitCode = 0, Output = "/usr/bin/python3\n" });
-            _mockProcessExecutor
-                .Setup(x => x.Execute("python3", "-c \"import matplotlib\""))
-                .Returns(new ProcessResult { ExitCode = 0, Output = "" });
-            _mockProcessExecutor
-                .Setup(x => x.Execute("python3", "-c \"import numpy\""))
-                .Returns(new ProcessResult { ExitCode = 0, Output = "" });
+            result.IsValid.Should().BeFalse();
+            var geometryGroup = result.Groups.First(g => g.Name == "Geometry Processing");
+            var gmshCheck = geometryGroup.Checks.First(c => c.Name == "gmsh");
+            gmshCheck.Passed.Should().BeFalse();
+            gmshCheck.InstallHint.Should().Be("sudo apt install gmsh");
         }
 
-        private void SetupEnvironmentWithMissingTools()
+        [Fact]
+        public void ValidateEnvironment_WhenPvpythonMissing_ReturnsInvalid()
         {
-            // Version exists
-            _mockProcessExecutor
-                .Setup(x => x.Execute("bash", "-c \"echo $WM_PROJECT_VERSION\""))
-                .Returns(new ProcessResult { ExitCode = 0, Output = "v2512\n" });
+            SetupFullyValidEnvironment();
 
-            // Environment variables - all present
+            // Override: pvpython not found
             _mockProcessExecutor
-                .Setup(x => x.Execute("bash", "-c \"echo $WM_PROJECT_DIR\""))
-                .Returns(new ProcessResult { ExitCode = 0, Output = "/opt/openfoam2512\n" });
-
-            _mockProcessExecutor
-                .Setup(x => x.Execute("bash", "-c \"echo $FOAM_APPBIN\""))
-                .Returns(new ProcessResult { ExitCode = 0, Output = "/opt/openfoam2512/platforms/linux64GccDPInt32Opt/bin\n" });
-
-            _mockProcessExecutor
-                .Setup(x => x.Execute("bash", "-c \"echo $FOAM_LIBBIN\""))
-                .Returns(new ProcessResult { ExitCode = 0, Output = "/opt/openfoam2512/platforms/linux64GccDPInt32Opt/lib\n" });
-
-            // Setup all tools individually
-            _mockProcessExecutor
-                .Setup(x => x.Execute("which", "blockMesh"))
-                .Returns(new ProcessResult { ExitCode = 0, Output = "/usr/bin/blockMesh\n" });
-
-            _mockProcessExecutor
-                .Setup(x => x.Execute("which", "snappyHexMesh"))
+                .Setup(x => x.Execute("bash", It.Is<string>(s => s.Contains("which pvpython"))))
                 .Returns(new ProcessResult { ExitCode = 1, Output = "" });
 
-            _mockProcessExecutor
-                .Setup(x => x.Execute("which", "surfaceFeatureExtract"))
-                .Returns(new ProcessResult { ExitCode = 0, Output = "/usr/bin/surfaceFeatureExtract\n" });
+            var result = _service.ValidateEnvironment();
 
-            _mockProcessExecutor
-                .Setup(x => x.Execute("which", "decomposePar"))
-                .Returns(new ProcessResult { ExitCode = 0, Output = "/usr/bin/decomposePar\n" });
-
-            _mockProcessExecutor
-                .Setup(x => x.Execute("which", "pimpleFoam"))
-                .Returns(new ProcessResult { ExitCode = 0, Output = "/usr/bin/pimpleFoam\n" });
-
-            _mockProcessExecutor
-                .Setup(x => x.Execute("which", "reconstructPar"))
-                .Returns(new ProcessResult { ExitCode = 0, Output = "/usr/bin/reconstructPar\n" });
-
-            _mockProcessExecutor
-                .Setup(x => x.Execute("which", "checkMesh"))
-                .Returns(new ProcessResult { ExitCode = 0, Output = "/usr/bin/checkMesh\n" });
-
-            _mockProcessExecutor
-                .Setup(x => x.Execute("which", "gmsh"))
-                .Returns(new ProcessResult { ExitCode = 1, Output = "" });
-
-            // Optional tools — not found (shouldn't affect IsValid)
-            _mockProcessExecutor
-                .Setup(x => x.Execute("which", "pvpython"))
-                .Returns(new ProcessResult { ExitCode = 1, Output = "" });
-            _mockProcessExecutor
-                .Setup(x => x.Execute("which", "python3"))
-                .Returns(new ProcessResult { ExitCode = 1, Output = "" });
+            result.IsValid.Should().BeFalse();
+            var vizGroup = result.Groups.First(g => g.Name == "Flow Visualization");
+            var pvCheck = vizGroup.Checks.First(c => c.Name == "pvpython");
+            pvCheck.Passed.Should().BeFalse();
+            pvCheck.InstallHint.Should().Be("sudo apt install paraview");
         }
 
-        private void SetupEnvironmentWithMissingOptionalTools()
+        [Fact]
+        public void ValidateEnvironment_WhenMatplotlibMissing_ReturnsInvalid()
         {
-            // All required tools present
-            SetupSuccessfulEnvironment();
+            SetupFullyValidEnvironment();
 
-            // Override optional tools to be missing
+            // Override: matplotlib import fails
             _mockProcessExecutor
-                .Setup(x => x.Execute("which", "pvpython"))
+                .Setup(x => x.Execute("bash", It.Is<string>(s => s.Contains("import matplotlib"))))
+                .Returns(new ProcessResult { ExitCode = 1, Output = "" });
+
+            var result = _service.ValidateEnvironment();
+
+            result.IsValid.Should().BeFalse();
+            var pyGroup = result.Groups.First(g => g.Name == "Python Libraries");
+            var matCheck = pyGroup.Checks.First(c => c.Name == "matplotlib");
+            matCheck.Passed.Should().BeFalse();
+            matCheck.InstallHint.Should().Be("pip3 install matplotlib");
+        }
+
+        [Fact]
+        public void ValidateEnvironment_PassedChecksCountsCorrectly()
+        {
+            SetupFullyValidEnvironment();
+
+            // Override: 2 tools missing
+            _mockProcessExecutor
+                .Setup(x => x.Execute("bash", It.Is<string>(s => s.Contains("which gmsh"))))
                 .Returns(new ProcessResult { ExitCode = 1, Output = "" });
             _mockProcessExecutor
-                .Setup(x => x.Execute("which", "python3"))
+                .Setup(x => x.Execute("bash", It.Is<string>(s => s.Contains("which pvpython"))))
                 .Returns(new ProcessResult { ExitCode = 1, Output = "" });
+
+            var result = _service.ValidateEnvironment();
+
+            result.IsValid.Should().BeFalse();
+            result.PassedChecks.Should().Be(result.TotalChecks - 2);
         }
 
         [Fact]
         public void DetectOpenFOAMInstallations_WhenInstallationsExist_ReturnsListOfPaths()
         {
-            // Arrange
             _mockProcessExecutor
-                .Setup(x => x.Execute("bash", "-c \"find /usr/lib/openfoam /opt -maxdepth 3 -type f -path '*/etc/bashrc' 2>/dev/null | xargs dirname | xargs dirname || true\""))
+                .Setup(x => x.Execute("bash", It.Is<string>(s => s.Contains("find /usr/lib/openfoam"))))
                 .Returns(new ProcessResult
                 {
                     ExitCode = 0,
                     Output = "/usr/lib/openfoam/openfoam2512\n/opt/openfoam11\n"
                 });
 
-            // Act
             var result = _service.DetectOpenFOAMInstallations();
 
-            // Assert
             result.Should().HaveCount(2);
             result.Should().Contain("/usr/lib/openfoam/openfoam2512");
             result.Should().Contain("/opt/openfoam11");
@@ -328,87 +184,117 @@ namespace foamscript.Tests.Services
         [Fact]
         public void DetectOpenFOAMInstallations_WhenNoInstallations_ReturnsEmptyList()
         {
-            // Arrange
             _mockProcessExecutor
-                .Setup(x => x.Execute("bash", "-c \"find /usr/lib/openfoam /opt -maxdepth 3 -type f -path '*/etc/bashrc' 2>/dev/null | xargs dirname | xargs dirname || true\""))
+                .Setup(x => x.Execute("bash", It.Is<string>(s => s.Contains("find /usr/lib/openfoam"))))
                 .Returns(new ProcessResult { ExitCode = 0, Output = "" });
 
-            // Act
             var result = _service.DetectOpenFOAMInstallations();
 
-            // Assert
             result.Should().BeEmpty();
         }
 
         [Fact]
         public void FindBashrcInInstallation_WhenBashrcExists_ReturnsPath()
         {
-            // Arrange
             _mockProcessExecutor
-                .Setup(x => x.Execute("bash", "-c \"find /usr/lib/openfoam/openfoam2512 -name bashrc -type f -path '*/etc/bashrc' 2>/dev/null | head -1\""))
+                .Setup(x => x.Execute("bash", It.Is<string>(s => s.Contains("find /usr/lib/openfoam/openfoam2512") && s.Contains("bashrc"))))
                 .Returns(new ProcessResult
                 {
                     ExitCode = 0,
                     Output = "/usr/lib/openfoam/openfoam2512/etc/bashrc\n"
                 });
 
-            // Act
             var result = _service.FindBashrcInInstallation("/usr/lib/openfoam/openfoam2512");
 
-            // Assert
             result.Should().Be("/usr/lib/openfoam/openfoam2512/etc/bashrc");
         }
 
         [Fact]
         public void FindBashrcInInstallation_WhenBashrcNotFound_ReturnsNull()
         {
-            // Arrange
             _mockProcessExecutor
-                .Setup(x => x.Execute("bash", "-c \"find /opt/openfoam11 -name bashrc -type f -path '*/etc/bashrc' 2>/dev/null | head -1\""))
+                .Setup(x => x.Execute("bash", It.Is<string>(s => s.Contains("find /opt/openfoam11") && s.Contains("bashrc"))))
                 .Returns(new ProcessResult { ExitCode = 0, Output = "" });
 
-            // Act
             var result = _service.FindBashrcInInstallation("/opt/openfoam11");
 
-            // Assert
             result.Should().BeNull();
         }
 
         [Fact]
-        public void ValidateEnvironment_WhenNotSourcedButInstallationDetected_ProvidesHelpfulErrorMessage()
+        public void CheckToolInEnvironment_WhenToolFound_ReturnsAvailable()
         {
-            // Arrange - Environment not sourced
             _mockProcessExecutor
-                .Setup(x => x.Execute("bash", "-c \"echo $WM_PROJECT_VERSION\""))
-                .Returns(new ProcessResult { ExitCode = 0, Output = "\n" });
+                .Setup(x => x.Execute("bash", It.Is<string>(s => s.Contains("source") && s.Contains("which blockMesh"))))
+                .Returns(new ProcessResult { ExitCode = 0, Output = "/opt/openfoam2512/bin/blockMesh\n" });
 
-            // But installation exists
+            var result = _service.CheckToolInEnvironment(BashrcPath, "blockMesh");
+
+            result.IsAvailable.Should().BeTrue();
+            result.Path.Should().Be("/opt/openfoam2512/bin/blockMesh");
+        }
+
+        [Fact]
+        public void CheckToolInEnvironment_WhenToolNotFound_ReturnsUnavailable()
+        {
             _mockProcessExecutor
-                .Setup(x => x.Execute("bash", "-c \"find /usr/lib/openfoam /opt -maxdepth 3 -type f -path '*/etc/bashrc' 2>/dev/null | xargs dirname | xargs dirname || true\""))
+                .Setup(x => x.Execute("bash", It.Is<string>(s => s.Contains("source") && s.Contains("which blockMesh"))))
+                .Returns(new ProcessResult { ExitCode = 1, Output = "" });
+
+            var result = _service.CheckToolInEnvironment(BashrcPath, "blockMesh");
+
+            result.IsAvailable.Should().BeFalse();
+        }
+
+        /// <summary>
+        /// Sets up mocks for a fully passing environment: installation detected, bashrc sourced,
+        /// all env vars set, all tools found, all python modules available.
+        /// </summary>
+        private void SetupFullyValidEnvironment()
+        {
+            // Installation detection (auto-detect path)
+            _mockProcessExecutor
+                .Setup(x => x.Execute("bash", It.Is<string>(s => s.Contains("find /usr/lib/openfoam"))))
+                .Returns(new ProcessResult { ExitCode = 0, Output = "/usr/lib/openfoam/openfoam2512\n" });
+            _mockProcessExecutor
+                .Setup(x => x.Execute("bash", It.Is<string>(s => s.Contains("find /usr/lib/openfoam/openfoam2512") && s.Contains("bashrc"))))
+                .Returns(new ProcessResult { ExitCode = 0, Output = BashrcPath + "\n" });
+
+            // Source bashrc + env capture
+            _mockProcessExecutor
+                .Setup(x => x.Execute("bash", It.Is<string>(s => s.Contains("source") && s.Contains("env"))))
                 .Returns(new ProcessResult
                 {
                     ExitCode = 0,
-                    Output = "/usr/lib/openfoam/openfoam2512\n"
+                    Output = "WM_PROJECT_DIR=/usr/lib/openfoam/openfoam2512\n" +
+                             "WM_PROJECT_VERSION=v2512\n" +
+                             "FOAM_APPBIN=/usr/lib/openfoam/openfoam2512/platforms/linux64GccDPInt32Opt/bin\n" +
+                             "FOAM_LIBBIN=/usr/lib/openfoam/openfoam2512/platforms/linux64GccDPInt32Opt/lib\n" +
+                             "PATH=/usr/lib/openfoam/openfoam2512/bin:/usr/bin\n"
                 });
 
-            // And bashrc can be found
+            // All tools found (match "source ... && which <tool>" pattern)
+            string[] allTools = {
+                "blockMesh", "snappyHexMesh", "surfaceFeatureExtract", "surfaceOrient",
+                "surfaceCheck", "decomposePar", "reconstructParMesh", "checkMesh",
+                "simpleFoam", "pimpleFoam", "reconstructPar",
+                "mpirun", "gmsh", "pvpython"
+            };
+
+            foreach (var tool in allTools)
+            {
+                _mockProcessExecutor
+                    .Setup(x => x.Execute("bash", It.Is<string>(s => s.Contains($"which {tool}"))))
+                    .Returns(new ProcessResult { ExitCode = 0, Output = $"/usr/bin/{tool}\n" });
+            }
+
+            // Python modules
             _mockProcessExecutor
-                .Setup(x => x.Execute("bash", "-c \"find /usr/lib/openfoam/openfoam2512 -name bashrc -type f -path '*/etc/bashrc' 2>/dev/null | head -1\""))
-                .Returns(new ProcessResult
-                {
-                    ExitCode = 0,
-                    Output = "/usr/lib/openfoam/openfoam2512/etc/bashrc\n"
-                });
-
-            // Act
-            var result = _service.ValidateEnvironment();
-
-            // Assert
-            result.IsValid.Should().BeFalse();
-            result.DetectedInstallations.Should().Contain("/usr/lib/openfoam/openfoam2512");
-            result.DetectedBashrcPath.Should().Be("/usr/lib/openfoam/openfoam2512/etc/bashrc");
-            result.ErrorMessage.Should().Contain("OpenFOAM is installed but not sourced");
-            result.ErrorMessage.Should().Contain("source /usr/lib/openfoam/openfoam2512/etc/bashrc");
+                .Setup(x => x.Execute("bash", It.Is<string>(s => s.Contains("import matplotlib"))))
+                .Returns(new ProcessResult { ExitCode = 0, Output = "" });
+            _mockProcessExecutor
+                .Setup(x => x.Execute("bash", It.Is<string>(s => s.Contains("import numpy"))))
+                .Returns(new ProcessResult { ExitCode = 0, Output = "" });
         }
     }
 }

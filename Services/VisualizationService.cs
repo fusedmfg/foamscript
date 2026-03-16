@@ -6,7 +6,7 @@ namespace foamscript.Services
     /// Generates flow field visualizations using a two-phase approach:
     /// Phase 1: pvpython extracts slice data from the OpenFOAM case (no rendering).
     /// Phase 2: python3 + matplotlib renders contour plots (headless via Agg backend).
-    /// Gracefully degrades if pvpython or python3 is not available.
+    /// Dependencies (pvpython, python3, matplotlib) are validated by the pre-flight guard.
     /// </summary>
     public class VisualizationService
     {
@@ -37,23 +37,6 @@ namespace foamscript.Services
             if (!File.Exists(extractScript) || !File.Exists(renderScript))
             {
                 Console.Error.WriteLine("  Warning: Visualization scripts not found — skipping flow visualization");
-                return null;
-            }
-
-            // Check if pvpython is available
-            var pvCheck = _processExecutor.Execute("which", "pvpython");
-            if (pvCheck.ExitCode != 0)
-            {
-                Console.Error.WriteLine("  Warning: pvpython not found — skipping flow visualization");
-                Console.Error.WriteLine("  Install ParaView for flow field visualizations");
-                return null;
-            }
-
-            // Check if python3 + matplotlib is available
-            var pyCheck = _processExecutor.Execute("python3", "-c \"import matplotlib\"");
-            if (pyCheck.ExitCode != 0)
-            {
-                Console.Error.WriteLine("  Warning: python3 with matplotlib not found — skipping flow visualization");
                 return null;
             }
 

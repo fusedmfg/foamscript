@@ -1,11 +1,14 @@
 using foamscript.Handlers;
 using foamscript.Models;
+using foamscript.Services;
 
 namespace foamscript
 {
     public class AppService
     {
-        private readonly Services.LoggingService _loggingService;
+        private readonly LoggingService _loggingService;
+        private readonly OpenFoamEnvironment _openFoamEnvironment;
+        private readonly IProcessExecutor _processExecutor;
         private readonly ValidateHandler _validateHandler;
         private readonly ConvertHandler _convertHandler;
         private readonly NewStudyHandler _newStudyHandler;
@@ -15,7 +18,9 @@ namespace foamscript
         private readonly ListTemplatesHandler _listTemplatesHandler;
 
         public AppService(
-            Services.LoggingService loggingService,
+            LoggingService loggingService,
+            OpenFoamEnvironment openFoamEnvironment,
+            IProcessExecutor processExecutor,
             ValidateHandler validateHandler,
             ConvertHandler convertHandler,
             NewStudyHandler newStudyHandler,
@@ -25,6 +30,8 @@ namespace foamscript
             ListTemplatesHandler listTemplatesHandler)
         {
             _loggingService = loggingService;
+            _openFoamEnvironment = openFoamEnvironment;
+            _processExecutor = processExecutor;
             _validateHandler = validateHandler;
             _convertHandler = convertHandler;
             _newStudyHandler = newStudyHandler;
@@ -38,15 +45,33 @@ namespace foamscript
         {
             try
             {
+                // Commands that don't need OpenFOAM environment
+                if (model is ValidateModel m1)
+                    return _validateHandler.Handle(m1);
+                if (model is ListTemplatesModel m2)
+                    return _listTemplatesHandler.Handle(m2);
+
+                // Pre-flight: ensure OpenFOAM environment is loaded
+                var envError = _openFoamEnvironment.Initialize();
+                if (envError != null)
+                {
+                    Console.Error.WriteLine($"✗ {envError}");
+                    return -1;
+                }
+
+                // Inject captured env into ProcessExecutor
+                if (_processExecutor is ProcessExecutor executor && _openFoamEnvironment.CapturedEnv != null)
+                {
+                    executor.SetEnvironment(_openFoamEnvironment.CapturedEnv);
+                }
+
                 return model switch
                 {
-                    ValidateModel m => _validateHandler.Handle(m),
                     ConvertModel m => _convertHandler.Handle(m),
                     NewStudyModel m => _newStudyHandler.Handle(m),
                     MeshModel m => _meshHandler.Handle(m),
                     SolveModel m => _solveHandler.Handle(m),
                     ReportModel m => _reportHandler.Handle(m),
-                    ListTemplatesModel m => _listTemplatesHandler.Handle(m),
                     _ => throw new NotImplementedException($"The verb of type {model.GetType().Name} is not implemented.")
                 };
             }
