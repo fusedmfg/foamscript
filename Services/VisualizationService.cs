@@ -3,14 +3,45 @@ using foamscript.Models;
 namespace foamscript.Services
 {
     /// <summary>
-    /// Generates flow field visualizations using a two-phase approach:
-    /// Phase 1: pvpython extracts slice data from the OpenFOAM case (no rendering).
-    /// Phase 2: python3 + matplotlib renders contour plots (headless via Agg backend).
-    /// Gracefully degrades if pvpython or python3 is not available.
+    /// Generates flow field visualizations using OpenFOAM postProcess + C# rendering:
+    /// 1. Writes surfaceSampling function object dict to system/
+    /// 2. Runs postProcess to generate raw surface data
+    /// 3. Parses raw output with VtkSliceParser.ParseRawFiles
+    /// 4. Renders heatmaps with VtkSliceRenderer (ScottPlot)
+    /// Gracefully degrades if postProcess fails.
     /// </summary>
     public class VisualizationService
     {
         private readonly IProcessExecutor _processExecutor;
+
+        private const string SurfaceSamplingDict = """
+            FoamFile
+            {
+                version     2.0;
+                format      ascii;
+                class       dictionary;
+                object      surfaceSampling;
+            }
+
+            surfaceSampling
+            {
+                type            surfaces;
+                libs            (sampling);
+                writeControl    writeTime;
+                surfaceFormat   raw;
+                fields          (p U);
+                surfaces
+                {
+                    yNormal
+                    {
+                        type        cuttingPlane;
+                        point       (0 0 0);
+                        normal      (0 1 0);
+                        interpolate true;
+                    }
+                }
+            }
+            """;
 
         public VisualizationService(IProcessExecutor processExecutor)
         {
@@ -19,119 +50,106 @@ namespace foamscript.Services
 
         /// <summary>
         /// Generates pressure and velocity slice visualizations for a case.
-        /// Returns paths to generated PNGs, or null if visualization tools are unavailable.
+        /// Returns rendered PNGs, or null if postProcess or rendering fails.
         /// </summary>
         public virtual SliceVisualizationResult? GenerateSliceVisualization(string caseDir, string outputDir)
         {
-            // Locate the Python scripts (bundled alongside the executable)
-            var scriptDir = FindScriptDirectory();
-            if (scriptDir == null)
+            var systemDir = Path.Combine(caseDir, "system");
+            if (!Directory.Exists(systemDir))
             {
-                Console.Error.WriteLine("  Warning: Visualization scripts not found — skipping flow visualization");
+                Console.Error.WriteLine("  Warning: Case system/ directory not found — skipping flow visualization");
                 return null;
             }
 
-            var extractScript = Path.Combine(scriptDir, "extract_slice.py");
-            var renderScript = Path.Combine(scriptDir, "render_slice.py");
+            var dictPath = Path.Combine(systemDir, "surfaceSampling");
 
-            if (!File.Exists(extractScript) || !File.Exists(renderScript))
+            try
             {
-                Console.Error.WriteLine("  Warning: Visualization scripts not found — skipping flow visualization");
-                return null;
-            }
+                // Step 1: Write surfaceSampling function object dict
+                File.WriteAllText(dictPath, SurfaceSamplingDict);
 
-            // Check if pvpython is available
-            var pvCheck = _processExecutor.Execute("which", "pvpython");
-            if (pvCheck.ExitCode != 0)
-            {
-                Console.Error.WriteLine("  Warning: pvpython not found — skipping flow visualization");
-                Console.Error.WriteLine("  Install ParaView for flow field visualizations");
-                return null;
-            }
+                // Step 2: Run OpenFOAM postProcess
+                Console.WriteLine("  Running postProcess surface sampling...");
+                var postResult = _processExecutor.Execute(
+                    "postProcess", $"-case {caseDir} -func surfaceSampling -latestTime");
 
-            // Check if python3 + matplotlib is available
-            var pyCheck = _processExecutor.Execute("python3", "-c \"import matplotlib\"");
-            if (pyCheck.ExitCode != 0)
-            {
-                Console.Error.WriteLine("  Warning: python3 with matplotlib not found — skipping flow visualization");
-                return null;
-            }
-
-            Directory.CreateDirectory(outputDir);
-            var jsonPath = Path.Combine(outputDir, "slice_data.json");
-
-            // Phase 1: Extract slice data via pvpython
-            Console.WriteLine("  Extracting flow field slice data...");
-            var extractResult = _processExecutor.Execute(
-                "pvpython", $"--force-offscreen-rendering {extractScript} {caseDir} {jsonPath}");
-
-            if (extractResult.ExitCode != 0 || !File.Exists(jsonPath))
-            {
-                Console.Error.WriteLine($"  Warning: Slice data extraction failed (exit code {extractResult.ExitCode})");
-                if (!string.IsNullOrEmpty(extractResult.Error))
-                    Console.Error.WriteLine($"  {extractResult.Error.Split('\n').LastOrDefault(l => !l.Contains("Authorization"))?.Trim()}");
-                return null;
-            }
-
-            // Phase 2: Render contour plots via python3 + matplotlib
-            Console.WriteLine("  Rendering flow visualizations...");
-            var renderResult = _processExecutor.Execute(
-                "python3", $"{renderScript} {jsonPath} {outputDir}");
-
-            if (renderResult.ExitCode != 0)
-            {
-                Console.Error.WriteLine($"  Warning: Visualization rendering failed (exit code {renderResult.ExitCode})");
-                return null;
-            }
-
-            var pressurePath = Path.Combine(outputDir, "p_slice.png");
-            var velocityPath = Path.Combine(outputDir, "umag_slice.png");
-
-            var result = new SliceVisualizationResult();
-            if (File.Exists(pressurePath))
-            {
-                result.PressureSlicePath = pressurePath;
-                result.PressureSlicePng = File.ReadAllBytes(pressurePath);
-            }
-            if (File.Exists(velocityPath))
-            {
-                result.VelocitySlicePath = velocityPath;
-                result.VelocitySlicePng = File.ReadAllBytes(velocityPath);
-            }
-
-            // Clean up intermediate JSON
-            try { File.Delete(jsonPath); } catch { /* Non-critical */ }
-
-            return result;
-        }
-
-        /// <summary>
-        /// Locates the directory containing visualization Python scripts.
-        /// Searches relative to the executable, then common development paths.
-        /// </summary>
-        private static string? FindScriptDirectory()
-        {
-            var candidates = new[]
-            {
-                // Relative to executable (production)
-                Path.Combine(AppContext.BaseDirectory, "Templates", "report"),
-                // Development paths
-                Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "Templates", "report"),
-                // Absolute fallback
-                Path.Combine(Directory.GetCurrentDirectory(), "Templates", "report"),
-            };
-
-            foreach (var candidate in candidates)
-            {
-                var normalized = Path.GetFullPath(candidate);
-                if (Directory.Exists(normalized) &&
-                    File.Exists(Path.Combine(normalized, "extract_slice.py")))
+                if (postResult.ExitCode != 0)
                 {
-                    return normalized;
+                    Console.Error.WriteLine($"  Warning: postProcess failed (exit code {postResult.ExitCode}) — skipping flow visualization");
+                    return null;
                 }
-            }
 
-            return null;
+                // Step 3: Find VTK output in postProcessing/surfaceSampling/<latestTime>/
+                var postProcDir = Path.Combine(caseDir, "postProcessing", "surfaceSampling");
+                if (!Directory.Exists(postProcDir))
+                {
+                    Console.Error.WriteLine("  Warning: postProcessing output not found — skipping flow visualization");
+                    return null;
+                }
+
+                var latestTimeDir = Directory.GetDirectories(postProcDir)
+                    .Select(d => new DirectoryInfo(d))
+                    .Where(d => double.TryParse(d.Name, System.Globalization.NumberStyles.Float,
+                        System.Globalization.CultureInfo.InvariantCulture, out _))
+                    .OrderByDescending(d => double.Parse(d.Name, System.Globalization.CultureInfo.InvariantCulture))
+                    .FirstOrDefault();
+
+                if (latestTimeDir == null)
+                {
+                    Console.Error.WriteLine("  Warning: No time directories in postProcessing output — skipping flow visualization");
+                    return null;
+                }
+
+                var rawFiles = Directory.GetFiles(latestTimeDir.FullName, "*.raw");
+                if (rawFiles.Length == 0)
+                {
+                    Console.Error.WriteLine("  Warning: No raw surface files found in postProcessing output — skipping flow visualization");
+                    return null;
+                }
+
+                // Step 4: Parse raw files and render
+                // Each field produces a separate .raw file (e.g., p_yNormal.raw, U_yNormal.raw)
+                Console.WriteLine("  Parsing surface slice data...");
+                var fieldFiles = new Dictionary<string, string>();
+                foreach (var rawFile in rawFiles)
+                {
+                    var fileName = Path.GetFileNameWithoutExtension(rawFile);
+                    // Extract field name: "p_yNormal" -> "p", "U_yNormal" -> "U"
+                    var fieldName = fileName.Split('_')[0];
+                    fieldFiles[fieldName] = File.ReadAllText(rawFile);
+                }
+                var sliceData = VtkSliceParser.ParseRawFiles(fieldFiles);
+
+                if (sliceData.Points.Count == 0)
+                {
+                    Console.Error.WriteLine("  Warning: Surface slice contains no points — skipping flow visualization");
+                    return null;
+                }
+
+                // Step 5: Render with ScottPlot (geometry bounds = null; renderer has data-driven fallback)
+                Console.WriteLine("  Rendering flow visualizations...");
+                var result = VtkSliceRenderer.Render(sliceData, geometryBounds: null);
+
+                // Write PNGs to output directory
+                Directory.CreateDirectory(outputDir);
+                if (result.PressureSlicePng != null)
+                {
+                    result.PressureSlicePath = Path.Combine(outputDir, "p_slice.png");
+                    File.WriteAllBytes(result.PressureSlicePath, result.PressureSlicePng);
+                }
+                if (result.VelocitySlicePng != null)
+                {
+                    result.VelocitySlicePath = Path.Combine(outputDir, "umag_slice.png");
+                    File.WriteAllBytes(result.VelocitySlicePath, result.VelocitySlicePng);
+                }
+
+                return result;
+            }
+            finally
+            {
+                // Clean up surfaceSampling dict
+                try { File.Delete(dictPath); } catch { /* Non-critical */ }
+            }
         }
     }
 

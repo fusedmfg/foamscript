@@ -177,7 +177,7 @@ namespace foamscript.Tests.Services
 
             var csv = ResultsService.FormatCsv(summary);
 
-            csv.Should().Contain("AoA,Cd,Cl,CmPitch,Cl/Cd,Converged");
+            csv.Should().Contain("AoA,Cd,Cl,CmPitch,Converged");
             csv.Should().Contain("0.0,0.045000");
         }
 
@@ -245,6 +245,100 @@ namespace foamscript.Tests.Services
 
             cases.Should().HaveCount(1);
             Path.GetFileName(cases[0]).Should().Be("Study_0.0");
+        }
+
+        // ── Generic Coefficients Dictionary ──────────────────────────────────────
+
+        [Fact]
+        public void CaseResult_BackwardCompatAccessors_ReadWriteThroughDictionary()
+        {
+            var result = new CaseResult();
+            result.Cd = 0.055;
+            result.Cl = 0.170;
+            result.CmPitch = -0.040;
+
+            result.Coefficients["Cd"].Should().Be(0.055);
+            result.Coefficients["Cl"].Should().Be(0.170);
+            result.Coefficients["CmPitch"].Should().Be(-0.040);
+        }
+
+        [Fact]
+        public void CaseResult_GenericCoefficients_AccessibleViaBackwardCompat()
+        {
+            var result = new CaseResult();
+            result.Coefficients["Cd"] = 0.055;
+            result.Coefficients["Cl"] = 0.170;
+            result.Coefficients["CmPitch"] = -0.040;
+
+            result.Cd.Should().Be(0.055);
+            result.Cl.Should().Be(0.170);
+            result.CmPitch.Should().Be(-0.040);
+        }
+
+        [Fact]
+        public void CaseResult_CustomCoefficients_AppearInDictionaryOnly()
+        {
+            var result = new CaseResult();
+            result.Coefficients["Cp"] = 1.23;
+            result.Coefficients["Cf"] = 0.005;
+
+            result.Coefficients.Should().ContainKey("Cp");
+            result.Coefficients.Should().ContainKey("Cf");
+            result.Coefficients["Cp"].Should().Be(1.23);
+        }
+
+        [Fact]
+        public void FormatCsv_WithCustomCoefficients_IncludesAllKeys()
+        {
+            var summary = new ResultsSummary
+            {
+                IsSuccess = true,
+                Cases = new List<CaseResult>
+                {
+                    new()
+                    {
+                        CaseName = "Study_0.0",
+                        AngleOfAttack = 0.0,
+                        Converged = true,
+                        Coefficients = new Dictionary<string, double?>
+                        {
+                            ["Cd"] = 0.045,
+                            ["Cl"] = 0.170,
+                            ["Cp"] = 1.23
+                        }
+                    }
+                }
+            };
+
+            var csv = ResultsService.FormatCsv(summary);
+
+            csv.Should().Contain("AoA,Cd,Cl,Cp,Converged");
+            csv.Should().Contain("0.0,0.045000,0.170000,1.230000,True");
+        }
+
+        [Fact]
+        public void GetCoefficientKeys_EmptyCases_ReturnsFallbackKeys()
+        {
+            var summary = new ResultsSummary { Cases = new List<CaseResult>() };
+            var keys = ResultsService.GetCoefficientKeys(summary);
+
+            keys.Should().BeEquivalentTo(new[] { "Cd", "Cl", "CmPitch" });
+        }
+
+        [Fact]
+        public void GetCoefficientKeys_MergesKeysFromAllCases()
+        {
+            var summary = new ResultsSummary
+            {
+                Cases = new List<CaseResult>
+                {
+                    new() { Coefficients = new Dictionary<string, double?> { ["Cd"] = 0.05, ["Cl"] = 0.17 } },
+                    new() { Coefficients = new Dictionary<string, double?> { ["Cd"] = 0.06, ["Cl"] = 0.18, ["Cp"] = 1.0 } }
+                }
+            };
+
+            var keys = ResultsService.GetCoefficientKeys(summary);
+            keys.Should().BeEquivalentTo(new[] { "Cd", "Cl", "Cp" });
         }
     }
 }

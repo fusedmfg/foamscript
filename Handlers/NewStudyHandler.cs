@@ -8,11 +8,13 @@ namespace foamscript.Handlers
     {
         private readonly LoggingService _loggingService;
         private readonly CaseService _caseService;
+        private readonly TemplateMetadataService _metadataService;
 
-        public NewStudyHandler(LoggingService loggingService, CaseService caseService)
+        public NewStudyHandler(LoggingService loggingService, CaseService caseService, TemplateMetadataService metadataService)
         {
             _loggingService = loggingService;
             _caseService = caseService;
+            _metadataService = metadataService;
         }
 
         public int Handle(NewStudyModel model)
@@ -34,6 +36,7 @@ namespace foamscript.Handlers
             {
                 // Validate required CLI args
                 var missing = new List<string>();
+                if (string.IsNullOrEmpty(model.TemplatePath)) missing.Add("--template (-t)");
                 if (string.IsNullOrEmpty(model.ProjectName)) missing.Add("--project-name (-n)");
                 if (string.IsNullOrEmpty(model.OutputDir)) missing.Add("--output-dir (-o)");
                 if (string.IsNullOrEmpty(model.ModelSource)) missing.Add("--model-source (-s)");
@@ -56,8 +59,8 @@ namespace foamscript.Handlers
                     TemplateName = model.TemplatePath,
                     ModelSource = model.ModelSource,
                     Angles = model.Angles,
-                    Velocity = model.Velocity,
-                    Rpm = model.Rpm,
+                    Velocity = model.Velocity ?? 0,
+                    Rpm = model.Rpm ?? 0,
                     InputUnits = model.InputUnits,
                     MeshSize = model.MeshSize,
                     FeatureAngle = model.FeatureAngle,
@@ -84,6 +87,11 @@ namespace foamscript.Handlers
                     }
                 };
             }
+
+            // Resolve cores (0 = auto-detect)
+            var requestedCores = config.Cores;
+            var (resolvedCores, _) = CoreResolver.Resolve(config.Cores);
+            config.Cores = resolvedCores;
 
             // Validate physics parameters
             var validationErrors = new List<string>();
@@ -126,6 +134,61 @@ namespace foamscript.Handlers
                 return -1;
             }
 
+            // Validate template-required parameters (only for CLI args, not JSON config)
+            if (model.ConfigFile == null)
+            {
+                try
+                {
+                    var metadata = _metadataService.LoadMetadata(templatePath);
+                    var templateErrors = new List<string>();
+
+                    foreach (var (paramName, paramDef) in metadata.Parameters)
+                    {
+                        if (paramDef.Required)
+                        {
+                            var isMissing = paramName.ToLowerInvariant() switch
+                            {
+                                "velocity" => model.Velocity == null,
+                                "rpm" => model.Rpm == null,
+                                "angles" => string.IsNullOrEmpty(model.Angles),
+                                _ => false
+                            };
+
+                            if (isMissing)
+                            {
+                                templateErrors.Add($"Template '{metadata.Name}' requires --{paramName} but it was not provided");
+                            }
+                        }
+                        else if (paramDef.Default != null)
+                        {
+                            // Apply template defaults for optional parameters when CLI value is null
+                            switch (paramName.ToLowerInvariant())
+                            {
+                                case "velocity" when model.Velocity == null:
+                                    config.Velocity = Convert.ToDouble(paramDef.Default);
+                                    break;
+                                case "rpm" when model.Rpm == null:
+                                    config.Rpm = Convert.ToDouble(paramDef.Default);
+                                    break;
+                            }
+                        }
+                    }
+
+                    if (templateErrors.Count > 0)
+                    {
+                        Console.WriteLine("✗ Missing required template parameters:");
+                        foreach (var err in templateErrors)
+                            Console.WriteLine($"    {err}");
+                        Console.WriteLine();
+                        return -1;
+                    }
+                }
+                catch (FileNotFoundException)
+                {
+                    // Template has no TEMPLATE.json — skip parameter validation
+                }
+            }
+
             _loggingService.LogInformation($"Creating project '{config.ProjectName}' in {config.OutputDir}");
 
             Console.WriteLine();
@@ -139,7 +202,7 @@ namespace foamscript.Handlers
             Console.WriteLine($"Angles:           {config.Angles}");
             Console.WriteLine($"Velocity:         {config.Velocity} m/s");
             Console.WriteLine($"RPM:              {config.Rpm}");
-            Console.WriteLine($"Cores:            {config.Cores}");
+            Console.WriteLine($"Cores:            {config.Cores} ({(requestedCores == 0 ? "auto-detected" : "specified")})");
             Console.WriteLine();
             Console.WriteLine("Geometry / Domain Parameters:");
             Console.WriteLine($"  Input units:        {config.InputUnits} (output in meters)");
@@ -246,7 +309,7 @@ namespace foamscript.Handlers
         {
             var templatesDir = ListTemplatesHandler.GetTemplatesDirectory();
 
-            // If null or empty, use default
+            // If null or empty, use default (JSON config path may not specify template)
             if (string.IsNullOrEmpty(templatePathOrName))
             {
                 return Path.Combine(templatesDir, "external_disc_rotatingwall_steady");

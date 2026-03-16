@@ -22,17 +22,19 @@ namespace foamscript.Tests.Handlers
             _mockLoggingService = new Mock<LoggingService>(Mock.Of<ILogger<LoggingService>>());
             _mockProcessExecutor = new Mock<IProcessExecutor>();
 
-            // CaseService requires (IProcessExecutor, GeometryService, TemplateService) — build the chain
+            // CaseService requires (IProcessExecutor, GeometryService, TemplateService, TemplateMetadataService) — build the chain
             var geometryService = new GeometryService(
                 new StlConversionService(_mockProcessExecutor.Object, _mockLoggingService.Object),
                 new DomainService(_mockProcessExecutor.Object, _mockLoggingService.Object));
             var templateService = new TemplateService(_mockLoggingService.Object);
+            var metadataService = new TemplateMetadataService();
             _mockCaseService = new Mock<CaseService>(
                 _mockProcessExecutor.Object,
                 geometryService,
-                templateService);
+                templateService,
+                metadataService);
 
-            _handler = new NewStudyHandler(_mockLoggingService.Object, _mockCaseService.Object);
+            _handler = new NewStudyHandler(_mockLoggingService.Object, _mockCaseService.Object, metadataService);
         }
 
         public void Dispose()
@@ -67,10 +69,13 @@ namespace foamscript.Tests.Handlers
 
         private static NewStudyModel CreateValidCliModel() => new NewStudyModel
         {
+            TemplatePath = "external_disc_rotatingwall_steady",
             ProjectName = "TestProject",
             OutputDir = Path.GetTempPath(),
             ModelSource = "/tmp/disc.stl",
-            Angles = "0,5,10"
+            Angles = "0,5,10",
+            Velocity = 27.0,
+            Rpm = 925.0
         };
 
         private static string CreateValidJsonConfig(string? outputDir = null)

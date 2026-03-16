@@ -1,0 +1,61 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
+|  \\    /   O peration     | Version:  v2512                                 |
+|   \\  /    A nd           | Website:  www.openfoam.com                      |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      controlDict;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+application     simpleFoam;
+startFrom       startTime;
+startTime       0;
+stopAt          endTime;
+
+endTime         {{ max_iterations }};
+deltaT          1;
+writeControl    timeStep;
+
+writeInterval   {{ write_interval }};
+purgeWrite      3;
+writeFormat     ascii;
+writePrecision  7;
+writeCompression off;
+timeFormat      general;
+timePrecision   6;
+runTimeModifiable yes;
+
+functions
+{
+    forces
+    {
+        type            forceCoeffs;
+        libs            (forces);
+        writeControl    timeStep;
+        writeInterval   1;
+
+        patches         (airfoil);
+        rho             rhoInf;
+        rhoInf          1.225;
+
+        magUInf         {{ mag_u_inf }};
+        lRef            {{ ref_length }};
+        Aref            {{ aref }};
+
+        // Standard aerodynamic directions
+        // X = streamwise (drag), Z = normal (lift)
+        dragDir         (1 0 0);
+        liftDir         (0 0 1);
+        pitchAxis       (0 1 0);
+        CofR            (0 0 0);
+    }
+}
+
+// ************************************************************************* //

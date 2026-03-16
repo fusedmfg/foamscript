@@ -97,7 +97,7 @@ namespace foamscript.Services
             if (generateHtml)
             {
                 Console.WriteLine("Generating HTML report...");
-                var htmlData = BuildHtmlReportData(studyName, resultsSummary, residualData, meshStats, physicsConfig, visualization);
+                var htmlData = BuildHtmlReportData(studyDir, studyName, resultsSummary, residualData, meshStats, physicsConfig, visualization);
                 var htmlPath = Path.Combine(outputDir, $"{studyName}_report.html");
                 _htmlGenerator.WriteReport(htmlData, htmlPath);
                 result.HtmlPath = htmlPath;
@@ -118,7 +118,7 @@ namespace foamscript.Services
             return result;
         }
 
-        private ReportData BuildHtmlReportData(string studyName, ResultsSummary summary,
+        private ReportData BuildHtmlReportData(string studyDir, string studyName, ResultsSummary summary,
             List<CaseResidualData> residuals, List<MeshStatEntry> meshStats, PhysicsConfig config,
             SliceVisualizationResult? visualization)
         {
@@ -127,7 +127,7 @@ namespace foamscript.Services
             {
                 StudyName = studyName,
                 GenerationDate = DateTime.Now.ToString("yyyy-MM-dd HH:mm"),
-                TemplateName = "external_disc_rotatingwall_steady",
+                TemplateName = ReadTemplateName(studyDir),
                 Velocity = config.Velocity,
                 Rpm = config.Rpm,
                 TurbulenceIntensity = config.TurbulenceIntensity,
@@ -147,12 +147,15 @@ namespace foamscript.Services
                     Converged = c.Converged
                 }).ToList(),
 
-                // SVG charts
+                // Legacy SVG charts (backward compat for existing report.html templates)
                 ClVsAoaChart = _chartGenerator.GeneratePolarChartSvg(cases, "Cl", "Lift Coefficient vs Angle of Attack", "Lift Coefficient, C\u2097"),
                 CdVsAoaChart = _chartGenerator.GeneratePolarChartSvg(cases, "Cd", "Drag Coefficient vs Angle of Attack", "Drag Coefficient, C\u2084"),
                 CmVsAoaChart = _chartGenerator.GeneratePolarChartSvg(cases, "CmPitch", "Pitching Moment vs Angle of Attack", "Pitching Moment, C\u2098"),
                 LdVsAoaChart = _chartGenerator.GeneratePolarChartSvg(cases, "L/D", "Lift-to-Drag Ratio vs Angle of Attack", "L/D"),
                 DragPolarChart = _chartGenerator.GenerateDragPolarSvg(cases),
+
+                // Dynamic chart list from Coefficients keys
+                CoefficientCharts = BuildCoefficientCharts(cases, summary),
 
                 ConvergenceCharts = residuals.Select(r => new ConvergenceChartEntry
                 {
@@ -264,6 +267,25 @@ namespace foamscript.Services
             return residuals;
         }
 
+        /// <summary>
+        /// Generates one chart per coefficient key discovered in the results.
+        /// This is the data-driven replacement for the hardcoded Cl/Cd/Cm/LD chart list.
+        /// </summary>
+        private List<ChartEntry> BuildCoefficientCharts(List<CaseResult> cases, ResultsSummary summary)
+        {
+            var coeffKeys = ResultsService.GetCoefficientKeys(summary);
+            var charts = new List<ChartEntry>();
+
+            foreach (var key in coeffKeys)
+            {
+                var title = $"{key} vs Angle of Attack";
+                var svg = _chartGenerator.GeneratePolarChartSvg(cases, key, title, key);
+                charts.Add(new ChartEntry { Name = key, Title = title, Chart = svg });
+            }
+
+            return charts;
+        }
+
         private static List<MeshStatEntry> CollectMeshStats(string studyDir, List<CaseResult> cases)
         {
             var stats = new List<MeshStatEntry>();
@@ -355,23 +377,43 @@ namespace foamscript.Services
             writer.WriteLine($"# Max Iterations: {config.MaxIterations}");
             writer.WriteLine("#");
 
-            // Column headers
-            writer.WriteLine("AoA_deg,Cd,Cl,CmPitch,L_over_D,Converged");
+            // Dynamic column headers from Coefficients dictionary
+            var coeffKeys = ResultsService.GetCoefficientKeys(summary);
+            var headers = new List<string> { "AoA_deg" };
+            headers.AddRange(coeffKeys);
+            headers.Add("Converged");
+            writer.WriteLine(string.Join(",", headers));
 
             // Data rows
             foreach (var c in summary.Cases)
             {
-                var ld = (c.Cl.HasValue && c.Cd.HasValue && c.Cd.Value != 0)
-                    ? $"{c.Cl.Value / c.Cd.Value:F6}"
-                    : "";
-                writer.WriteLine(string.Join(",",
-                    $"{c.AngleOfAttack:F1}",
-                    c.Cd?.ToString("F6") ?? "",
-                    c.Cl?.ToString("F6") ?? "",
-                    c.CmPitch?.ToString("F6") ?? "",
-                    ld,
-                    c.Converged));
+                var values = new List<string> { $"{c.AngleOfAttack:F1}" };
+                foreach (var key in coeffKeys)
+                {
+                    var val = c.Coefficients.TryGetValue(key, out var v) && v.HasValue
+                        ? v.Value.ToString("F6") : "";
+                    values.Add(val);
+                }
+                values.Add(c.Converged.ToString());
+                writer.WriteLine(string.Join(",", values));
             }
+        }
+
+        private static string ReadTemplateName(string studyDir)
+        {
+            var manifestPath = Path.Combine(studyDir, "study.json");
+            if (File.Exists(manifestPath))
+            {
+                try
+                {
+                    var json = File.ReadAllText(manifestPath);
+                    var manifest = System.Text.Json.JsonSerializer.Deserialize<Models.StudyManifest>(json);
+                    if (manifest != null && !string.IsNullOrEmpty(manifest.TemplateName))
+                        return manifest.TemplateName;
+                }
+                catch { }
+            }
+            return string.Empty; // no template name available — will use global report template
         }
 
         internal static PhysicsConfig ReadPhysicsConfig(string studyDir)

@@ -13,6 +13,7 @@ namespace foamscript.Tests.Services
         private readonly Mock<LoggingService> _mockLoggingService;
         private readonly GeometryService _geometryService;
         private readonly TemplateService _templateService;
+        private readonly TemplateMetadataService _metadataService;
         private readonly CaseService _service;
         private readonly List<string> _tempDirs = new();
 
@@ -24,7 +25,8 @@ namespace foamscript.Tests.Services
                 new StlConversionService(_mockProcessExecutor.Object, _mockLoggingService.Object),
                 new DomainService(_mockProcessExecutor.Object, _mockLoggingService.Object));
             _templateService = new TemplateService(_mockLoggingService.Object);
-            _service = new CaseService(_mockProcessExecutor.Object, _geometryService, _templateService);
+            _metadataService = new TemplateMetadataService();
+            _service = new CaseService(_mockProcessExecutor.Object, _geometryService, _templateService, _metadataService);
         }
 
         public void Dispose()
@@ -98,6 +100,28 @@ endsolid disc
                 "nu {{ nu }};");
             File.WriteAllText(Path.Combine(templateDir, "system", "controlDict"),
                 "endTime {{ end_time }};");
+
+            // TEMPLATE.json — required by TemplateMetadataService
+            File.WriteAllText(Path.Combine(templateDir, "TEMPLATE.json"), """
+            {
+              "name": "test_template",
+              "description": "Minimal test template",
+              "solver": "simpleFoam",
+              "geometry": {
+                "type": "disc",
+                "stlName": "disc.stl",
+                "requiredStlFiles": ["disc.stl", "tunnel.stl"]
+              },
+              "reference": {
+                "dimension": "diameter",
+                "areaFormula": "circular"
+              },
+              "rotation": {
+                "enabled": true,
+                "requiresRotorZone": true
+              }
+            }
+            """);
 
             return templateDir;
         }

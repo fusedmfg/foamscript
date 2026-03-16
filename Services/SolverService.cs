@@ -5,21 +5,24 @@ namespace foamscript.Services
 {
     /// <summary>
     /// Service for running OpenFOAM solvers on meshed cases.
+    /// Uses template-driven pipeline from TEMPLATE.json solvePipeline.
     /// </summary>
     public class SolverService
     {
         private readonly IProcessExecutor _processExecutor;
         private readonly LoggingService _loggingService;
+        private readonly TemplateMetadataService _metadataService;
 
-        public SolverService(IProcessExecutor processExecutor, LoggingService loggingService)
+        public SolverService(IProcessExecutor processExecutor, LoggingService loggingService, TemplateMetadataService metadataService)
         {
             _processExecutor = processExecutor;
             _loggingService = loggingService;
+            _metadataService = metadataService;
         }
 
         /// <summary>
-        /// Runs the OpenFOAM solver on a single meshed case.
-        /// Automatically detects the solver (simpleFoam, pimpleFoam, etc.) from controlDict.
+        /// Runs the OpenFOAM solver on a single meshed case using the template-driven pipeline.
+        /// Pipeline steps come from TEMPLATE.json solvePipeline.
         /// </summary>
         public virtual SolveResult SolveCase(string caseDir, bool parallel, int cores)
         {
@@ -53,82 +56,72 @@ namespace foamscript.Services
                     return result;
                 }
 
-                // Detect solver from controlDict (simpleFoam, pimpleFoam, etc.)
-                var solverName = DetectSolver(caseDir);
-                var isTransient = solverName == "pimpleFoam";
+                // Load template metadata for pipeline definition
+                var metadata = _metadataService.LoadMetadata(caseDir);
 
                 if (parallel)
                 {
-                    // Clean old processor directories if present
+                    // Clean old processor directories before parallel execution
                     CleanProcessorDirs(caseDir);
+                }
 
-                    // Decompose — transient solvers use -force (time-varying fields)
-                    Console.WriteLine($"Decomposing case for {cores} processors...");
-                    var decomposeArgs = isTransient
-                        ? $"-case {caseDir} -force"
-                        : $"-case {caseDir}";
-                    var decomposeResult = _processExecutor.Execute("decomposePar", decomposeArgs);
+                // Execute solve pipeline from TEMPLATE.json
+                foreach (var step in metadata.SolvePipeline)
+                {
+                    // Skip parallel-only steps (decomposePar, reconstructPar) in serial mode
+                    if (step.ParallelOnly && !parallel)
+                        continue;
 
-                    if (decomposeResult.ExitCode != 0)
+                    var resolvedArgs = ResolvePipelineTokens(step.Args, caseDir, cores);
+                    Console.WriteLine($"Running {step.Command}...");
+
+                    ProcessResult stepResult;
+                    if (step.Parallel && parallel)
                     {
-                        result.IsSuccess = false;
-                        result.ErrorMessage = $"decomposePar failed with exit code {decomposeResult.ExitCode}";
-                        LogToolError("decomposePar", decomposeResult);
-                        return result;
-                    }
-
-                    Console.WriteLine("✓ Domain decomposed successfully");
-
-                    // Run solver in parallel with shell-level log capture.
-                    // mpirun doesn't reliably pipe child process stdout through .NET's
-                    // ProcessStartInfo redirection, so we use tee to write the log file
-                    // directly at the shell level.
-                    Console.WriteLine($"Running {solverName} in parallel ({cores} cores)...");
-                    var logPath = Path.Combine(caseDir, $"log.{solverName}");
-                    var bashCmd = $"set -o pipefail; mpirun -np {cores} {solverName} -case {caseDir} -parallel 2>&1 | tee {logPath}";
-                    var solverResult = _processExecutor.Execute("bash", $"-c \"{bashCmd}\"");
-
-                    if (solverResult.ExitCode != 0)
-                    {
-                        result.IsSuccess = false;
-                        result.ErrorMessage = $"{solverName} (parallel) failed with exit code {solverResult.ExitCode}";
-                        LogToolError($"{solverName} (parallel)", solverResult);
-                        return result;
-                    }
-
-                    Console.WriteLine($"✓ {solverName} completed successfully");
-
-                    // Reconstruct
-                    Console.WriteLine("Reconstructing fields...");
-                    var reconstructResult = _processExecutor.Execute("reconstructPar", $"-case {caseDir}");
-
-                    if (reconstructResult.ExitCode != 0)
-                    {
-                        result.Warnings.Add($"reconstructPar returned exit code {reconstructResult.ExitCode} (may be non-critical)");
+                        // Parallel solver runs via bash with tee for log capture.
+                        // mpirun doesn't reliably pipe child process stdout through .NET's
+                        // ProcessStartInfo redirection, so we use tee to write the log file
+                        // directly at the shell level.
+                        var logPath = Path.Combine(caseDir, $"log.{step.Command}");
+                        var bashCmd = $"set -o pipefail; mpirun -np {cores} {step.Command} -case {caseDir} -parallel 2>&1 | tee {logPath}";
+                        stepResult = _processExecutor.Execute("bash", $"-c \"{bashCmd}\"");
                     }
                     else
                     {
-                        Console.WriteLine("✓ Fields reconstructed successfully");
+                        stepResult = _processExecutor.Execute(step.Command, resolvedArgs);
+
+                        // Persist solver log for serial runs (report generation needs it)
+                        if (step.Parallel && !parallel)
+                        {
+                            PersistSolverLog(caseDir, step.Command, stepResult.Output);
+                        }
                     }
-                }
-                else
-                {
-                    // Run solver in serial
-                    Console.WriteLine($"Running {solverName}...");
-                    var solverResult = _processExecutor.Execute(solverName, $"-case {caseDir}");
 
-                    // Persist solver log for report generation
-                    PersistSolverLog(caseDir, solverName, solverResult.Output);
-
-                    if (solverResult.ExitCode != 0)
+                    if (stepResult.ExitCode != 0)
                     {
-                        result.IsSuccess = false;
-                        result.ErrorMessage = $"{solverName} failed with exit code {solverResult.ExitCode}";
-                        LogToolError(solverName, solverResult);
-                        return result;
+                        if (step.Optional)
+                        {
+                            result.Warnings.Add($"{step.Command} failed (optional step — continuing)");
+                            _loggingService.LogError($"{step.Command} failed: {stepResult.Output}");
+                        }
+                        else if (step.Command == "reconstructPar")
+                        {
+                            // reconstructPar failure is non-critical
+                            result.Warnings.Add($"reconstructPar returned exit code {stepResult.ExitCode} (may be non-critical)");
+                        }
+                        else
+                        {
+                            result.IsSuccess = false;
+                            var label = step.Parallel && parallel ? $"{step.Command} (parallel)" : step.Command;
+                            result.ErrorMessage = $"{label} failed with exit code {stepResult.ExitCode}";
+                            LogToolError(label, stepResult);
+                            return result;
+                        }
                     }
-
-                    Console.WriteLine($"✓ {solverName} completed successfully");
+                    else
+                    {
+                        Console.WriteLine($"✓ {step.Command} completed successfully");
+                    }
                 }
 
                 // Try to extract force coefficients from postProcessing
@@ -246,6 +239,16 @@ namespace foamscript.Services
         }
 
         /// <summary>
+        /// Resolves template tokens in pipeline step arguments.
+        /// </summary>
+        private static string ResolvePipelineTokens(string args, string caseDir, int cores)
+        {
+            return args
+                .Replace("{caseDir}", caseDir)
+                .Replace("{cores}", cores.ToString());
+        }
+
+        /// <summary>
         /// Parses force coefficient data from postProcessing output.
         /// Returns time-averaged values from the last entries.
         /// </summary>
@@ -345,6 +348,7 @@ namespace foamscript.Services
         /// <summary>
         /// Detects the solver application from the case's controlDict file.
         /// Falls back to "simpleFoam" if the application line cannot be parsed.
+        /// Retained as a utility — pipeline execution uses metadata.SolvePipeline instead.
         /// </summary>
         internal static string DetectSolver(string caseDir)
         {
@@ -358,7 +362,7 @@ namespace foamscript.Services
                 var trimmed = line.Trim();
                 if (trimmed.StartsWith("application"))
                 {
-                    // Parse "application     simpleFoam;" → "simpleFoam"
+                    // Parse "application     simpleFoam;" -> "simpleFoam"
                     var match = Regex.Match(trimmed, @"application\s+(\w+)\s*;");
                     if (match.Success)
                         return match.Groups[1].Value;

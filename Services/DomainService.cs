@@ -3,7 +3,7 @@ using foamscript.Models;
 namespace foamscript.Services
 {
     /// <summary>
-    /// Service for domain geometry generation: rotor (cylinder) and tunnel (box) STL creation from disc geometry.
+    /// Service for domain geometry generation: rotor (cylinder) and tunnel (box) STL creation from geometry STL.
     /// </summary>
     public class DomainService
     {
@@ -17,10 +17,11 @@ namespace foamscript.Services
         }
 
         /// <summary>
-        /// Generates rotor and tunnel domain geometries from a disc STL file.
+        /// Generates rotor and tunnel domain geometries from a geometry STL file.
+        /// Validation (e.g., PDGA size checks) is the caller's responsibility via TemplateMetadata.
         /// </summary>
         public DomainGenerationResult GenerateDomain(
-            string discStlFile,
+            string geometryStlFile,
             string outputDirectory,
             double rotorRadiusScale,
             double rotorHeightScale,
@@ -31,36 +32,28 @@ namespace foamscript.Services
         {
             var result = new DomainGenerationResult();
 
-            // Check if disc STL exists
-            var fileCheckResult = _processExecutor.Execute("test", $"-f {discStlFile}");
+            // Check if STL exists
+            var fileCheckResult = _processExecutor.Execute("test", $"-f {geometryStlFile}");
             if (fileCheckResult.ExitCode != 0)
             {
                 result.IsSuccess = false;
-                result.ErrorMessage = $"Disc STL file not found: {discStlFile}";
+                result.ErrorMessage = $"Geometry STL file not found: {geometryStlFile}";
                 return result;
             }
 
-            // Parse disc STL and calculate bounding box
+            // Parse STL and calculate bounding box
             // STL file is assumed to be in meters (converted by the convert command with --input-units)
-            var boundingBox = CalculateBoundingBox(discStlFile);
+            var boundingBox = CalculateBoundingBox(geometryStlFile);
             if (boundingBox == null)
             {
                 result.IsSuccess = false;
-                result.ErrorMessage = $"Failed to parse disc STL file: {discStlFile}";
+                result.ErrorMessage = $"Failed to parse geometry STL file: {geometryStlFile}";
                 return result;
-            }
-
-            // Validate disc dimensions are reasonable (PDGA disc: 21-30cm diameter)
-            var discDiameter = Math.Max(boundingBox.Width, boundingBox.Depth);
-            if (discDiameter < 0.18 || discDiameter > 0.35)
-            {
-                Console.WriteLine($"⚠ Warning: Disc diameter {discDiameter:F4}m is outside expected PDGA range (0.21-0.30m).");
-                Console.WriteLine($"  Ensure you used correct --input-units during conversion.");
             }
 
             result.DiscBoundingBox = boundingBox;
 
-            // Calculate rotor dimensions (cylinder around disc)
+            // Calculate rotor dimensions (cylinder around geometry)
             var discRadius = Math.Max(boundingBox.Width, boundingBox.Depth) / 2.0;
             var discHeight = boundingBox.Height;
             var discCenterX = (boundingBox.MinX + boundingBox.MaxX) / 2.0;
@@ -111,9 +104,67 @@ namespace foamscript.Services
         }
 
         /// <summary>
+        /// Generates only the tunnel (box) domain without a rotor zone.
+        /// Used by templates that do not require rotation (e.g., airfoil, duct).
+        /// </summary>
+        public DomainGenerationResult GenerateTunnelOnly(
+            string stlFile,
+            string outputDirectory,
+            double tunnelUpstream,
+            double tunnelDownstream,
+            double tunnelRadial)
+        {
+            var result = new DomainGenerationResult();
+
+            var fileCheckResult = _processExecutor.Execute("test", $"-f {stlFile}");
+            if (fileCheckResult.ExitCode != 0)
+            {
+                result.IsSuccess = false;
+                result.ErrorMessage = $"STL file not found: {stlFile}";
+                return result;
+            }
+
+            var boundingBox = CalculateBoundingBox(stlFile);
+            if (boundingBox == null)
+            {
+                result.IsSuccess = false;
+                result.ErrorMessage = $"Failed to parse STL file: {stlFile}";
+                return result;
+            }
+
+            result.DiscBoundingBox = boundingBox;
+
+            var refDim = Math.Max(boundingBox.Width, boundingBox.Depth);
+            var centerX = (boundingBox.MinX + boundingBox.MaxX) / 2.0;
+            var centerY = (boundingBox.MinY + boundingBox.MaxY) / 2.0;
+            var centerZ = (boundingBox.MinZ + boundingBox.MaxZ) / 2.0;
+
+            var tunnelDimensions = new BoxDimensions
+            {
+                MinX = centerX - (tunnelUpstream * refDim),
+                MaxX = centerX + (tunnelDownstream * refDim),
+                MinY = centerY - (tunnelRadial * refDim),
+                MaxY = centerY + (tunnelRadial * refDim),
+                MinZ = centerZ - (tunnelRadial * refDim),
+                MaxZ = centerZ + (tunnelRadial * refDim)
+            };
+            result.TunnelDimensions = tunnelDimensions;
+
+            Directory.CreateDirectory(outputDirectory);
+
+            var tunnelStlPath = Path.Combine(outputDirectory, "tunnel.stl");
+            var tunnelMesh = GenerateBoxMesh(tunnelDimensions);
+            WriteStlFile(tunnelStlPath, "tunnel", tunnelMesh);
+            result.TunnelStlFile = tunnelStlPath;
+
+            result.IsSuccess = true;
+            return result;
+        }
+
+        /// <summary>
         /// Calculates bounding box of an STL file by parsing vertices.
         /// </summary>
-        private BoundingBox? CalculateBoundingBox(string stlFile)
+        public BoundingBox? CalculateBoundingBox(string stlFile)
         {
             try
             {

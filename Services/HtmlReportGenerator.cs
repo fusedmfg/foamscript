@@ -12,10 +12,11 @@ namespace foamscript.Services
     {
         /// <summary>
         /// Renders the HTML report template with chart data and returns the HTML string.
+        /// Looks for per-template report.html first, then falls back to global.
         /// </summary>
         public string GenerateReport(ReportData data)
         {
-            var templatePath = FindTemplatePath();
+            var templatePath = FindTemplatePath(data.TemplateName);
             var templateContent = File.ReadAllText(templatePath);
 
             var template = Template.Parse(templateContent);
@@ -46,17 +47,36 @@ namespace foamscript.Services
             File.WriteAllText(outputPath, html);
         }
 
-        private static string FindTemplatePath()
+        /// <summary>
+        /// Finds the report template HTML file. Searches template-specific directory first
+        /// (e.g., Templates/{templateName}/report/report.html), then falls back to global
+        /// Templates/report/report.html. This allows each template to ship its own report layout.
+        /// </summary>
+        internal static string FindTemplatePath(string? templateName = null)
         {
-            // Check relative to executable
             var exeDir = AppDomain.CurrentDomain.BaseDirectory;
-            var candidates = new[]
+            var candidates = new List<string>();
+
+            // Template-specific paths first (if template name is known)
+            if (!string.IsNullOrEmpty(templateName))
+            {
+                candidates.AddRange(new[]
+                {
+                    Path.Combine(exeDir, "Templates", templateName, "report", "report.html"),
+                    Path.Combine(exeDir, "..", "Templates", templateName, "report", "report.html"),
+                    Path.Combine(exeDir, "..", "..", "..", "Templates", templateName, "report", "report.html"),
+                    Path.Combine(exeDir, "..", "..", "..", "..", "Templates", templateName, "report", "report.html"),
+                });
+            }
+
+            // Fall back to global report template
+            candidates.AddRange(new[]
             {
                 Path.Combine(exeDir, "Templates", "report", "report.html"),
                 Path.Combine(exeDir, "..", "Templates", "report", "report.html"),
                 Path.Combine(exeDir, "..", "..", "..", "Templates", "report", "report.html"),
                 Path.Combine(exeDir, "..", "..", "..", "..", "Templates", "report", "report.html"),
-            };
+            });
 
             foreach (var candidate in candidates)
             {
@@ -66,7 +86,7 @@ namespace foamscript.Services
             }
 
             throw new FileNotFoundException(
-                "Could not find report template. Expected at Templates/report/report.html relative to executable.");
+                "Could not find report template. Expected at Templates/{template}/report/report.html or Templates/report/report.html relative to executable.");
         }
 
         private static string ConvertToSnakeCase(string name)
@@ -101,11 +121,18 @@ namespace foamscript.Services
         public List<MeshStatEntry> MeshStats { get; set; } = new();
 
         // Charts (SVG strings for HTML, PNG bytes for PDF)
+        // Legacy fixed chart properties — kept for backward compat with existing report.html templates
         public string ClVsAoaChart { get; set; } = string.Empty;
         public string CdVsAoaChart { get; set; } = string.Empty;
         public string CmVsAoaChart { get; set; } = string.Empty;
         public string LdVsAoaChart { get; set; } = string.Empty;
         public string DragPolarChart { get; set; } = string.Empty;
+
+        /// <summary>
+        /// Dynamic chart list — one SVG chart per coefficient from TEMPLATE.json results.columns.
+        /// New report templates should use this instead of the fixed chart properties above.
+        /// </summary>
+        public List<ChartEntry> CoefficientCharts { get; set; } = new();
 
         // Case results table
         public List<CaseResultEntry> Cases { get; set; } = new();
@@ -142,6 +169,16 @@ namespace foamscript.Services
     public class ConvergenceChartEntry
     {
         public string CaseName { get; set; } = string.Empty;
+        public string Chart { get; set; } = string.Empty;
+    }
+
+    /// <summary>
+    /// A named chart entry for dynamic report generation.
+    /// </summary>
+    public class ChartEntry
+    {
+        public string Name { get; set; } = string.Empty;
+        public string Title { get; set; } = string.Empty;
         public string Chart { get; set; } = string.Empty;
     }
 }

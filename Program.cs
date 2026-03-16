@@ -66,6 +66,7 @@ namespace foamscript
                 builder.Services.AddTransient<StlConversionService>();
                 builder.Services.AddTransient<DomainService>();
                 builder.Services.AddTransient<GeometryService>();
+                builder.Services.AddTransient<TemplateMetadataService>();
                 builder.Services.AddTransient<TemplateService>();
                 builder.Services.AddTransient<CaseService>();
                 builder.Services.AddTransient<MeshService>();
