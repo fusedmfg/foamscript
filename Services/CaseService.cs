@@ -236,7 +236,11 @@ namespace foamscript.Services
             StudyPhysicsConfig physics, StudyDomainConfig domain,
             double spanHalf = 0.0)
         {
-            const double cmu = 0.09; // Standard k-omega SST turbulence model constant
+            // Universal turbulence model constants — NOT template-parameterized.
+            // cmu is the standard eddy-viscosity constant used by k-omega SST, k-epsilon, and Spalart-Allmaras.
+            // TKE formula k = 1.5*(U*TI)² is the definition of turbulent kinetic energy from intensity.
+            // These are physics definitions, not tunable knobs.
+            const double cmu = 0.09;
 
             var nu = physics.Nu ?? 1.5e-5;
             var turbulenceIntensity = physics.TurbulenceIntensity ?? 0.01;
