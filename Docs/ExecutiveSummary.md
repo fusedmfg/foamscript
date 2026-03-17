@@ -32,8 +32,9 @@ Each step involves hand-editing OpenFOAM dictionary files, running shell command
 FoamScript collapses this entire workflow into four commands:
 
 ```
+foamscript convert disc.step disc.stl --input-units mm
 foamscript new-study --template external_disc_rotatingwall_steady \
-  --model-source disc.step --angles 0,5,10 --velocity 27 --rpm 925
+  --model-source disc.stl --angles 0,5,10 --velocity 27 --rpm 925
 foamscript mesh -d ./DiscStudy
 foamscript solve -d ./DiscStudy
 foamscript report -d ./DiscStudy
@@ -43,9 +44,9 @@ foamscript report -d ./DiscStudy
 
 | Feature | Description |
 |---------|-------------|
-| **STEP-to-STL Conversion** | Automated CAD conversion via gmsh with unit detection and scaling |
-| **Domain Generation** | Auto-sized wind tunnel from geometry bounding box (10x/5x/5x extents) |
-| **Template Metadata System** | Each template has `TEMPLATE.json` defining geometry type, solver, pipeline steps, required parameters, and post-processing; `--template` selects the workflow |
+| **STEP-to-STL Conversion** | Separate `convert` command via gmsh with unit scaling and validation; must be run before `new-study` for non-STL geometry |
+| **Template-Driven Domain** | Domain sizing computed from geometry bounding box and template config (upstream, downstream, radial extents, margin) |
+| **Template Metadata System** | Each template has `TEMPLATE.json` defining geometry type, solver, pipeline steps, parameter defaults, domain config, and post-processing; `--template` selects the workflow |
 | **Parallel Meshing** | Template-driven pipeline: blockMesh → surfaceOrient → surfaceFeatureExtract → decomposePar → snappyHexMesh (MPI) → reconstruct |
 | **Template-Driven Solving** | Solver, decomposition, and reconstruction steps defined per-template in `TEMPLATE.json` |
 | **Parametric Studies** | Generate and process multiple angle-of-attack cases automatically |
