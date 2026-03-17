@@ -172,9 +172,9 @@ FoamScript was built using **Claude Code** (Anthropic's AI coding agent) as the 
 │  Production Code       6,880 lines               │
 │  Test Code             5,588 lines               │
 │  Test/Production Ratio 81.2%                     │
-│  Passing Tests         241                       │
+│  Passing Tests         262                       │
 │  Template Files        64                        │
-│  GitHub Issues         39 (29 closed, 10 open)   │
+│  GitHub Issues         41 (30 closed, 11 open)   │
 └─────────────────────────────────────────────────┘
 ```
 

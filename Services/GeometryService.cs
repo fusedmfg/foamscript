@@ -1,3 +1,4 @@
+using System.Globalization;
 using foamscript.Models;
 
 namespace foamscript.Services
@@ -19,6 +20,69 @@ namespace foamscript.Services
 
         public StlValidationResult ValidateStl(string stlFile)
             => _conversionService.ValidateStl(stlFile);
+
+        /// <summary>
+        /// Checks whether the STL bounding box suggests non-meter units based on template validation rules.
+        /// Returns null if no warning is needed (within range, no validation rules, or unreadable STL).
+        /// </summary>
+        public static GeometryScaleWarning? CheckGeometryScale(string stlFile, GeometryValidation? validation)
+        {
+            if (validation == null || (validation.MinSize == null && validation.MaxSize == null))
+                return null;
+
+            var bbox = CalculateBoundingBox(stlFile);
+            if (bbox == null)
+                return null;
+
+            var maxExtent = bbox.Diameter;
+            var minSize = validation.MinSize ?? 0;
+            var maxSize = validation.MaxSize ?? double.MaxValue;
+
+            if (maxExtent >= minSize && maxExtent <= maxSize)
+                return null;
+
+            // Heuristic: guess likely source units based on ratio to expected range
+            var midExpected = (minSize + maxSize) / 2.0;
+            string? likelyUnits = null;
+            if (midExpected > 0)
+            {
+                var ratio = maxExtent / midExpected;
+                if (ratio > 500 && ratio < 2000)
+                    likelyUnits = "mm";
+                else if (ratio > 15 && ratio < 50)
+                    likelyUnits = "in";
+                else if (ratio > 50 && ratio < 500)
+                    likelyUnits = "cm";
+            }
+
+            return new GeometryScaleWarning
+            {
+                MaxExtent = maxExtent,
+                MinSize = minSize,
+                MaxSize = maxSize,
+                LikelySourceUnits = likelyUnits,
+                TemplateWarningMessage = validation.WarningMessage
+            };
+        }
+
+        /// <summary>
+        /// Formats a GeometryScaleWarning into a user-facing warning string.
+        /// </summary>
+        public static string FormatScaleWarning(GeometryScaleWarning warning)
+        {
+            var msg = $"⚠ Geometry max extent ({warning.MaxExtent.ToString("G4", CultureInfo.InvariantCulture)} m) " +
+                      $"is outside expected range ({warning.MinSize.ToString("G3", CultureInfo.InvariantCulture)}–" +
+                      $"{warning.MaxSize.ToString("G3", CultureInfo.InvariantCulture)} m).";
+
+            if (warning.TemplateWarningMessage != null)
+                msg += $"\n  {warning.TemplateWarningMessage}";
+
+            if (warning.LikelySourceUnits != null)
+                msg += $"\n  This looks like {warning.LikelySourceUnits} units. " +
+                       $"Run 'foamscript convert --input-units {warning.LikelySourceUnits} ...' to rescale.";
+
+            return msg;
+        }
 
         /// <summary>
         /// Calculates bounding box of an STL file by parsing vertices.

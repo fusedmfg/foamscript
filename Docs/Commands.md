@@ -212,7 +212,7 @@ Domain sizing is primarily controlled by the template's `TEMPLATE.json` (upstrea
 
 1. **Creates study directory structure**
 2. **Loads template metadata** from `TEMPLATE.json` — determines geometry type, required STL files, pipeline steps, and parameter defaults
-3. **Copies STL geometry** to study directory (validates dimensions against template rules)
+3. **Copies STL geometry** to study directory and checks bounding box against template validation rules — if dimensions suggest non-meter units (mm, cm, in), prints a warning with a suggested `foamscript convert` command (warning only, does not block execution)
 4. **Applies template defaults** — any physics parameter not specified on the CLI is filled from `TEMPLATE.json`
 5. **Computes domain extents** from geometry bounding box and template domain config (upstream, downstream, radial, margin)
 6. **For each angle of attack:**
