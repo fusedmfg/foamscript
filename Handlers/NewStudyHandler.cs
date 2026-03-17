@@ -61,8 +61,6 @@ namespace foamscript.Handlers
                     Angles = model.Angles,
                     Velocity = model.Velocity ?? 0,
                     Rpm = model.Rpm ?? 0,
-                    InputUnits = model.InputUnits,
-                    MeshSize = model.MeshSize,
                     FeatureAngle = model.FeatureAngle,
                     Cores = model.Cores,
                     Physics = new StudyPhysicsConfig
@@ -209,8 +207,6 @@ namespace foamscript.Handlers
             Console.WriteLine($"Cores:            {config.Cores} ({(requestedCores == 0 ? "auto-detected" : "specified")})");
             Console.WriteLine();
             Console.WriteLine("Geometry / Domain Parameters:");
-            Console.WriteLine($"  Input units:        {config.InputUnits} (output in meters)");
-            Console.WriteLine($"  Mesh size:          {config.MeshSize}");
             if (config.FeatureAngle.HasValue)
                 Console.WriteLine($"  Feature angle:      {config.FeatureAngle.Value}°");
             Console.WriteLine($"  Tunnel upstream:    {config.Domain.TunnelUpstream} D");

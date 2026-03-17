@@ -22,7 +22,7 @@ namespace foamscript.Models
         [Option('o', "output-dir", Required = false, HelpText = "Parent directory where project folder will be created (e.g., ~/studies)")]
         public string OutputDir { get; set; } = string.Empty;
 
-        [Option('s', "model-source", Required = false, HelpText = "Path to source geometry file (STEP, IGES, or STL)")]
+        [Option('s', "model-source", Required = false, HelpText = "Path to STL geometry file (in meters). Use 'foamscript convert' first for STEP/IGES files.")]
         public string ModelSource { get; set; } = string.Empty;
 
         [Option('a', "angles", Required = false, HelpText = "Angles of attack in degrees (comma-separated, e.g., -5,-2.5,0,2.5,5)")]
@@ -38,12 +38,6 @@ namespace foamscript.Models
 
         [Option('r', "rpm", Required = false, HelpText = "Rotational speed (RPM)")]
         public double? Rpm { get; set; }
-
-        [Option('u', "input-units", Required = false, Default = "mm", HelpText = "Source file units (mm, cm, m, in, ft). Only used for STEP/IGES conversion. Default: mm")]
-        public string InputUnits { get; set; } = "mm";
-
-        [Option('m', "mesh-size", Required = false, Default = 0.05, HelpText = "STL mesh size factor for STEP/IGES conversion (default: 0.05)")]
-        public double MeshSize { get; set; } = 0.05;
 
         [Option("feature-angle", Required = false, HelpText = "Feature angle for edge preservation in degrees (optional)")]
         public double? FeatureAngle { get; set; }

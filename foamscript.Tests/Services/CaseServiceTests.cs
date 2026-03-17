@@ -134,8 +134,6 @@ endsolid disc
                 Angles = "0",
                 Velocity = 20.0,
                 Rpm = 1000.0,
-                InputUnits = "m",
-                MeshSize = 0.05,
                 Cores = 4,
                 Physics = new StudyPhysicsConfig(),
                 Domain = new StudyDomainConfig()
@@ -452,35 +450,46 @@ endsolid disc
             controlDict.Should().Contain("2.5");
         }
 
-        // ── CreateStudy — STEP File Handling ────────────────────────────────────────
+        // ── CreateStudy — STEP/IGES File Rejection ─────────────────────────────────
 
-        [Fact]
-        public void CreateStudy_WithStepFile_CallsGmshForConversion()
+        [Theory]
+        [InlineData("disc.step")]
+        [InlineData("disc.stp")]
+        [InlineData("disc.iges")]
+        [InlineData("disc.igs")]
+        public void CreateStudy_WithNonStlFile_ReturnsErrorWithConvertHint(string fileName)
         {
             var tempDir = CreateTempDir();
             var templateDir = CreateMinimalTemplate(tempDir);
-            var stepFile = Path.Combine(tempDir, "disc.step");
-            File.WriteAllText(stepFile, "fake step content");
+            var nonStlFile = Path.Combine(tempDir, fileName);
+            File.WriteAllText(nonStlFile, "fake content");
 
-            // gmsh check will find the file
-            _mockProcessExecutor
-                .Setup(x => x.Execute("test", It.IsAny<string>()))
-                .Returns(new ProcessResult { ExitCode = 0, Output = "" });
-
-            // gmsh conversion — will fail because no real gmsh, but we verify the call
-            _mockProcessExecutor
-                .Setup(x => x.Execute("gmsh", It.IsAny<string>()))
-                .Returns(new ProcessResult { ExitCode = 1, Error = "gmsh not available" });
-
-            var config = CreateDefaultConfig(tempDir, stepFile);
+            var config = CreateDefaultConfig(tempDir, nonStlFile);
             config.Angles = "0";
 
             var result = _service.CreateStudy(config, templateDir);
 
-            // Should fail because gmsh mock returns failure, but it should have tried
             result.IsSuccess.Should().BeFalse();
-            result.ErrorMessage.Should().Contain("convert");
-            _mockProcessExecutor.Verify(x => x.Execute("gmsh", It.IsAny<string>()), Times.Once);
+            result.ErrorMessage.Should().Contain("STL file");
+            result.ErrorMessage.Should().Contain("foamscript convert");
+        }
+
+        [Fact]
+        public void CreateStudy_WithUnsupportedFormat_ReturnsError()
+        {
+            var tempDir = CreateTempDir();
+            var templateDir = CreateMinimalTemplate(tempDir);
+            var objFile = Path.Combine(tempDir, "disc.obj");
+            File.WriteAllText(objFile, "fake content");
+
+            var config = CreateDefaultConfig(tempDir, objFile);
+            config.Angles = "0";
+
+            var result = _service.CreateStudy(config, templateDir);
+
+            result.IsSuccess.Should().BeFalse();
+            result.ErrorMessage.Should().Contain("Unsupported file format");
+            result.ErrorMessage.Should().Contain("foamscript convert");
         }
 
         // ── CreateStudy — StudyResult Metadata ──────────────────────────────────────

@@ -12,8 +12,6 @@ namespace foamscript.Models
         public string Angles { get; set; } = string.Empty;
         public double Velocity { get; set; } = 27.0;
         public double Rpm { get; set; } = 925.0;
-        public string InputUnits { get; set; } = "mm";
-        public double MeshSize { get; set; } = 0.05;
         public double? FeatureAngle { get; set; }
         public int Cores { get; set; } = 0;
         public StudyPhysicsConfig Physics { get; set; } = new();
