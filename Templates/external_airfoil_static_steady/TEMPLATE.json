@@ -40,7 +40,7 @@
   "meshPipeline": [
     { "command": "blockMesh", "args": "-case {caseDir}" },
     { "command": "surfaceFeatureExtract", "args": "-case {caseDir}" },
-    { "command": "snappyHexMesh", "args": "-case {caseDir}" },
+    { "command": "snappyHexMesh", "args": "-case {caseDir} -overwrite" },
     { "command": "checkMesh", "args": "-case {caseDir}" }
   ],
   "solvePipeline": [
