@@ -375,6 +375,8 @@ Parallel mode is enabled automatically when cores > 1. Set `FOAMSCRIPT_MAX_CORES
 
 ### Workflow
 
+If the template defines `preProcess` hooks in `TEMPLATE.json`, those run before the mesh pipeline. If any non-optional hook fails, meshing aborts. Available tokens: `{caseDir}`, `{geometryDir}`, `{studyDir}`, `{geometryStlPath}`.
+
 **Serial (1 core):**
 1. `blockMesh` — background hex mesh
 2. `surfaceFeatureExtract` — extract edge features for snapping
@@ -442,6 +444,8 @@ Parallel mode is enabled automatically when cores > 1. Set `FOAMSCRIPT_MAX_CORES
 1. `decomposePar -case <dir>` — decompose with fields
 2. `mpirun -np <cores> <solver> -case <dir> -parallel` — run solver
 3. `reconstructPar -case <dir>` — reassemble time directories
+
+If the template defines `postProcess` hooks in `TEMPLATE.json`, those run after the solve pipeline completes. If any non-optional hook fails, the solve is marked as failed. Available tokens: `{caseDir}`, `{geometryDir}`, `{studyDir}`, `{cores}`.
 
 After solving, force coefficients are extracted from `postProcessing/forces/0/coefficient.dat` using dynamic header parsing and time-window averaging. The available coefficients depend on the OpenFOAM version and function object configuration.
 

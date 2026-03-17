@@ -53,6 +53,37 @@ namespace foamscript.Services
                 // Load template metadata for pipeline definition
                 var metadata = _metadataService.LoadMetadata(caseDir);
 
+                // Execute pre-processing hooks from TEMPLATE.json
+                foreach (var step in metadata.PreProcess)
+                {
+                    var resolvedArgs = ResolvePipelineTokens(step.Args, caseDir, metadata);
+                    Console.WriteLine($"Running pre-process: {step.Command}...");
+
+                    var stepResult = _processExecutor.Execute(step.Command, resolvedArgs);
+
+                    if (stepResult.ExitCode != 0)
+                    {
+                        if (step.Optional)
+                        {
+                            result.Warnings.Add($"Pre-process {step.Command} failed (optional — continuing)");
+                            _loggingService.LogError($"Pre-process {step.Command} failed: {stepResult.Output}");
+                        }
+                        else
+                        {
+                            result.IsSuccess = false;
+                            result.ErrorMessage = $"Pre-process {step.Command} failed with exit code {stepResult.ExitCode}";
+                            _loggingService.LogError($"{step.Command} stdout:\n{stepResult.Output}");
+                            if (!string.IsNullOrEmpty(stepResult.Error))
+                                _loggingService.LogError($"{step.Command} stderr:\n{stepResult.Error}");
+                            return result;
+                        }
+                    }
+                    else
+                    {
+                        Console.WriteLine($"✓ Pre-process {step.Command} completed");
+                    }
+                }
+
                 // Execute mesh pipeline from TEMPLATE.json
                 foreach (var step in metadata.MeshPipeline)
                 {
@@ -149,12 +180,16 @@ namespace foamscript.Services
         private static string ResolvePipelineTokens(string args, string caseDir, TemplateMetadata metadata)
         {
             var geometryStlPath = Path.Combine(caseDir, "constant", "triSurface", metadata.Geometry.StlName);
+            var geometryDir = Path.Combine(caseDir, "constant", "triSurface");
+            var studyDir = Path.GetDirectoryName(caseDir) ?? caseDir;
             var outsidePoint = metadata.Geometry.SurfaceOrient?.OutsidePoint is { Length: 3 } pt
                 ? $"{pt[0]} {pt[1]} {pt[2]}"
                 : "0 0 0";
 
             return args
                 .Replace("{caseDir}", caseDir)
+                .Replace("{geometryDir}", geometryDir)
+                .Replace("{studyDir}", studyDir)
                 .Replace("{geometryStlPath}", geometryStlPath)
                 .Replace("{outsidePoint}", outsidePoint);
         }
