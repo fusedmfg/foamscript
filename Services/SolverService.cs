@@ -124,6 +124,35 @@ namespace foamscript.Services
                     }
                 }
 
+                // Execute post-processing hooks from TEMPLATE.json
+                foreach (var step in metadata.PostProcess)
+                {
+                    var resolvedArgs = ResolvePipelineTokens(step.Args, caseDir, cores);
+                    Console.WriteLine($"Running post-process: {step.Command}...");
+
+                    var stepResult = _processExecutor.Execute(step.Command, resolvedArgs);
+
+                    if (stepResult.ExitCode != 0)
+                    {
+                        if (step.Optional)
+                        {
+                            result.Warnings.Add($"Post-process {step.Command} failed (optional — continuing)");
+                            _loggingService.LogError($"Post-process {step.Command} failed: {stepResult.Output}");
+                        }
+                        else
+                        {
+                            result.IsSuccess = false;
+                            result.ErrorMessage = $"Post-process {step.Command} failed with exit code {stepResult.ExitCode}";
+                            LogToolError(step.Command, stepResult);
+                            return result;
+                        }
+                    }
+                    else
+                    {
+                        Console.WriteLine($"✓ Post-process {step.Command} completed");
+                    }
+                }
+
                 // Try to extract force coefficients from postProcessing
                 var coeffs = ParseForceCoeffs(caseDir);
                 if (coeffs != null)
@@ -243,8 +272,13 @@ namespace foamscript.Services
         /// </summary>
         private static string ResolvePipelineTokens(string args, string caseDir, int cores)
         {
+            var geometryDir = Path.Combine(caseDir, "constant", "triSurface");
+            var studyDir = Path.GetDirectoryName(caseDir) ?? caseDir;
+
             return args
                 .Replace("{caseDir}", caseDir)
+                .Replace("{geometryDir}", geometryDir)
+                .Replace("{studyDir}", studyDir)
                 .Replace("{cores}", cores.ToString());
         }
 

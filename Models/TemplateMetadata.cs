@@ -35,11 +35,17 @@ namespace foamscript.Models
         [JsonPropertyName("domain")]
         public DomainConfig Domain { get; set; } = new();
 
+        [JsonPropertyName("preProcess")]
+        public List<PipelineStep> PreProcess { get; set; } = new();
+
         [JsonPropertyName("meshPipeline")]
         public List<PipelineStep> MeshPipeline { get; set; } = new();
 
         [JsonPropertyName("solvePipeline")]
         public List<PipelineStep> SolvePipeline { get; set; } = new();
+
+        [JsonPropertyName("postProcess")]
+        public List<PipelineStep> PostProcess { get; set; } = new();
 
         [JsonPropertyName("results")]
         public ResultsConfig Results { get; set; } = new();

@@ -1,6 +1,6 @@
 # FoamScript Executive Summary
 
-**Last Updated:** March 16, 2026
+**Last Updated:** March 17, 2026
 **Version:** 0.5.0 (Template Generalization + Environment Redesign)
 **Repository:** [fusedmfg/foamscript](https://github.com/fusedmfg/foamscript)
 
@@ -46,7 +46,9 @@ foamscript report -d ./DiscStudy
 |---------|-------------|
 | **STEP-to-STL Conversion** | Separate `convert` command via gmsh with unit scaling and validation; must be run before `new-study` for non-STL geometry |
 | **Template-Driven Domain** | Domain sizing computed from geometry bounding box and template config (upstream, downstream, radial extents, margin) |
-| **Template Metadata System** | Each template has `TEMPLATE.json` defining geometry type, solver, pipeline steps, parameter defaults, domain config, and post-processing; `--template` selects the workflow |
+| **Template Metadata System** | Each template has `TEMPLATE.json` defining geometry type, solver, pipeline steps, parameter defaults, domain config, pre/post-processing hooks, and reporting; `--template` selects the workflow. See [template authoring guide](Commands.md#creating-templates) |
+| **Geometry Validation** | `new-study` checks STL bounding box against template-defined size rules and warns if dimensions suggest non-meter units (mm, cm, in) with a suggested `convert` command |
+| **Pre/Post-Processing Hooks** | Templates can define `preProcess` and `postProcess` script arrays in TEMPLATE.json — run before meshing and after solving with token substitution and optional/required failure handling |
 | **Parallel Meshing** | Template-driven pipeline: blockMesh → surfaceOrient → surfaceFeatureExtract → decomposePar → snappyHexMesh (MPI) → reconstruct |
 | **Template-Driven Solving** | Solver, decomposition, and reconstruction steps defined per-template in `TEMPLATE.json` |
 | **Parametric Studies** | Generate and process multiple angle-of-attack cases automatically |
@@ -172,9 +174,9 @@ FoamScript was built using **Claude Code** (Anthropic's AI coding agent) as the 
 │  Production Code       6,880 lines               │
 │  Test Code             5,588 lines               │
 │  Test/Production Ratio 81.2%                     │
-│  Passing Tests         241                       │
+│  Passing Tests         271                       │
 │  Template Files        64                        │
-│  GitHub Issues         39 (29 closed, 10 open)   │
+│  GitHub Issues         41 (31 closed, 10 open)   │
 └─────────────────────────────────────────────────┘
 ```
 

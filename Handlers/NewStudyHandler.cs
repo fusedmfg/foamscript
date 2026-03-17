@@ -217,6 +217,18 @@ namespace foamscript.Handlers
                 // Copy domain config from template metadata (margin and spanRatio)
                 config.Domain.Margin = metadata.Domain.Margin;
                 config.Domain.SpanRatio = metadata.Domain.SpanRatio;
+
+                // Check STL bounding box against template validation rules
+                if (config.ModelSource != null)
+                {
+                    var scaleWarning = GeometryService.CheckGeometryScale(config.ModelSource, metadata.Validation);
+                    if (scaleWarning != null)
+                    {
+                        Console.WriteLine();
+                        Console.WriteLine(GeometryService.FormatScaleWarning(scaleWarning));
+                        Console.WriteLine();
+                    }
+                }
             }
             catch (FileNotFoundException)
             {
