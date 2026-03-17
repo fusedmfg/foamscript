@@ -3,17 +3,15 @@ using foamscript.Models;
 namespace foamscript.Services
 {
     /// <summary>
-    /// Facade for geometry operations. Delegates to StlConversionService and DomainService.
+    /// Facade for geometry operations. Delegates to StlConversionService for STEP→STL conversion.
     /// </summary>
     public class GeometryService
     {
         private readonly StlConversionService _conversionService;
-        private readonly DomainService _domainService;
 
-        public GeometryService(StlConversionService conversionService, DomainService domainService)
+        public GeometryService(StlConversionService conversionService)
         {
             _conversionService = conversionService;
-            _domainService = domainService;
         }
 
         public GeometryConversionResult ConvertStepToStl(string inputFile, string outputFile, double meshSize = 1.0, double? featureAngle = null, string inputUnits = "m")
@@ -22,26 +20,61 @@ namespace foamscript.Services
         public StlValidationResult ValidateStl(string stlFile)
             => _conversionService.ValidateStl(stlFile);
 
-        public DomainGenerationResult GenerateDomain(
-            string geometryStlFile,
-            string outputDirectory,
-            double rotorRadiusScale,
-            double rotorHeightScale,
-            double tunnelUpstream,
-            double tunnelDownstream,
-            double tunnelRadial,
-            int meshResolution)
-            => _domainService.GenerateDomain(geometryStlFile, outputDirectory, rotorRadiusScale, rotorHeightScale, tunnelUpstream, tunnelDownstream, tunnelRadial, meshResolution);
+        /// <summary>
+        /// Calculates bounding box of an STL file by parsing vertices.
+        /// </summary>
+        public static BoundingBox? CalculateBoundingBox(string stlFile)
+        {
+            try
+            {
+                var lines = File.ReadAllLines(stlFile);
+                double minX = double.MaxValue, maxX = double.MinValue;
+                double minY = double.MaxValue, maxY = double.MinValue;
+                double minZ = double.MaxValue, maxZ = double.MinValue;
 
-        public DomainGenerationResult GenerateTunnelOnly(
-            string stlFile,
-            string outputDirectory,
-            double tunnelUpstream,
-            double tunnelDownstream,
-            double tunnelRadial)
-            => _domainService.GenerateTunnelOnly(stlFile, outputDirectory, tunnelUpstream, tunnelDownstream, tunnelRadial);
+                foreach (var line in lines)
+                {
+                    var trimmed = line.Trim();
+                    if (trimmed.StartsWith("vertex"))
+                    {
+                        var parts = trimmed.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+                        if (parts.Length >= 4)
+                        {
+                            if (double.TryParse(parts[1], out double x) &&
+                                double.TryParse(parts[2], out double y) &&
+                                double.TryParse(parts[3], out double z))
+                            {
+                                minX = Math.Min(minX, x);
+                                maxX = Math.Max(maxX, x);
+                                minY = Math.Min(minY, y);
+                                maxY = Math.Max(maxY, y);
+                                minZ = Math.Min(minZ, z);
+                                maxZ = Math.Max(maxZ, z);
+                            }
+                        }
+                    }
+                }
 
-        public BoundingBox? CalculateBoundingBox(string stlFile)
-            => _domainService.CalculateBoundingBox(stlFile);
+                if (minX == double.MaxValue)
+                {
+                    return null; // No vertices found
+                }
+
+                return new BoundingBox
+                {
+                    MinX = minX,
+                    MaxX = maxX,
+                    MinY = minY,
+                    MaxY = maxY,
+                    MinZ = minZ,
+                    MaxZ = maxZ
+                };
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"Failed to calculate bounding box: {ex.Message}");
+                return null;
+            }
+        }
     }
 }

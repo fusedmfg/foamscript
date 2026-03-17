@@ -53,7 +53,6 @@ namespace foamscript.Models
         [JsonIgnore] public string GeometryStlName => Geometry.StlName;
         [JsonIgnore] public string ReferenceDimension => Reference.Dimension;
         [JsonIgnore] public string ReferenceAreaFormula => Reference.AreaFormula;
-        [JsonIgnore] public bool RequiresRotorZone => Rotation.RequiresRotorZone;
         [JsonIgnore] public string[] RequiredStlFiles => Geometry.RequiredStlFiles;
     }
 
@@ -91,9 +90,6 @@ namespace foamscript.Models
     {
         [JsonPropertyName("enabled")]
         public bool Enabled { get; set; }
-
-        [JsonPropertyName("requiresRotorZone")]
-        public bool RequiresRotorZone { get; set; }
     }
 
     public class ParameterDef

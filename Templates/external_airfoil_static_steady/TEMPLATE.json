@@ -13,8 +13,7 @@
     "areaFormula": "rectangular"
   },
   "rotation": {
-    "enabled": false,
-    "requiresRotorZone": false
+    "enabled": false
   },
   "validation": null,
   "parameters": {

@@ -78,12 +78,9 @@ namespace foamscript.Handlers
                     },
                     Domain = new StudyDomainConfig
                     {
-                        RotorRadiusScale = model.RotorRadiusScale,
-                        RotorHeightScale = model.RotorHeightScale,
                         TunnelUpstream = model.TunnelUpstream,
                         TunnelDownstream = model.TunnelDownstream,
                         TunnelRadial = model.TunnelRadial,
-                        MeshResolution = model.MeshResolution
                     }
                 };
             }
@@ -216,12 +213,9 @@ namespace foamscript.Handlers
             Console.WriteLine($"  Mesh size:          {config.MeshSize}");
             if (config.FeatureAngle.HasValue)
                 Console.WriteLine($"  Feature angle:      {config.FeatureAngle.Value}°");
-            Console.WriteLine($"  Rotor radius scale: {config.Domain.RotorRadiusScale}x");
-            Console.WriteLine($"  Rotor height scale: {config.Domain.RotorHeightScale}x");
             Console.WriteLine($"  Tunnel upstream:    {config.Domain.TunnelUpstream} D");
             Console.WriteLine($"  Tunnel downstream:  {config.Domain.TunnelDownstream} D");
             Console.WriteLine($"  Tunnel radial:      {config.Domain.TunnelRadial} D");
-            Console.WriteLine($"  Mesh resolution:    {config.Domain.MeshResolution} segments");
             Console.WriteLine();
             Console.WriteLine("Physics Parameters:");
             Console.WriteLine($"  nu:                   {config.Physics.Nu:E2} m²/s");

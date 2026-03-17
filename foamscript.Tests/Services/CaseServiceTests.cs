@@ -22,8 +22,7 @@ namespace foamscript.Tests.Services
             _mockProcessExecutor = new Mock<IProcessExecutor>();
             _mockLoggingService = new Mock<LoggingService>(Mock.Of<ILogger<LoggingService>>());
             _geometryService = new GeometryService(
-                new StlConversionService(_mockProcessExecutor.Object, _mockLoggingService.Object),
-                new DomainService(_mockProcessExecutor.Object, _mockLoggingService.Object));
+                new StlConversionService(_mockProcessExecutor.Object, _mockLoggingService.Object));
             _templateService = new TemplateService(_mockLoggingService.Object);
             _metadataService = new TemplateMetadataService();
             _service = new CaseService(_mockProcessExecutor.Object, _geometryService, _templateService, _metadataService);
@@ -110,15 +109,14 @@ endsolid disc
               "geometry": {
                 "type": "disc",
                 "stlName": "disc.stl",
-                "requiredStlFiles": ["disc.stl", "tunnel.stl"]
+                "requiredStlFiles": ["disc.stl"]
               },
               "reference": {
                 "dimension": "diameter",
                 "areaFormula": "circular"
               },
               "rotation": {
-                "enabled": true,
-                "requiresRotorZone": true
+                "enabled": true
               }
             }
             """);
@@ -393,7 +391,6 @@ endsolid disc
             var triSurfaceDir = Path.Combine(result.Cases[0].CaseDir, "constant", "triSurface");
             Directory.Exists(triSurfaceDir).Should().BeTrue();
             File.Exists(Path.Combine(triSurfaceDir, "disc.stl")).Should().BeTrue();
-            File.Exists(Path.Combine(triSurfaceDir, "tunnel.stl")).Should().BeTrue();
         }
 
         [Fact]

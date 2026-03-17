@@ -122,7 +122,7 @@ namespace foamscript.Services
         }
 
         /// <summary>
-        /// Processes geometry: copies source file, converts if needed, generates domain.
+        /// Processes geometry: copies source file, converts if needed, extracts bounding box.
         /// </summary>
         private (bool Success, string? ErrorMessage, double RefLength, BoundingBox? BoundingBox) ProcessGeometry(
             string geometryDir, StudyConfig config, TemplateMetadata metadata)
@@ -177,42 +177,14 @@ namespace foamscript.Services
                     return (false, $"Unsupported file format: {sourceExt}. Supported formats: .step, .stp, .iges, .igs, .stl", 0.0, null);
                 }
 
-                var domain = config.Domain;
-                DomainGenerationResult domainResult;
-
-                if (metadata.RequiresRotorZone)
+                // Extract bounding box from the geometry STL
+                var bbox = GeometryService.CalculateBoundingBox(geomStlPath);
+                if (bbox == null)
                 {
-                    // Generate rotor and tunnel STL files
-                    domainResult = _geometryService.GenerateDomain(
-                        geomStlPath,
-                        geometryDir,
-                        rotorRadiusScale: domain.RotorRadiusScale,
-                        rotorHeightScale: domain.RotorHeightScale,
-                        tunnelUpstream: domain.TunnelUpstream,
-                        tunnelDownstream: domain.TunnelDownstream,
-                        tunnelRadial: domain.TunnelRadial,
-                        meshResolution: domain.MeshResolution
-                    );
-                }
-                else
-                {
-                    // Generate only tunnel (no rotor zone needed)
-                    domainResult = _geometryService.GenerateTunnelOnly(
-                        geomStlPath,
-                        geometryDir,
-                        tunnelUpstream: domain.TunnelUpstream,
-                        tunnelDownstream: domain.TunnelDownstream,
-                        tunnelRadial: domain.TunnelRadial
-                    );
-                }
-
-                if (!domainResult.IsSuccess)
-                {
-                    return (false, $"Failed to generate domain: {domainResult.ErrorMessage}", 0.0, null);
+                    return (false, $"Failed to parse geometry STL bounding box: {geomStlPath}", 0.0, null);
                 }
 
                 // Extract reference dimension from bounding box using metadata rules
-                var bbox = domainResult.DiscBoundingBox!;
                 var refLength = TemplateMetadataService.CalculateReferenceDimension(bbox, metadata);
 
                 return (true, null, refLength, bbox);

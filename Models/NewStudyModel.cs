@@ -79,12 +79,6 @@ namespace foamscript.Models
 
         // ── Domain geometry parameters ────────────────────────────────────────
 
-        [Option("rotor-radius-scale", Required = false, Default = 1.25, HelpText = "Rotor cylinder radius as a multiple of reference radius — rotating templates only (default: 1.25)")]
-        public double RotorRadiusScale { get; set; } = 1.25;
-
-        [Option("rotor-height-scale", Required = false, Default = 1.5, HelpText = "Rotor cylinder height as a multiple of geometry height — rotating templates only (default: 1.5)")]
-        public double RotorHeightScale { get; set; } = 1.5;
-
         [Option("tunnel-upstream", Required = false, Default = 5.0, HelpText = "Wind tunnel upstream extent in reference lengths (default: 5.0)")]
         public double TunnelUpstream { get; set; } = 5.0;
 
@@ -93,8 +87,5 @@ namespace foamscript.Models
 
         [Option("tunnel-radial", Required = false, Default = 5.0, HelpText = "Wind tunnel radial extent in reference lengths (default: 5.0)")]
         public double TunnelRadial { get; set; } = 5.0;
-
-        [Option("mesh-resolution", Required = false, Default = 32, HelpText = "Number of vertices around generated cylinder geometries (default: 32)")]
-        public int MeshResolution { get; set; } = 32;
     }
 }

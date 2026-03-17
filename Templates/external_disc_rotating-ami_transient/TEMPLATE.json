@@ -13,8 +13,7 @@
     "areaFormula": "circular"
   },
   "rotation": {
-    "enabled": true,
-    "requiresRotorZone": true
+    "enabled": true
   },
   "validation": {
     "minSize": 0.18,
