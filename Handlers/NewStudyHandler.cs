@@ -61,8 +61,6 @@ namespace foamscript.Handlers
                     Angles = model.Angles,
                     Velocity = model.Velocity ?? 0,
                     Rpm = model.Rpm ?? 0,
-                    InputUnits = model.InputUnits,
-                    MeshSize = model.MeshSize,
                     FeatureAngle = model.FeatureAngle,
                     Cores = model.Cores,
                     Physics = new StudyPhysicsConfig
@@ -74,17 +72,14 @@ namespace foamscript.Handlers
                         MaxIterations = model.MaxIterations,
                         WriteInterval = model.WriteInterval,
                         RefinementLevelMin = model.RefinementLevelMin,
-                        RefinementLevelMax = model.RefinementLevelMax
+                        RefinementLevelMax = model.RefinementLevelMax,
                     },
                     Domain = new StudyDomainConfig
                     {
-                        RotorRadiusScale = model.RotorRadiusScale,
-                        RotorHeightScale = model.RotorHeightScale,
                         TunnelUpstream = model.TunnelUpstream,
                         TunnelDownstream = model.TunnelDownstream,
                         TunnelRadial = model.TunnelRadial,
-                        MeshResolution = model.MeshResolution
-                    }
+                    },
                 };
             }
 
@@ -93,11 +88,11 @@ namespace foamscript.Handlers
             var (resolvedCores, _) = CoreResolver.Resolve(config.Cores);
             config.Cores = resolvedCores;
 
-            // Validate physics parameters
+            // Pre-template validation (non-nullable params only)
             var validationErrors = new List<string>();
             if (config.Velocity <= 0) validationErrors.Add($"Velocity must be positive (got {config.Velocity})");
-            if (config.Physics.Nu <= 0) validationErrors.Add($"Kinematic viscosity (nu) must be positive (got {config.Physics.Nu})");
-            if (config.Physics.RefinementLevelMin > config.Physics.RefinementLevelMax)
+            if (config.Physics.RefinementLevelMin.HasValue && config.Physics.RefinementLevelMax.HasValue &&
+                config.Physics.RefinementLevelMin.Value > config.Physics.RefinementLevelMax.Value)
                 validationErrors.Add($"Refinement min ({config.Physics.RefinementLevelMin}) cannot exceed max ({config.Physics.RefinementLevelMax})");
             if (config.Rpm < 0) validationErrors.Add($"RPM must be non-negative (got {config.Rpm})");
 
@@ -134,14 +129,15 @@ namespace foamscript.Handlers
                 return -1;
             }
 
-            // Validate template-required parameters (only for CLI args, not JSON config)
-            if (model.ConfigFile == null)
+            // Load template metadata and apply defaults for null config values
+            try
             {
-                try
-                {
-                    var metadata = _metadataService.LoadMetadata(templatePath);
-                    var templateErrors = new List<string>();
+                var metadata = _metadataService.LoadMetadata(templatePath);
 
+                // Validate template-required parameters (only for CLI args, not JSON config)
+                if (model.ConfigFile == null)
+                {
+                    var templateErrors = new List<string>();
                     foreach (var (paramName, paramDef) in metadata.Parameters)
                     {
                         if (paramDef.Required)
@@ -159,19 +155,6 @@ namespace foamscript.Handlers
                                 templateErrors.Add($"Template '{metadata.Name}' requires --{paramName} but it was not provided");
                             }
                         }
-                        else if (paramDef.Default != null)
-                        {
-                            // Apply template defaults for optional parameters when CLI value is null
-                            switch (paramName.ToLowerInvariant())
-                            {
-                                case "velocity" when model.Velocity == null:
-                                    config.Velocity = Convert.ToDouble(paramDef.Default);
-                                    break;
-                                case "rpm" when model.Rpm == null:
-                                    config.Rpm = Convert.ToDouble(paramDef.Default);
-                                    break;
-                            }
-                        }
                     }
 
                     if (templateErrors.Count > 0)
@@ -183,10 +166,80 @@ namespace foamscript.Handlers
                         return -1;
                     }
                 }
-                catch (FileNotFoundException)
+
+                // Apply template defaults for optional parameters when config value is null (both CLI and JSON paths)
+                foreach (var (paramName, paramDef) in metadata.Parameters)
                 {
-                    // Template has no TEMPLATE.json — skip parameter validation
+                    if (paramDef.Default != null)
+                    {
+                        switch (paramName.ToLowerInvariant())
+                        {
+                            case "velocity" when config.Velocity == 0:
+                                config.Velocity = GetDoubleFromDefault(paramDef.Default);
+                                break;
+                            case "rpm" when config.Rpm == 0:
+                                config.Rpm = GetDoubleFromDefault(paramDef.Default);
+                                break;
+                            case "refinementmin" when config.Physics.RefinementLevelMin == null:
+                                config.Physics.RefinementLevelMin = GetIntFromDefault(paramDef.Default);
+                                break;
+                            case "refinementmax" when config.Physics.RefinementLevelMax == null:
+                                config.Physics.RefinementLevelMax = GetIntFromDefault(paramDef.Default);
+                                break;
+                            case "nu" when config.Physics.Nu == null:
+                                config.Physics.Nu = GetDoubleFromDefault(paramDef.Default);
+                                break;
+                            case "turbulenceintensity" when config.Physics.TurbulenceIntensity == null:
+                                config.Physics.TurbulenceIntensity = GetDoubleFromDefault(paramDef.Default);
+                                break;
+                            case "endtime" when config.Physics.EndTime == null:
+                                config.Physics.EndTime = GetDoubleFromDefault(paramDef.Default);
+                                break;
+                            case "noutercorrectors" when config.Physics.NOuterCorrectors == null:
+                                config.Physics.NOuterCorrectors = GetIntFromDefault(paramDef.Default);
+                                break;
+                            case "maxiterations" when config.Physics.MaxIterations == null:
+                                config.Physics.MaxIterations = GetIntFromDefault(paramDef.Default);
+                                break;
+                            case "writeinterval" when config.Physics.WriteInterval == null:
+                                config.Physics.WriteInterval = GetIntFromDefault(paramDef.Default);
+                                break;
+                            case "mixinglengthratio":
+                                config.Physics.MixingLengthRatio = GetDoubleFromDefault(paramDef.Default);
+                                break;
+                            case "nutildamultiplier":
+                                config.Physics.NuTildaMultiplier = GetDoubleFromDefault(paramDef.Default);
+                                break;
+                        }
+                    }
                 }
+
+                // Copy domain config from template metadata (margin and spanRatio)
+                config.Domain.Margin = metadata.Domain.Margin;
+                config.Domain.SpanRatio = metadata.Domain.SpanRatio;
+            }
+            catch (FileNotFoundException)
+            {
+                // Template has no TEMPLATE.json — skip parameter validation
+            }
+
+            // Post-template validation — nullable physics params must be resolved by now
+            var postValidationErrors = new List<string>();
+            if (config.Physics.Nu == null) postValidationErrors.Add("Kinematic viscosity (nu) was not specified and template has no default");
+            else if (config.Physics.Nu <= 0) postValidationErrors.Add($"Kinematic viscosity (nu) must be positive (got {config.Physics.Nu})");
+            if (config.Physics.TurbulenceIntensity == null) postValidationErrors.Add("Turbulence intensity was not specified and template has no default");
+            if (config.Physics.EndTime == null) postValidationErrors.Add("End time was not specified and template has no default");
+            if (config.Physics.NOuterCorrectors == null) postValidationErrors.Add("Outer correctors was not specified and template has no default");
+            if (config.Physics.MaxIterations == null) postValidationErrors.Add("Max iterations was not specified and template has no default");
+            if (config.Physics.WriteInterval == null) postValidationErrors.Add("Write interval was not specified and template has no default");
+
+            if (postValidationErrors.Count > 0)
+            {
+                Console.WriteLine("✗ Missing physics parameters (not specified and no template default):");
+                foreach (var err in postValidationErrors)
+                    Console.WriteLine($"    {err}");
+                Console.WriteLine();
+                return -1;
             }
 
             _loggingService.LogInformation($"Creating project '{config.ProjectName}' in {config.OutputDir}");
@@ -205,22 +258,17 @@ namespace foamscript.Handlers
             Console.WriteLine($"Cores:            {config.Cores} ({(requestedCores == 0 ? "auto-detected" : "specified")})");
             Console.WriteLine();
             Console.WriteLine("Geometry / Domain Parameters:");
-            Console.WriteLine($"  Input units:        {config.InputUnits} (output in meters)");
-            Console.WriteLine($"  Mesh size:          {config.MeshSize}");
             if (config.FeatureAngle.HasValue)
                 Console.WriteLine($"  Feature angle:      {config.FeatureAngle.Value}°");
-            Console.WriteLine($"  Rotor radius scale: {config.Domain.RotorRadiusScale}x");
-            Console.WriteLine($"  Rotor height scale: {config.Domain.RotorHeightScale}x");
             Console.WriteLine($"  Tunnel upstream:    {config.Domain.TunnelUpstream} D");
             Console.WriteLine($"  Tunnel downstream:  {config.Domain.TunnelDownstream} D");
             Console.WriteLine($"  Tunnel radial:      {config.Domain.TunnelRadial} D");
-            Console.WriteLine($"  Mesh resolution:    {config.Domain.MeshResolution} segments");
             Console.WriteLine();
             Console.WriteLine("Physics Parameters:");
-            Console.WriteLine($"  nu:                   {config.Physics.Nu:E2} m²/s");
-            Console.WriteLine($"  Turbulence intensity: {config.Physics.TurbulenceIntensity * 100:F0}%");
-            Console.WriteLine($"  End time:             {config.Physics.EndTime} s");
-            Console.WriteLine($"  Outer correctors:     {config.Physics.NOuterCorrectors}");
+            Console.WriteLine($"  nu:                   {config.Physics.Nu!.Value:E2} m²/s");
+            Console.WriteLine($"  Turbulence intensity: {config.Physics.TurbulenceIntensity!.Value * 100:F0}%");
+            Console.WriteLine($"  End time:             {config.Physics.EndTime!.Value} s");
+            Console.WriteLine($"  Outer correctors:     {config.Physics.NOuterCorrectors!.Value}");
             Console.WriteLine($"  Refinement levels:    {config.Physics.RefinementLevelMin}–{config.Physics.RefinementLevelMax}");
             Console.WriteLine();
             Console.WriteLine("Processing geometry...");
@@ -332,6 +380,26 @@ namespace foamscript.Handlers
             }
 
             return Path.GetFullPath(resolvedPath);
+        }
+
+        /// <summary>
+        /// Extracts a double from a TEMPLATE.json default value (may be JsonElement or boxed number).
+        /// </summary>
+        private static double GetDoubleFromDefault(object? value)
+        {
+            if (value is JsonElement je)
+                return je.GetDouble();
+            return Convert.ToDouble(value);
+        }
+
+        /// <summary>
+        /// Extracts an int from a TEMPLATE.json default value (may be JsonElement or boxed number).
+        /// </summary>
+        private static int GetIntFromDefault(object? value)
+        {
+            if (value is JsonElement je)
+                return je.GetInt32();
+            return Convert.ToInt32(value);
         }
     }
 }

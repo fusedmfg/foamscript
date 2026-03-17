@@ -46,8 +46,7 @@ namespace foamscript.Tests.Services
                 "areaFormula": "rectangular"
               },
               "rotation": {
-                "enabled": false,
-                "requiresRotorZone": false
+                "enabled": false
               }
             }
             """);
@@ -60,7 +59,6 @@ namespace foamscript.Tests.Services
             metadata.GeometryStlName.Should().Be("airfoil.stl");
             metadata.ReferenceDimension.Should().Be("chord");
             metadata.ReferenceAreaFormula.Should().Be("rectangular");
-            metadata.RequiresRotorZone.Should().BeFalse();
             metadata.RequiredStlFiles.Should().BeEquivalentTo("airfoil.stl", "tunnel.stl");
         }
 
@@ -95,7 +93,7 @@ namespace foamscript.Tests.Services
               "name": "test",
               "geometry": { "type": "disc", "stlName": "disc.stl", "requiredStlFiles": ["disc.stl"] },
               "reference": { "dimension": "diameter", "areaFormula": "circular" },
-              "rotation": { "enabled": true, "requiresRotorZone": true },
+              "rotation": { "enabled": true },
               "validation": {
                 "minSize": 0.18,
                 "maxSize": 0.35,
@@ -121,7 +119,7 @@ namespace foamscript.Tests.Services
               "name": "external_airfoil_static_steady",
               "geometry": { "type": "airfoil", "stlName": "airfoil.stl", "requiredStlFiles": ["airfoil.stl"] },
               "reference": { "dimension": "chord", "areaFormula": "rectangular" },
-              "rotation": { "enabled": false, "requiresRotorZone": false }
+              "rotation": { "enabled": false }
             }
             """);
 
@@ -205,7 +203,6 @@ namespace foamscript.Tests.Services
             metadata.Name.Should().Be("external_disc_rotatingwall_steady");
             metadata.Solver.Should().Be("simpleFoam");
             metadata.GeometryType.Should().Be("disc");
-            metadata.RequiresRotorZone.Should().BeTrue();
         }
 
         [Fact]
@@ -228,8 +225,7 @@ namespace foamscript.Tests.Services
                 "areaFormula": "circular"
               },
               "rotation": {
-                "enabled": true,
-                "requiresRotorZone": true
+                "enabled": true
               },
               "parameters": {
                 "velocity": { "required": true, "default": 27.0, "description": "Freestream velocity (m/s)" },
@@ -287,7 +283,6 @@ namespace foamscript.Tests.Services
 
             // Rotation
             metadata.Rotation.Enabled.Should().BeTrue();
-            metadata.Rotation.RequiresRotorZone.Should().BeTrue();
 
             // Parameters
             metadata.Parameters.Should().ContainKey("velocity");
@@ -336,7 +331,6 @@ namespace foamscript.Tests.Services
             metadata.GeometryStlName.Should().Be("disc.stl");
             metadata.ReferenceDimension.Should().Be("diameter");
             metadata.ReferenceAreaFormula.Should().Be("circular");
-            metadata.RequiresRotorZone.Should().BeTrue();
             metadata.RequiredStlFiles.Should().BeEquivalentTo("disc.stl", "tunnel.stl");
         }
 
@@ -353,7 +347,7 @@ namespace foamscript.Tests.Services
                 "requiredStlFiles": ["airfoil.stl"]
               },
               "reference": { "dimension": "chord", "areaFormula": "rectangular" },
-              "rotation": { "enabled": false, "requiresRotorZone": false }
+              "rotation": { "enabled": false }
             }
             """);
 

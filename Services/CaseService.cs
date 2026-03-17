@@ -94,13 +94,25 @@ namespace foamscript.Services
                 // Convert RPM to rad/s
                 var omega = RpmToRadPerSec(config.Rpm);
 
+                // Copy domain config from template metadata (margin, spanRatio)
+                // These may already be set by the handler from TEMPLATE.json, but for JSON config
+                // path (which skips the handler's template defaults), apply them from metadata.
+                if (config.Domain.Margin == 1.1 && metadata.Domain.Margin != 1.1)
+                    config.Domain.Margin = metadata.Domain.Margin;
+                config.Domain.SpanRatio ??= metadata.Domain.SpanRatio;
+
+                // Calculate spanHalf: if template specifies spanRatio (2D case), use it; else 0 (3D, uses radial)
+                var spanHalf = metadata.Domain.SpanRatio.HasValue
+                    ? bbox.Height / 2.0 * metadata.Domain.SpanRatio.Value
+                    : 0.0;
+
                 // Create case for each angle
                 foreach (var angle in angles)
                 {
                     var caseInfo = CreateCase(result.StudyDir, config.ProjectName, templatePath, angle,
                         config.Velocity, omega, config.Cores, geometryDir, refLength, aref,
-                        metadata.RequiredStlFiles, metadata.RequiresRotorZone, config.Physics, config.Domain,
-                        spanHalf: bbox.Height / 2.0);
+                        metadata.RequiredStlFiles, config.Physics, config.Domain,
+                        spanHalf: spanHalf);
                     result.Cases.Add(caseInfo);
                 }
 
@@ -122,7 +134,8 @@ namespace foamscript.Services
         }
 
         /// <summary>
-        /// Processes geometry: copies source file, converts if needed, generates domain.
+        /// Processes geometry: validates STL input, copies to geometry directory, extracts bounding box.
+        /// STEP/IGES files are no longer accepted — users must run 'foamscript convert' first.
         /// </summary>
         private (bool Success, string? ErrorMessage, double RefLength, BoundingBox? BoundingBox) ProcessGeometry(
             string geometryDir, StudyConfig config, TemplateMetadata metadata)
@@ -136,83 +149,36 @@ namespace foamscript.Services
                 }
 
                 var sourceExt = Path.GetExtension(config.ModelSource).ToLowerInvariant();
-                var sourceFileName = Path.GetFileName(config.ModelSource);
-                var sourceCopyPath = Path.Combine(geometryDir, sourceFileName);
 
-                // Copy source file to geometry directory
-                File.Copy(config.ModelSource, sourceCopyPath, overwrite: true);
-
-                var geomStlName = metadata.GeometryStlName;
-                string geomStlPath;
-
-                // If STEP or IGES, convert to STL
+                // Reject STEP/IGES files — users must convert first
                 if (sourceExt == ".step" || sourceExt == ".stp" || sourceExt == ".iges" || sourceExt == ".igs")
                 {
-                    geomStlPath = Path.Combine(geometryDir, geomStlName);
-
-                    var conversionResult = _geometryService.ConvertStepToStl(
-                        sourceCopyPath,
-                        geomStlPath,
-                        config.MeshSize,
-                        config.FeatureAngle,
-                        config.InputUnits
-                    );
-
-                    if (!conversionResult.IsSuccess)
-                    {
-                        return (false, $"Failed to convert geometry: {conversionResult.ErrorMessage}", 0.0, null);
-                    }
-                }
-                else if (sourceExt == ".stl")
-                {
-                    // If already STL, copy to expected name
-                    geomStlPath = Path.Combine(geometryDir, geomStlName);
-                    if (sourceCopyPath != geomStlPath)
-                    {
-                        File.Copy(sourceCopyPath, geomStlPath, overwrite: true);
-                    }
-                }
-                else
-                {
-                    return (false, $"Unsupported file format: {sourceExt}. Supported formats: .step, .stp, .iges, .igs, .stl", 0.0, null);
+                    return (false,
+                        $"new-study requires an STL file (in meters), but received '{Path.GetFileName(config.ModelSource)}'. " +
+                        $"To convert STEP/IGES files, run: foamscript convert -i {Path.GetFileName(config.ModelSource)} -o model.stl -u <units>",
+                        0.0, null);
                 }
 
-                var domain = config.Domain;
-                DomainGenerationResult domainResult;
-
-                if (metadata.RequiresRotorZone)
+                // Only accept STL files
+                if (sourceExt != ".stl")
                 {
-                    // Generate rotor and tunnel STL files
-                    domainResult = _geometryService.GenerateDomain(
-                        geomStlPath,
-                        geometryDir,
-                        rotorRadiusScale: domain.RotorRadiusScale,
-                        rotorHeightScale: domain.RotorHeightScale,
-                        tunnelUpstream: domain.TunnelUpstream,
-                        tunnelDownstream: domain.TunnelDownstream,
-                        tunnelRadial: domain.TunnelRadial,
-                        meshResolution: domain.MeshResolution
-                    );
-                }
-                else
-                {
-                    // Generate only tunnel (no rotor zone needed)
-                    domainResult = _geometryService.GenerateTunnelOnly(
-                        geomStlPath,
-                        geometryDir,
-                        tunnelUpstream: domain.TunnelUpstream,
-                        tunnelDownstream: domain.TunnelDownstream,
-                        tunnelRadial: domain.TunnelRadial
-                    );
+                    return (false, $"Unsupported file format: {sourceExt}. Only STL files are accepted. " +
+                        "To convert STEP/IGES files, run: foamscript convert -i <input> -o <output.stl> -u <units>", 0.0, null);
                 }
 
-                if (!domainResult.IsSuccess)
+                // Copy STL to geometry directory with the expected name
+                var geomStlName = metadata.GeometryStlName;
+                var geomStlPath = Path.Combine(geometryDir, geomStlName);
+                File.Copy(config.ModelSource, geomStlPath, overwrite: true);
+
+                // Extract bounding box from the geometry STL
+                var bbox = GeometryService.CalculateBoundingBox(geomStlPath);
+                if (bbox == null)
                 {
-                    return (false, $"Failed to generate domain: {domainResult.ErrorMessage}", 0.0, null);
+                    return (false, $"Failed to parse geometry STL bounding box: {geomStlPath}", 0.0, null);
                 }
 
                 // Extract reference dimension from bounding box using metadata rules
-                var bbox = domainResult.DiscBoundingBox!;
                 var refLength = TemplateMetadataService.CalculateReferenceDimension(bbox, metadata);
 
                 return (true, null, refLength, bbox);
@@ -229,7 +195,7 @@ namespace foamscript.Services
         private CaseInfo CreateCase(string studyDir, string studyName, string templatePath,
             double angle, double velocity, double omega, int cores,
             string geometryDir, double refLength, double aref,
-            string[] requiredStlFiles, bool requiresRotorZone,
+            string[] requiredStlFiles,
             StudyPhysicsConfig physics, StudyDomainConfig domain,
             double spanHalf = 0.0)
         {
@@ -251,7 +217,7 @@ namespace foamscript.Services
 
             // Calculate all template parameters
             var context = CalculateTemplateContext(caseInfo.Ux, caseInfo.Uz, omega, cores,
-                refLength, aref, requiresRotorZone, physics, domain, spanHalf);
+                refLength, aref, physics, domain, spanHalf);
 
             // Process template with Scriban
             _templateService.ProcessTemplate(templatePath, caseDir, context);
@@ -266,79 +232,62 @@ namespace foamscript.Services
         /// Calculates all template context parameters for Scriban rendering.
         /// </summary>
         internal static object CalculateTemplateContext(double ux, double uz, double omegaRotation,
-            int cores, double refLength, double aref, bool requiresRotorZone,
+            int cores, double refLength, double aref,
             StudyPhysicsConfig physics, StudyDomainConfig domain,
             double spanHalf = 0.0)
         {
-            const double cmu = 0.09; // Standard k-omega SST turbulence model constant
+            // Universal turbulence model constants — NOT template-parameterized.
+            // cmu is the standard eddy-viscosity constant used by k-omega SST, k-epsilon, and Spalart-Allmaras.
+            // TKE formula k = 1.5*(U*TI)² is the definition of turbulent kinetic energy from intensity.
+            // These are physics definitions, not tunable knobs.
+            const double cmu = 0.09;
+
+            var nu = physics.Nu ?? 1.5e-5;
+            var turbulenceIntensity = physics.TurbulenceIntensity ?? 0.01;
+            var endTime = physics.EndTime ?? 1.0;
+            var nOuterCorrectors = physics.NOuterCorrectors ?? 1;
+            var maxIterations = physics.MaxIterations ?? 500;
+            var writeInterval = physics.WriteInterval ?? 100;
 
             var velocityMagnitude = Math.Sqrt(ux * ux + uz * uz);
-            var k = 1.5 * Math.Pow(velocityMagnitude * physics.TurbulenceIntensity, 2);
-            var mixingLength = 0.07 * refLength;
+            var k = 1.5 * Math.Pow(velocityMagnitude * turbulenceIntensity, 2);
+            var mixingLength = physics.MixingLengthRatio * refLength;
             var omegaTurbulence = Math.Sqrt(k) / (Math.Pow(cmu, 0.25) * mixingLength);
 
-            // Domain extents in meters (with 10% margin beyond tunnel STL)
-            const double margin = 1.1;
+            // Domain extents in meters (with configurable margin)
+            var margin = domain.Margin;
             var domainUpstream = domain.TunnelUpstream * refLength * margin;
             var domainDownstream = domain.TunnelDownstream * refLength * margin;
             var domainRadial = domain.TunnelRadial * refLength * margin;
-
-            // Compute safe initial deltaT targeting Co ≈ 0.125 at finest refinement level
-            var domainLength = domainUpstream + domainDownstream;
-            var nxCells = Math.Ceiling(domainLength / refLength * 4);
-            var baseCellSize = domainLength / nxCells;
-            var fineCellSize = baseCellSize / Math.Pow(2, physics.RefinementLevelMax);
-            var deltaT = 0.125 * fineCellSize / Math.Max(velocityMagnitude, 1.0);
-
-            // Cap maxDeltaT
-            var maxDeltaTFlow = physics.EndTime / 100.0;
-            double maxDeltaT;
-
-            if (requiresRotorZone)
-            {
-                // Mesh motion velocity at rotor boundary (rotor radius ≈ 1.5× geometry radius)
-                var rotorRadius = refLength * 0.75;
-                var meshMotionVelocity = Math.Abs(omegaRotation) * rotorRadius;
-                var maxDeltaTMeshMotion = meshMotionVelocity > 0
-                    ? 0.5 * fineCellSize / meshMotionVelocity
-                    : maxDeltaTFlow;
-                maxDeltaT = Math.Min(maxDeltaTFlow, maxDeltaTMeshMotion);
-            }
-            else
-            {
-                maxDeltaT = maxDeltaTFlow;
-            }
 
             return new
             {
                 ux = ux,
                 uz = uz,
                 p = 0,
-                turbulence_intensity = physics.TurbulenceIntensity,
+                turbulence_intensity = turbulenceIntensity,
                 k = k,
                 cmu = cmu,
                 disc_diameter = refLength,  // backward compat alias
                 ref_length = refLength,
                 mixing_length = mixingLength,
                 omega_turbulence = omegaTurbulence,
-                nu = physics.Nu,
+                nu = nu,
                 omega_rotation = omegaRotation,
-                end_time = physics.EndTime,
+                end_time = endTime,
                 mag_u_inf = velocityMagnitude,
-                n_outer_correctors = physics.NOuterCorrectors,
-                refinement_level_min = physics.RefinementLevelMin,
-                refinement_level_max = physics.RefinementLevelMax,
-                feature_level = physics.RefinementLevelMax,
+                n_outer_correctors = nOuterCorrectors,
+                refinement_level_min = physics.RefinementLevelMin ?? 0,
+                refinement_level_max = physics.RefinementLevelMax ?? 0,
+                feature_level = physics.RefinementLevelMax ?? 0,
                 cores = cores,
                 aref = aref,
                 domain_upstream = domainUpstream,
                 domain_downstream = domainDownstream,
                 domain_radial = domainRadial,
-                delta_t = deltaT,
-                max_delta_t = maxDeltaT,
-                max_iterations = physics.MaxIterations,
-                write_interval = physics.WriteInterval,
-                nu_tilda = 3.0 * physics.Nu,  // Spalart-Allmaras initial value (~3x molecular viscosity)
+                max_iterations = maxIterations,
+                write_interval = writeInterval,
+                nu_tilda = physics.NuTildaMultiplier * nu,  // Spalart-Allmaras initial value
                 domain_span_half = spanHalf > 0 ? spanHalf : domainRadial  // Y half-extent for 2D domains
             };
         }

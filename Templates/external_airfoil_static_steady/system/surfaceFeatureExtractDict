@@ -14,14 +14,19 @@ FoamFile
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
+// Matches airfoilWithLayers tutorial (using airfoil.stl instead of aerofoil.stl)
+
 airfoil.stl
 {
     extractionMethod    extractFromSurface;
 
-    extractFromSurfaceCoeffs
-    {
-        includedAngle   150;
-    }
+    includedAngle       120;
+
+    curvature           true;
+
+    geometricTestOnly   yes;
+
+    intersectionMethod  none;
 
     writeObj            yes;
 }

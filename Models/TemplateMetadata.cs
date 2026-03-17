@@ -53,7 +53,6 @@ namespace foamscript.Models
         [JsonIgnore] public string GeometryStlName => Geometry.StlName;
         [JsonIgnore] public string ReferenceDimension => Reference.Dimension;
         [JsonIgnore] public string ReferenceAreaFormula => Reference.AreaFormula;
-        [JsonIgnore] public bool RequiresRotorZone => Rotation.RequiresRotorZone;
         [JsonIgnore] public string[] RequiredStlFiles => Geometry.RequiredStlFiles;
     }
 
@@ -91,9 +90,6 @@ namespace foamscript.Models
     {
         [JsonPropertyName("enabled")]
         public bool Enabled { get; set; }
-
-        [JsonPropertyName("requiresRotorZone")]
-        public bool RequiresRotorZone { get; set; }
     }
 
     public class ParameterDef
@@ -118,6 +114,16 @@ namespace foamscript.Models
 
         [JsonPropertyName("radial")]
         public double Radial { get; set; }
+
+        /// <summary>Domain extent margin multiplier (e.g., 1.1 = 10% beyond tunnel STL).</summary>
+        [JsonPropertyName("margin")]
+        public double Margin { get; set; } = 1.1;
+
+        /// <summary>
+        /// Span ratio for 2D domains. null = 3D (use radial); 0.8 = STL protrudes through symmetry planes.
+        /// </summary>
+        [JsonPropertyName("spanRatio")]
+        public double? SpanRatio { get; set; }
     }
 
     public class PipelineStep

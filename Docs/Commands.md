@@ -143,6 +143,7 @@ The command displays:
 - **Output is always in meters** (OpenFOAM convention) — verify converted dimensions match expected geometry size
 - **Lower mesh-size = finer mesh** (more triangles, larger file, better accuracy)
 - **Feature angle preserves sharp edges** (use 20-45° for most cases)
+- **Important:** The `convert` command must be run before `new-study` if your geometry is in STEP/IGES format. The `new-study` command requires STL files in meters.
 
 ---
 
@@ -169,7 +170,7 @@ foamscript new-study --config study.json
 | `--template` | `-t` | Template name (run `list-templates` to see available) |
 | `--project-name` | `-n` | Project name (folder and case naming) |
 | `--output-dir` | `-o` | Parent directory for the project folder |
-| `--model-source` | `-s` | Source geometry file: STEP, IGES, or STL |
+| `--model-source` | `-s` | Path to STL geometry file (in meters). Run `convert` first for STEP/IGES files. |
 | `--angles` | `-a` | Angles of attack in degrees, comma-separated |
 
 ### Study Options
@@ -177,46 +178,44 @@ foamscript new-study --config study.json
 | Option | Short | Description | Default |
 |--------|-------|-------------|---------|
 | `--config` | `-c` | Path to JSON config file (replaces all CLI options) | - |
-| `--velocity` | `-v` | Free stream velocity magnitude (m/s) | Template-defined |
+| `--velocity` | `-v` | Freestream velocity magnitude (m/s) | Template-defined |
 | `--rpm` | `-r` | Rotation speed (RPM) — only for rotating templates | Template-defined |
-| `--input-units` | `-u` | Source file units: mm, cm, m, in, ft | `mm` |
-| `--mesh-size` | `-m` | STL mesh size factor for STEP/IGES conversion | `0.05` |
 | `--feature-angle` | | Feature angle for edge preservation (degrees) | - |
 | `--cores` | | Number of CPU cores (0 = auto-detect all available) | `0` |
 
 ### Physics Parameters
 
+All physics parameters are optional. When omitted, defaults are read from the template's `TEMPLATE.json`.
+
 | Option | Description | Default |
 |--------|-------------|---------|
-| `--nu` | Kinematic viscosity (m²/s) — air at ~20°C sea level | `1.5e-5` |
-| `--turbulence-intensity` | Freestream turbulence intensity (fraction, e.g. 0.01 = 1%) | `0.01` |
-| `--max-iterations` | Maximum solver iterations (steady-state) | `500` |
-| `--write-interval` | Write results every N iterations | `100` |
-| `--end-time` | Simulation end time — transient only (seconds) | `1.0` |
-| `--outer-correctors` | PIMPLE outer corrector iterations — transient only | `3` |
-| `--refinement-min` | snappyHexMesh minimum refinement level | `5` |
-| `--refinement-max` | snappyHexMesh maximum refinement level | `6` |
+| `--nu` | Kinematic viscosity (m²/s) — air at ~20°C sea level | Template-defined |
+| `--turbulence-intensity` | Freestream turbulence intensity (fraction, e.g. 0.01 = 1%) | Template-defined |
+| `--max-iterations` | Maximum solver iterations (steady-state) | Template-defined |
+| `--write-interval` | Write results every N iterations | Template-defined |
+| `--end-time` | Simulation end time — transient only (seconds) | Template-defined |
+| `--outer-correctors` | PIMPLE outer corrector iterations — transient only | Template-defined |
+| `--refinement-min` | snappyHexMesh minimum refinement level | Template-defined |
+| `--refinement-max` | snappyHexMesh maximum refinement level | Template-defined |
 
 ### Domain Geometry Parameters
 
-All scales are relative to the geometry's reference length (diameter for discs, chord for airfoils — determined by the template's `TEMPLATE.json`).
+Domain sizing is primarily controlled by the template's `TEMPLATE.json` (upstream, downstream, radial extents and margin). CLI overrides are available for tunnel extent parameters. All scales are relative to the geometry's reference length (diameter for discs, chord for airfoils).
 
 | Option | Description | Default |
 |--------|-------------|---------|
-| `--rotor-radius-scale` | Rotor cylinder radius (multiple of reference radius) — rotating templates only | `1.25` |
-| `--rotor-height-scale` | Rotor cylinder height (multiple of geometry height) — rotating templates only | `1.5` |
 | `--tunnel-upstream` | Wind tunnel upstream extent (reference lengths) | `5.0` |
 | `--tunnel-downstream` | Wind tunnel downstream extent (reference lengths) | `10.0` |
 | `--tunnel-radial` | Wind tunnel radial extent (reference lengths) | `5.0` |
-| `--mesh-resolution` | Segments around generated cylinder geometries | `32` |
 
 ### How It Works
 
 1. **Creates study directory structure**
 2. **Loads template metadata** from `TEMPLATE.json` — determines geometry type, required STL files, pipeline steps, and parameter defaults
-3. **Processes geometry** (convert STEP/IGES → STL, scale to meters, validate)
-4. **Generates domain** — tunnel STL for all templates; rotor STL only for rotating templates
-5. **For each angle of attack:**
+3. **Copies STL geometry** to study directory (validates dimensions against template rules)
+4. **Applies template defaults** — any physics parameter not specified on the CLI is filled from `TEMPLATE.json`
+5. **Computes domain extents** from geometry bounding box and template domain config (upstream, downstream, radial, margin)
+6. **For each angle of attack:**
    - Calculates velocity components: `Ux = V·cos(α)`, `Uz = V·sin(α)`
    - For rotating templates: `ω = RPM × 2π/60`
    - Derives turbulence parameters (`k`, `ω_turb`) from physics config
@@ -230,11 +229,8 @@ The exact structure depends on the template. Example for a disc study with rotat
 ```
 {outputDir}/
 └── {projectName}/
-    ├── geometry/                   # Master geometry (processed once)
-    │   ├── disc.step              # Original source file
-    │   ├── disc.stl               # Converted geometry (meters)
-    │   ├── rotor.stl              # Generated rotor cylinder (rotating templates only)
-    │   └── tunnel.stl             # Generated wind tunnel
+    ├── geometry/                   # Master geometry (copied once)
+    │   └── disc.stl               # User-provided STL (in meters)
     ├── {projectName}_-5.0/        # Case for AoA = -5°
     │   ├── 0/                     # Initial conditions (U, p, k, omega, nut)
     │   ├── constant/
@@ -249,22 +245,28 @@ The exact structure depends on the template. Example for a disc study with rotat
 
 **Disc study — rotating wall BC, steady-state:**
 ```bash
+# Convert STEP to STL first (if needed)
+foamscript convert ~/my_disc.step ~/my_disc.stl --input-units mm
+
+# Create study from STL
 foamscript new-study \
   --template external_disc_rotatingwall_steady \
   -n DiscAnalysis \
   -o ~/studies \
-  -s ~/my_disc.step \
+  -s ~/my_disc.stl \
   -a -5,0,5,10 \
   --velocity 27 --rpm 925
 ```
 
 **Airfoil study — static geometry, steady-state:**
 ```bash
+foamscript convert ~/airfoil.step ~/airfoil.stl --input-units mm
+
 foamscript new-study \
   --template external_airfoil_static_steady \
   -n AirfoilStudy \
   -o ~/studies \
-  -s ~/airfoil.step \
+  -s ~/airfoil.stl \
   -a -5,0,5,10 \
   --velocity 30
 ```
@@ -289,7 +291,7 @@ foamscript new-study \
   --template external_disc_rotating-ami_transient \
   -n HiFi \
   -o ~/studies \
-  -s ~/disc.step \
+  -s ~/disc.stl \
   -a 0,5 \
   --velocity 27 --rpm 925 \
   --refinement-min 4 \
@@ -315,29 +317,26 @@ An alternative to specifying all CLI options is to provide a JSON config file wi
   "projectName": "MyStudy",
   "outputDir": "~/studies",
   "templateName": "external_disc_rotatingwall_steady",
-  "modelSource": "~/my_disc.step",
+  "modelSource": "~/my_disc.stl",
   "angles": "-5,0,5,10",
   "velocity": 27.0,
   "rpm": 925.0,
-  "inputUnits": "mm",
-  "meshSize": 0.05,
   "featureAngle": null,
   "cores": 0,
   "physics": {
     "nu": 1.5e-5,
     "turbulenceIntensity": 0.01,
+    "maxIterations": 500,
+    "writeInterval": 100,
     "endTime": 1.0,
     "nOuterCorrectors": 3,
     "refinementLevelMin": 5,
     "refinementLevelMax": 6
   },
   "domain": {
-    "rotorRadiusScale": 1.25,
-    "rotorHeightScale": 1.5,
     "tunnelUpstream": 5.0,
     "tunnelDownstream": 10.0,
-    "tunnelRadial": 5.0,
-    "meshResolution": 32
+    "tunnelRadial": 5.0
   }
 }
 ```
@@ -345,9 +344,10 @@ An alternative to specifying all CLI options is to provide a JSON config file wi
 ### Notes
 
 - **Required fields**: `projectName`, `outputDir`, `templateName`, `modelSource`, `angles`
-- **All other fields are optional** — omitted physics/domain fields use the same defaults as the CLI options; templates may provide defaults for `velocity` and `rpm`
+- **`modelSource` must be an STL file in meters** — run `foamscript convert` first if you have STEP/IGES geometry
+- **All other fields are optional** — omitted physics/domain fields use defaults from the template's `TEMPLATE.json`
 - **JSON keys are case-insensitive** — `projectName`, `ProjectName`, and `project_name` are all accepted
-- The `physics` and `domain` sections can be omitted entirely if defaults are acceptable
+- The `physics` and `domain` sections can be omitted entirely if template defaults are acceptable
 - `featureAngle` accepts `null` or a numeric value in degrees
 
 ---
@@ -559,33 +559,39 @@ Shows each template name along with metadata from `TEMPLATE.json` (geometry type
 # 1. Validate environment
 foamscript validate
 
-# 2. Create parametric study with AoA sweep
+# 2. Convert STEP geometry to STL (meters)
+foamscript convert ~/my_disc.step ~/my_disc.stl --input-units mm
+
+# 3. Create parametric study with AoA sweep
 foamscript new-study \
   --template external_disc_rotatingwall_steady \
   -n DiscAnalysis \
   -o ~/studies \
-  -s ~/my_disc.step \
+  -s ~/my_disc.stl \
   -a -10,-5,-2.5,0,2.5,5,10 \
   --velocity 27 --rpm 925
 
-# 3. Mesh all cases (auto-detects cores, runs parallel)
+# 4. Mesh all cases (auto-detects cores, runs parallel)
 foamscript mesh -d ~/studies/DiscAnalysis
 
-# 4. Solve all cases
+# 5. Solve all cases
 foamscript solve -d ~/studies/DiscAnalysis
 
-# 5. Generate report
+# 6. Generate report
 foamscript report -d ~/studies/DiscAnalysis
 ```
 
 ### Complete Airfoil Study
 
 ```bash
+# Convert STEP to STL first
+foamscript convert ~/naca0012.step ~/naca0012.stl --input-units mm
+
 foamscript new-study \
   --template external_airfoil_static_steady \
   -n NACA0012 \
   -o ~/studies \
-  -s ~/naca0012.step \
+  -s ~/naca0012.stl \
   -a -5,-2.5,0,2.5,5,7.5,10 \
   --velocity 30
 
@@ -597,17 +603,19 @@ foamscript report -d ~/studies/NACA0012
 ### Using a Config File for Repeatable Studies
 
 ```bash
+# Convert geometry first
+foamscript convert ~/my_disc.step ~/my_disc.stl --input-units mm
+
 # Save study config as JSON
 cat > ~/studies/disc_study.json << 'EOF'
 {
   "projectName": "DiscAnalysis",
   "outputDir": "~/studies",
   "templateName": "external_disc_rotatingwall_steady",
-  "modelSource": "~/my_disc.step",
+  "modelSource": "~/my_disc.stl",
   "angles": "-10,-5,-2.5,0,2.5,5,10",
   "velocity": 27.0,
   "rpm": 925.0,
-  "inputUnits": "mm",
   "cores": 8
 }
 EOF
@@ -635,13 +643,6 @@ foamscript convert disc.step disc.stl \
 
 ## Tips and Best Practices
 
-### Mesh Size Selection
-
-- **Coarse (0.1)**: Quick preview, low accuracy
-- **Medium (0.05)**: Standard for most studies
-- **Fine (0.02-0.03)**: High accuracy, slower conversion
-- **Very Fine (0.01)**: Research-grade, very slow
-
 ### Angle of Attack Arrays
 
 - **Coarse sweep**: `-10,0,10` (quick exploration)
@@ -656,12 +657,12 @@ foamscript convert disc.step disc.stl \
 
 ### Geometry Units
 
-Always specify correct input units:
-- CAD files from SolidWorks/Fusion 360 are typically in **mm**
-- CAD files from some tools may be in **inches**
-- STL files from scanners may be in **mm** or **m**
+The `new-study` command requires STL files already converted to **meters**. Use `foamscript convert` to handle unit conversion from STEP/IGES files:
+- CAD files from SolidWorks/Fusion 360 are typically in **mm** — use `--input-units mm`
+- CAD files from some tools may be in **inches** — use `--input-units in`
+- STL files already in meters can be used directly with `new-study`
 
-When in doubt, check the file in your CAD software before conversion.
+When in doubt, check the file in your CAD software before conversion, or use `foamscript convert ... --validate` to inspect dimensions.
 
 ---
 

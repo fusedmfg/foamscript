@@ -17,8 +17,7 @@ namespace foamscript.Tests.Services
             _mockProcessExecutor = new Mock<IProcessExecutor>();
             _mockLoggingService = new Mock<LoggingService>(Mock.Of<Microsoft.Extensions.Logging.ILogger<LoggingService>>());
             _service = new GeometryService(
-                new StlConversionService(_mockProcessExecutor.Object, _mockLoggingService.Object),
-                new DomainService(_mockProcessExecutor.Object, _mockLoggingService.Object));
+                new StlConversionService(_mockProcessExecutor.Object, _mockLoggingService.Object));
         }
 
         [Fact]

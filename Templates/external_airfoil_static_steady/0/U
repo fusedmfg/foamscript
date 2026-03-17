@@ -20,13 +20,7 @@ internalField   uniform ({{ ux }} 0 {{ uz }});
 
 boundaryField
 {
-    inlet
-    {
-        type            freestreamVelocity;
-        freestreamValue $internalField;
-    }
-
-    outlet
+    airFlow
     {
         type            freestreamVelocity;
         freestreamValue $internalField;
@@ -37,21 +31,14 @@ boundaryField
         type            noSlip;
     }
 
-    lowerWall
+    front
     {
-        type            freestreamVelocity;
-        freestreamValue $internalField;
+        type            symmetryPlane;
     }
 
-    upperWall
+    back
     {
-        type            freestreamVelocity;
-        freestreamValue $internalField;
-    }
-
-    frontAndBack
-    {
-        type            empty;
+        type            symmetryPlane;
     }
 }
 

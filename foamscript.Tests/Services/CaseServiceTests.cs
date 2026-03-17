@@ -22,8 +22,7 @@ namespace foamscript.Tests.Services
             _mockProcessExecutor = new Mock<IProcessExecutor>();
             _mockLoggingService = new Mock<LoggingService>(Mock.Of<ILogger<LoggingService>>());
             _geometryService = new GeometryService(
-                new StlConversionService(_mockProcessExecutor.Object, _mockLoggingService.Object),
-                new DomainService(_mockProcessExecutor.Object, _mockLoggingService.Object));
+                new StlConversionService(_mockProcessExecutor.Object, _mockLoggingService.Object));
             _templateService = new TemplateService(_mockLoggingService.Object);
             _metadataService = new TemplateMetadataService();
             _service = new CaseService(_mockProcessExecutor.Object, _geometryService, _templateService, _metadataService);
@@ -110,15 +109,14 @@ endsolid disc
               "geometry": {
                 "type": "disc",
                 "stlName": "disc.stl",
-                "requiredStlFiles": ["disc.stl", "tunnel.stl"]
+                "requiredStlFiles": ["disc.stl"]
               },
               "reference": {
                 "dimension": "diameter",
                 "areaFormula": "circular"
               },
               "rotation": {
-                "enabled": true,
-                "requiresRotorZone": true
+                "enabled": true
               }
             }
             """);
@@ -136,8 +134,6 @@ endsolid disc
                 Angles = "0",
                 Velocity = 20.0,
                 Rpm = 1000.0,
-                InputUnits = "m",
-                MeshSize = 0.05,
                 Cores = 4,
                 Physics = new StudyPhysicsConfig(),
                 Domain = new StudyDomainConfig()
@@ -149,6 +145,43 @@ endsolid disc
             _mockProcessExecutor
                 .Setup(x => x.Execute("test", $"-f {path}"))
                 .Returns(new ProcessResult { ExitCode = 0, Output = "" });
+
+        // ── CalculateTemplateContext — Unit Tests ──────────────────────────────────
+
+        [Fact]
+        public void CalculateTemplateContext_DoesNotContain_LegacyDeltaTProperties()
+        {
+            var physics = new StudyPhysicsConfig();
+            var domain = new StudyDomainConfig();
+
+            var context = CaseService.CalculateTemplateContext(
+                ux: 20.0, uz: 0.0, omegaRotation: 100.0,
+                cores: 4, refLength: 0.211, aref: 0.035,
+                physics: physics, domain: domain);
+
+            // delta_t and max_delta_t were removed — they belonged to the abandoned AMI/transient approach
+            var properties = context.GetType().GetProperties();
+            var propertyNames = properties.Select(p => p.Name).ToArray();
+            propertyNames.Should().NotContain("delta_t");
+            propertyNames.Should().NotContain("max_delta_t");
+        }
+
+        [Fact]
+        public void CalculateTemplateContext_StillContains_OmegaRotation()
+        {
+            var physics = new StudyPhysicsConfig();
+            var domain = new StudyDomainConfig();
+
+            var context = CaseService.CalculateTemplateContext(
+                ux: 20.0, uz: 0.0, omegaRotation: 100.0,
+                cores: 4, refLength: 0.211, aref: 0.035,
+                physics: physics, domain: domain);
+
+            // omega_rotation must survive — used by disc template's rotatingWallVelocity BC
+            var omegaProp = context.GetType().GetProperty("omega_rotation");
+            omegaProp.Should().NotBeNull();
+            ((double)omegaProp!.GetValue(context)!).Should().BeApproximately(100.0, 1e-10);
+        }
 
         // ── CreateStudy — Input Validation ──────────────────────────────────────────
 
@@ -356,7 +389,6 @@ endsolid disc
             var triSurfaceDir = Path.Combine(result.Cases[0].CaseDir, "constant", "triSurface");
             Directory.Exists(triSurfaceDir).Should().BeTrue();
             File.Exists(Path.Combine(triSurfaceDir, "disc.stl")).Should().BeTrue();
-            File.Exists(Path.Combine(triSurfaceDir, "tunnel.stl")).Should().BeTrue();
         }
 
         [Fact]
@@ -418,35 +450,46 @@ endsolid disc
             controlDict.Should().Contain("2.5");
         }
 
-        // ── CreateStudy — STEP File Handling ────────────────────────────────────────
+        // ── CreateStudy — STEP/IGES File Rejection ─────────────────────────────────
 
-        [Fact]
-        public void CreateStudy_WithStepFile_CallsGmshForConversion()
+        [Theory]
+        [InlineData("disc.step")]
+        [InlineData("disc.stp")]
+        [InlineData("disc.iges")]
+        [InlineData("disc.igs")]
+        public void CreateStudy_WithNonStlFile_ReturnsErrorWithConvertHint(string fileName)
         {
             var tempDir = CreateTempDir();
             var templateDir = CreateMinimalTemplate(tempDir);
-            var stepFile = Path.Combine(tempDir, "disc.step");
-            File.WriteAllText(stepFile, "fake step content");
+            var nonStlFile = Path.Combine(tempDir, fileName);
+            File.WriteAllText(nonStlFile, "fake content");
 
-            // gmsh check will find the file
-            _mockProcessExecutor
-                .Setup(x => x.Execute("test", It.IsAny<string>()))
-                .Returns(new ProcessResult { ExitCode = 0, Output = "" });
-
-            // gmsh conversion — will fail because no real gmsh, but we verify the call
-            _mockProcessExecutor
-                .Setup(x => x.Execute("gmsh", It.IsAny<string>()))
-                .Returns(new ProcessResult { ExitCode = 1, Error = "gmsh not available" });
-
-            var config = CreateDefaultConfig(tempDir, stepFile);
+            var config = CreateDefaultConfig(tempDir, nonStlFile);
             config.Angles = "0";
 
             var result = _service.CreateStudy(config, templateDir);
 
-            // Should fail because gmsh mock returns failure, but it should have tried
             result.IsSuccess.Should().BeFalse();
-            result.ErrorMessage.Should().Contain("convert");
-            _mockProcessExecutor.Verify(x => x.Execute("gmsh", It.IsAny<string>()), Times.Once);
+            result.ErrorMessage.Should().Contain("STL file");
+            result.ErrorMessage.Should().Contain("foamscript convert");
+        }
+
+        [Fact]
+        public void CreateStudy_WithUnsupportedFormat_ReturnsError()
+        {
+            var tempDir = CreateTempDir();
+            var templateDir = CreateMinimalTemplate(tempDir);
+            var objFile = Path.Combine(tempDir, "disc.obj");
+            File.WriteAllText(objFile, "fake content");
+
+            var config = CreateDefaultConfig(tempDir, objFile);
+            config.Angles = "0";
+
+            var result = _service.CreateStudy(config, templateDir);
+
+            result.IsSuccess.Should().BeFalse();
+            result.ErrorMessage.Should().Contain("Unsupported file format");
+            result.ErrorMessage.Should().Contain("foamscript convert");
         }
 
         // ── CreateStudy — StudyResult Metadata ──────────────────────────────────────
@@ -467,6 +510,109 @@ endsolid disc
             result.IsSuccess.Should().BeTrue();
             result.StudyName.Should().Be("MyDiscStudy");
             result.StudyDir.Should().EndWith("MyDiscStudy");
+        }
+
+        // ── CalculateTemplateContext — Template-Driven Values ────────────────────────
+
+        [Fact]
+        public void CalculateTemplateContext_UsesMixingLengthRatio()
+        {
+            var physics = new StudyPhysicsConfig { MixingLengthRatio = 0.1 };
+            var domain = new StudyDomainConfig();
+            var refLength = 0.211;
+
+            var context = CaseService.CalculateTemplateContext(
+                ux: 20.0, uz: 0.0, omegaRotation: 100.0,
+                cores: 4, refLength: refLength, aref: 0.035,
+                physics: physics, domain: domain);
+
+            var mixingLength = (double)context.GetType().GetProperty("mixing_length")!.GetValue(context)!;
+            mixingLength.Should().BeApproximately(0.1 * refLength, 1e-10);
+        }
+
+        [Fact]
+        public void CalculateTemplateContext_UsesNuTildaMultiplier()
+        {
+            var physics = new StudyPhysicsConfig { Nu = 1.5e-5, NuTildaMultiplier = 5.0 };
+            var domain = new StudyDomainConfig();
+
+            var context = CaseService.CalculateTemplateContext(
+                ux: 20.0, uz: 0.0, omegaRotation: 100.0,
+                cores: 4, refLength: 0.211, aref: 0.035,
+                physics: physics, domain: domain);
+
+            var nuTilda = (double)context.GetType().GetProperty("nu_tilda")!.GetValue(context)!;
+            nuTilda.Should().BeApproximately(5.0 * 1.5e-5, 1e-15);
+        }
+
+        [Fact]
+        public void CalculateTemplateContext_UsesDomainMargin()
+        {
+            var physics = new StudyPhysicsConfig();
+            var domain = new StudyDomainConfig
+            {
+                Margin = 1.0,  // no margin
+                TunnelUpstream = 5.0,
+                TunnelDownstream = 10.0,
+                TunnelRadial = 5.0
+            };
+            var refLength = 1.0;
+
+            var context = CaseService.CalculateTemplateContext(
+                ux: 20.0, uz: 0.0, omegaRotation: 0.0,
+                cores: 4, refLength: refLength, aref: 1.0,
+                physics: physics, domain: domain);
+
+            var domainUpstream = (double)context.GetType().GetProperty("domain_upstream")!.GetValue(context)!;
+            var domainDownstream = (double)context.GetType().GetProperty("domain_downstream")!.GetValue(context)!;
+            var domainRadial = (double)context.GetType().GetProperty("domain_radial")!.GetValue(context)!;
+
+            // With margin 1.0, no expansion: upstream = 5.0 * 1.0 * 1.0 = 5.0
+            domainUpstream.Should().BeApproximately(5.0, 1e-10);
+            domainDownstream.Should().BeApproximately(10.0, 1e-10);
+            domainRadial.Should().BeApproximately(5.0, 1e-10);
+        }
+
+        [Fact]
+        public void CalculateTemplateContext_DefaultMargin_Applies10PercentExpansion()
+        {
+            var physics = new StudyPhysicsConfig();
+            var domain = new StudyDomainConfig();  // default Margin = 1.1
+            var refLength = 1.0;
+
+            var context = CaseService.CalculateTemplateContext(
+                ux: 20.0, uz: 0.0, omegaRotation: 0.0,
+                cores: 4, refLength: refLength, aref: 1.0,
+                physics: physics, domain: domain);
+
+            var domainUpstream = (double)context.GetType().GetProperty("domain_upstream")!.GetValue(context)!;
+            // With default margin 1.1: upstream = 5.0 * 1.0 * 1.1 = 5.5
+            domainUpstream.Should().BeApproximately(5.5, 1e-10);
+        }
+
+        [Fact]
+        public void CalculateTemplateContext_NullablePhysics_UseFallbackDefaults()
+        {
+            // All nullable physics params are null — should use fallback defaults
+            var physics = new StudyPhysicsConfig();
+            var domain = new StudyDomainConfig();
+
+            var context = CaseService.CalculateTemplateContext(
+                ux: 20.0, uz: 0.0, omegaRotation: 100.0,
+                cores: 4, refLength: 0.211, aref: 0.035,
+                physics: physics, domain: domain);
+
+            // nu fallback is 1.5e-5
+            var nu = (double)context.GetType().GetProperty("nu")!.GetValue(context)!;
+            nu.Should().BeApproximately(1.5e-5, 1e-10);
+
+            // end_time fallback is 1.0
+            var endTime = (double)context.GetType().GetProperty("end_time")!.GetValue(context)!;
+            endTime.Should().BeApproximately(1.0, 1e-10);
+
+            // max_iterations fallback is 500
+            var maxIter = (int)context.GetType().GetProperty("max_iterations")!.GetValue(context)!;
+            maxIter.Should().Be(500);
         }
     }
 }

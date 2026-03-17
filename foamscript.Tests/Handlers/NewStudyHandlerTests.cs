@@ -24,8 +24,7 @@ namespace foamscript.Tests.Handlers
 
             // CaseService requires (IProcessExecutor, GeometryService, TemplateService, TemplateMetadataService) — build the chain
             var geometryService = new GeometryService(
-                new StlConversionService(_mockProcessExecutor.Object, _mockLoggingService.Object),
-                new DomainService(_mockProcessExecutor.Object, _mockLoggingService.Object));
+                new StlConversionService(_mockProcessExecutor.Object, _mockLoggingService.Object));
             var templateService = new TemplateService(_mockLoggingService.Object);
             var metadataService = new TemplateMetadataService();
             _mockCaseService = new Mock<CaseService>(
@@ -87,7 +86,15 @@ namespace foamscript.Tests.Handlers
     ""modelSource"": ""/tmp/disc.stl"",
     ""angles"": ""0,5,10"",
     ""velocity"": 20.0,
-    ""rpm"": 1000.0
+    ""rpm"": 1000.0,
+    ""physics"": {{
+        ""nu"": 1.5e-5,
+        ""turbulenceIntensity"": 0.01,
+        ""endTime"": 500,
+        ""nOuterCorrectors"": 1,
+        ""maxIterations"": 500,
+        ""writeInterval"": 100
+    }}
 }}";
         }
 

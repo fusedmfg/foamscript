@@ -16,6 +16,15 @@ FoamFile
 
 solvers
 {
+    // From airfoilWithLayers tutorial — cellDisplacement for snappyHexMesh layer addition
+    "cellDisplacement.*"
+    {
+        solver          GAMG;
+        tolerance       1e-08;
+        relTol          0;
+        smoother        GaussSeidel;
+    }
+
     p
     {
         solver          GAMG;

@@ -20,13 +20,7 @@ internalField   uniform {{ nu_tilda }};
 
 boundaryField
 {
-    inlet
-    {
-        type            freestream;
-        freestreamValue $internalField;
-    }
-
-    outlet
+    airFlow
     {
         type            freestream;
         freestreamValue $internalField;
@@ -38,21 +32,14 @@ boundaryField
         value           uniform 0;
     }
 
-    lowerWall
+    front
     {
-        type            freestream;
-        freestreamValue $internalField;
+        type            symmetryPlane;
     }
 
-    upperWall
+    back
     {
-        type            freestream;
-        freestreamValue $internalField;
-    }
-
-    frontAndBack
-    {
-        type            empty;
+        type            symmetryPlane;
     }
 }
 

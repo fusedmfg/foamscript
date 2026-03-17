@@ -55,4 +55,12 @@ wallDist
     method          meshWave;
 }
 
+// From airfoilWithLayers tutorial — high aspect ratio mesh improvement
+geometry
+{
+    type            highAspectRatio;
+    minAspect       10;
+    maxAspect       100;
+}
+
 // ************************************************************************* //

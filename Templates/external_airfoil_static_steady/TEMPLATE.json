@@ -13,27 +13,34 @@
     "areaFormula": "rectangular"
   },
   "rotation": {
-    "enabled": false,
-    "requiresRotorZone": false
+    "enabled": false
   },
   "validation": null,
   "parameters": {
     "velocity": { "required": true, "description": "Freestream velocity (m/s)" },
     "angles": { "required": true, "description": "Angle(s) of attack (degrees)" },
-    "refinementMin": { "required": false, "default": 5, "description": "Minimum refinement level" },
-    "refinementMax": { "required": false, "default": 6, "description": "Maximum refinement level" }
+    "refinementMin": { "required": false, "default": 2, "description": "Minimum refinement level" },
+    "refinementMax": { "required": false, "default": 2, "description": "Maximum refinement level" },
+    "nu": { "required": false, "default": 1.5e-5, "description": "Kinematic viscosity (m²/s)" },
+    "turbulenceIntensity": { "required": false, "default": 0.01, "description": "Freestream turbulence intensity" },
+    "maxIterations": { "required": false, "default": 15000, "description": "Maximum solver iterations" },
+    "writeInterval": { "required": false, "default": 1000, "description": "Write interval (iterations)" },
+    "endTime": { "required": false, "default": 15000, "description": "Simulation end time" },
+    "nOuterCorrectors": { "required": false, "default": 1, "description": "SIMPLE outer correctors" },
+    "mixingLengthRatio": { "required": false, "default": 0.07, "description": "Mixing length ratio" },
+    "nuTildaMultiplier": { "required": false, "default": 3.0, "description": "nu-tilda multiplier" }
   },
   "domain": {
     "upstream": 5.0,
     "downstream": 10.0,
-    "radial": 5.0
+    "radial": 5.0,
+    "margin": 1.0,
+    "spanRatio": 0.8
   },
   "meshPipeline": [
     { "command": "blockMesh", "args": "-case {caseDir}" },
     { "command": "surfaceFeatureExtract", "args": "-case {caseDir}" },
-    { "command": "decomposePar", "args": "-case {caseDir}", "parallelOnly": true },
-    { "command": "snappyHexMesh", "args": "-case {caseDir} -overwrite", "parallel": true },
-    { "command": "reconstructParMesh", "args": "-case {caseDir} -constant", "parallelOnly": true },
+    { "command": "snappyHexMesh", "args": "-case {caseDir} -overwrite" },
     { "command": "checkMesh", "args": "-case {caseDir}" }
   ],
   "solvePipeline": [

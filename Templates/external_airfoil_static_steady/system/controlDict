@@ -24,13 +24,13 @@ deltaT          1;
 writeControl    timeStep;
 
 writeInterval   {{ write_interval }};
-purgeWrite      3;
-writeFormat     ascii;
-writePrecision  7;
+purgeWrite      2;
+writeFormat     binary;
+writePrecision  15;
 writeCompression off;
 timeFormat      general;
-timePrecision   6;
-runTimeModifiable yes;
+timePrecision   8;
+runTimeModifiable false;
 
 functions
 {

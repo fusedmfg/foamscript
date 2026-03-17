@@ -16,28 +16,27 @@ FoamFile
 
 scale   1;
 
-// 2D domain: thin in Y (single cell), extended in X (streamwise) and Z (normal)
-// Based on aerofoilNACA0012_directionalRefinement tutorial pattern
+// Based on airfoilWithLayers tutorial (parameterized domain extents)
 
 vertices
 (
-    (-{{ domain_upstream }}  -{{ domain_span_half }}  -{{ domain_radial }}) // 0
-    ( {{ domain_downstream }} -{{ domain_span_half }}  -{{ domain_radial }}) // 1
-    ( {{ domain_downstream }}  {{ domain_span_half }}  -{{ domain_radial }}) // 2
-    (-{{ domain_upstream }}   {{ domain_span_half }}  -{{ domain_radial }}) // 3
-    (-{{ domain_upstream }}  -{{ domain_span_half }}   {{ domain_radial }}) // 4
-    ( {{ domain_downstream }} -{{ domain_span_half }}   {{ domain_radial }}) // 5
-    ( {{ domain_downstream }}  {{ domain_span_half }}   {{ domain_radial }}) // 6
-    (-{{ domain_upstream }}   {{ domain_span_half }}   {{ domain_radial }}) // 7
+    (-{{ domain_upstream }}  -{{ domain_span_half }}  -{{ domain_radial }})
+    ( {{ domain_downstream }} -{{ domain_span_half }}  -{{ domain_radial }})
+    ( {{ domain_downstream }}  {{ domain_span_half }}  -{{ domain_radial }})
+    (-{{ domain_upstream }}   {{ domain_span_half }}  -{{ domain_radial }})
+    (-{{ domain_upstream }}  -{{ domain_span_half }}   {{ domain_radial }})
+    ( {{ domain_downstream }} -{{ domain_span_half }}   {{ domain_radial }})
+    ( {{ domain_downstream }}  {{ domain_span_half }}   {{ domain_radial }})
+    (-{{ domain_upstream }}   {{ domain_span_half }}   {{ domain_radial }})
 );
 
-{{- # Cell counts: streamwise and normal sized to ~4 cells per chord, 1 cell spanwise }}
+{{- # Cell counts: streamwise and normal sized to ~4 cells per chord, 5 spanwise (matches tutorial) }}
 {{- nx = math.ceil((domain_upstream + domain_downstream) / ref_length * 4) }}
 {{- nz = math.ceil(2 * domain_radial / ref_length * 4) }}
 
 blocks
 (
-    hex (0 1 2 3 4 5 6 7) ({{ nx }} 1 {{ nz }}) simpleGrading (1 1 1)
+    hex (0 1 2 3 4 5 6 7) ({{ nx }} 5 {{ nz }}) simpleGrading (1 1 1)
 );
 
 edges
@@ -45,45 +44,33 @@ edges
 
 boundary
 (
-    inlet
-    {
-        type patch;
-        faces
-        (
-            (0 4 7 3)
-        );
-    }
-    outlet
+    airFlow
     {
         type patch;
         faces
         (
             (2 6 5 1)
+            (0 4 7 3)
+            (0 3 2 1)
+            (4 5 6 7)
         );
     }
-    frontAndBack
+
+    front
     {
-        type empty;
+        type symmetryPlane;
         faces
         (
             (3 7 6 2)
+        );
+    }
+
+    back
+    {
+        type symmetryPlane;
+        faces
+        (
             (1 5 4 0)
-        );
-    }
-    lowerWall
-    {
-        type patch;
-        faces
-        (
-            (0 3 2 1)
-        );
-    }
-    upperWall
-    {
-        type patch;
-        faces
-        (
-            (4 5 6 7)
         );
     }
 );

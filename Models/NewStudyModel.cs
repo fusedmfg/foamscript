@@ -22,7 +22,7 @@ namespace foamscript.Models
         [Option('o', "output-dir", Required = false, HelpText = "Parent directory where project folder will be created (e.g., ~/studies)")]
         public string OutputDir { get; set; } = string.Empty;
 
-        [Option('s', "model-source", Required = false, HelpText = "Path to source geometry file (STEP, IGES, or STL)")]
+        [Option('s', "model-source", Required = false, HelpText = "Path to STL geometry file (in meters). Use 'foamscript convert' first for STEP/IGES files.")]
         public string ModelSource { get; set; } = string.Empty;
 
         [Option('a', "angles", Required = false, HelpText = "Angles of attack in degrees (comma-separated, e.g., -5,-2.5,0,2.5,5)")]
@@ -39,51 +39,39 @@ namespace foamscript.Models
         [Option('r', "rpm", Required = false, HelpText = "Rotational speed (RPM)")]
         public double? Rpm { get; set; }
 
-        [Option('u', "input-units", Required = false, Default = "mm", HelpText = "Source file units (mm, cm, m, in, ft). Only used for STEP/IGES conversion. Default: mm")]
-        public string InputUnits { get; set; } = "mm";
-
-        [Option('m', "mesh-size", Required = false, Default = 0.05, HelpText = "STL mesh size factor for STEP/IGES conversion (default: 0.05)")]
-        public double MeshSize { get; set; } = 0.05;
-
         [Option("feature-angle", Required = false, HelpText = "Feature angle for edge preservation in degrees (optional)")]
         public double? FeatureAngle { get; set; }
 
         [Option("cores", Required = false, Default = 0, HelpText = "Number of CPU cores for parallel execution (0 = auto-detect, default: auto-detect)")]
         public int Cores { get; set; } = 0;
 
-        // ── Physics parameters ────────────────────────────────────────────────
+        // ── Physics parameters (nullable — template defaults apply when not specified) ──
 
-        [Option("nu", Required = false, Default = 1.5e-5, HelpText = "Kinematic viscosity of air (m²/s, default: 1.5e-5 for air at 20°C sea level)")]
-        public double Nu { get; set; } = 1.5e-5;
+        [Option("nu", Required = false, HelpText = "Kinematic viscosity of air (m²/s, template default: 1.5e-5 for air at 20°C sea level)")]
+        public double? Nu { get; set; }
 
-        [Option("turbulence-intensity", Required = false, Default = 0.01, HelpText = "Freestream turbulence intensity as a fraction (default: 0.01 = 1%)")]
-        public double TurbulenceIntensity { get; set; } = 0.01;
+        [Option("turbulence-intensity", Required = false, HelpText = "Freestream turbulence intensity as a fraction (template default: 0.01 = 1%)")]
+        public double? TurbulenceIntensity { get; set; }
 
-        [Option("end-time", Required = false, Default = 1.0, HelpText = "Simulation end time in seconds (default: 1.0)")]
-        public double EndTime { get; set; } = 1.0;
+        [Option("end-time", Required = false, HelpText = "Simulation end time (template default varies by solver type)")]
+        public double? EndTime { get; set; }
 
-        [Option("outer-correctors", Required = false, Default = 3, HelpText = "PIMPLE outer corrector iterations (default: 3)")]
-        public int NOuterCorrectors { get; set; } = 3;
+        [Option("outer-correctors", Required = false, HelpText = "PIMPLE outer corrector iterations (template default varies)")]
+        public int? NOuterCorrectors { get; set; }
 
-        [Option("max-iterations", Required = false, Default = 500, HelpText = "Maximum solver iterations for steady-state simpleFoam (default: 500)")]
-        public int MaxIterations { get; set; } = 500;
+        [Option("max-iterations", Required = false, HelpText = "Maximum solver iterations (template default varies)")]
+        public int? MaxIterations { get; set; }
 
-        [Option("write-interval", Required = false, Default = 100, HelpText = "Write results every N iterations (default: 100)")]
-        public int WriteInterval { get; set; } = 100;
+        [Option("write-interval", Required = false, HelpText = "Write results every N iterations (template default varies)")]
+        public int? WriteInterval { get; set; }
 
-        [Option("refinement-min", Required = false, Default = 5, HelpText = "snappyHexMesh minimum refinement level (default: 5)")]
-        public int RefinementLevelMin { get; set; } = 5;
+        [Option("refinement-min", Required = false, HelpText = "snappyHexMesh minimum refinement level (template-defined, fallback: 0)")]
+        public int? RefinementLevelMin { get; set; }
 
-        [Option("refinement-max", Required = false, Default = 6, HelpText = "snappyHexMesh maximum refinement level (default: 6)")]
-        public int RefinementLevelMax { get; set; } = 6;
+        [Option("refinement-max", Required = false, HelpText = "snappyHexMesh maximum refinement level (template-defined, fallback: 0)")]
+        public int? RefinementLevelMax { get; set; }
 
         // ── Domain geometry parameters ────────────────────────────────────────
-
-        [Option("rotor-radius-scale", Required = false, Default = 1.25, HelpText = "Rotor cylinder radius as a multiple of reference radius — rotating templates only (default: 1.25)")]
-        public double RotorRadiusScale { get; set; } = 1.25;
-
-        [Option("rotor-height-scale", Required = false, Default = 1.5, HelpText = "Rotor cylinder height as a multiple of geometry height — rotating templates only (default: 1.5)")]
-        public double RotorHeightScale { get; set; } = 1.5;
 
         [Option("tunnel-upstream", Required = false, Default = 5.0, HelpText = "Wind tunnel upstream extent in reference lengths (default: 5.0)")]
         public double TunnelUpstream { get; set; } = 5.0;
@@ -93,8 +81,5 @@ namespace foamscript.Models
 
         [Option("tunnel-radial", Required = false, Default = 5.0, HelpText = "Wind tunnel radial extent in reference lengths (default: 5.0)")]
         public double TunnelRadial { get; set; } = 5.0;
-
-        [Option("mesh-resolution", Required = false, Default = 32, HelpText = "Number of vertices around generated cylinder geometries (default: 32)")]
-        public int MeshResolution { get; set; } = 32;
     }
 }

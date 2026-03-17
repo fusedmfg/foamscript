@@ -65,7 +65,6 @@ namespace foamscript
                 builder.Services.AddSingleton<OpenFoamEnvironment>();
                 builder.Services.AddTransient<EnvironmentService>();
                 builder.Services.AddTransient<StlConversionService>();
-                builder.Services.AddTransient<DomainService>();
                 builder.Services.AddTransient<GeometryService>();
                 builder.Services.AddTransient<TemplateMetadataService>();
                 builder.Services.AddTransient<TemplateService>();
