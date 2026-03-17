@@ -11,6 +11,8 @@ Complete reference for all FoamScript commands with explanations and examples.
 - [solve](#solve) - Run solver on a case or study directory
 - [report](#report) - Generate AIAA-quality analysis report (HTML + PDF + CSV)
 - [list-templates](#list-templates) - List available templates
+- [Pre/Post-Processing Hooks](#prepost-processing-hooks) - Configure template script hooks
+- [Creating Templates](#creating-templates) - Template authoring guide
 
 ---
 
@@ -81,7 +83,7 @@ fi
 
 ## convert
 
-Converts STEP or IGES CAD geometry files to STL format with unit conversion and optional validation.
+Converts STEP or IGES CAD geometry files to STL format **in meters** — the required input format for `new-study`. Most CAD tools export STEP files in millimeters, inches, or other non-meter units; `convert` handles both the format conversion (STEP/IGES → STL via gmsh) and the unit scaling to meters in one step.
 
 ### Usage
 
@@ -103,9 +105,9 @@ foamscript convert <input> <output> [OPTIONS]
 
 ### How It Works
 
-1. **Conversion**: Uses gmsh to convert STEP/IGES → STL
-2. **Unit Scaling**: Automatically scales from input units to meters (OpenFOAM standard)
-3. **Validation** (optional): Checks for watertightness, manifold edges, self-intersection
+1. **Conversion**: Uses gmsh to convert STEP/IGES → STL surface mesh
+2. **Unit Scaling**: Scales all coordinates from `--input-units` to meters — e.g., a disc that is 210 mm in the STEP file becomes 0.210 m in the output STL. This is critical because `new-study` and all downstream OpenFOAM operations assume geometry is in meters.
+3. **Validation** (optional): Runs `surfaceCheck` to verify watertightness, manifold edges, and self-intersection
 
 ### Examples
 
@@ -140,10 +142,12 @@ The command displays:
 
 ### Notes
 
+- **This is the prerequisite for `new-study`** when your geometry is STEP or IGES. The `new-study` command only accepts STL files and assumes they are already in meters. If you skip `convert` or use the wrong `--input-units`, your simulation domain and physics will be wrong (e.g., a 210 mm disc treated as 210 m).
 - **Output is always in meters** (OpenFOAM convention) — verify converted dimensions match expected geometry size
+- **`--input-units` must match your CAD file's units** — SolidWorks and Fusion 360 typically export in **mm**, some tools use **inches**. Check your CAD software's export settings if unsure.
 - **Lower mesh-size = finer mesh** (more triangles, larger file, better accuracy)
 - **Feature angle preserves sharp edges** (use 20-45° for most cases)
-- **Important:** The `convert` command must be run before `new-study` if your geometry is in STEP/IGES format. The `new-study` command requires STL files in meters.
+- **If you already have an STL in meters**, you can skip `convert` entirely and pass it directly to `new-study`. The `new-study` command will check the bounding box and warn if the dimensions look wrong for the template.
 
 ---
 
@@ -375,7 +379,7 @@ Parallel mode is enabled automatically when cores > 1. Set `FOAMSCRIPT_MAX_CORES
 
 ### Workflow
 
-If the template defines `preProcess` hooks in `TEMPLATE.json`, those run before the mesh pipeline. If any non-optional hook fails, meshing aborts. Available tokens: `{caseDir}`, `{geometryDir}`, `{studyDir}`, `{geometryStlPath}`.
+If the template defines `preProcess` hooks in `TEMPLATE.json`, those run before the mesh pipeline. See [Pre/Post-Processing Hooks](#prepost-processing-hooks) for configuration details.
 
 **Serial (1 core):**
 1. `blockMesh` — background hex mesh
@@ -445,7 +449,7 @@ Parallel mode is enabled automatically when cores > 1. Set `FOAMSCRIPT_MAX_CORES
 2. `mpirun -np <cores> <solver> -case <dir> -parallel` — run solver
 3. `reconstructPar -case <dir>` — reassemble time directories
 
-If the template defines `postProcess` hooks in `TEMPLATE.json`, those run after the solve pipeline completes. If any non-optional hook fails, the solve is marked as failed. Available tokens: `{caseDir}`, `{geometryDir}`, `{studyDir}`, `{cores}`.
+If the template defines `postProcess` hooks in `TEMPLATE.json`, those run after the solve pipeline completes. See [Pre/Post-Processing Hooks](#prepost-processing-hooks) for configuration details.
 
 After solving, force coefficients are extracted from `postProcessing/forces/0/coefficient.dat` using dynamic header parsing and time-window averaging. The available coefficients depend on the OpenFOAM version and function object configuration.
 
@@ -552,6 +556,407 @@ foamscript list-templates
 ### Output
 
 Shows each template name along with metadata from `TEMPLATE.json` (geometry type, solver, description). Templates without `TEMPLATE.json` fall back to `TEMPLATE.md` parsing.
+
+---
+
+## Pre/Post-Processing Hooks
+
+Templates can define `preProcess` and `postProcess` arrays in `TEMPLATE.json` to run custom scripts at specific points in the pipeline:
+
+- **`preProcess`** — runs before the mesh pipeline (during `foamscript mesh`)
+- **`postProcess`** — runs after the solve pipeline (during `foamscript solve`)
+
+### Hook Schema
+
+Each hook is a pipeline step with the same schema used by `meshPipeline` and `solvePipeline`:
+
+```json
+{
+  "preProcess": [
+    { "command": "surfaceCheck", "args": "{geometryStlPath}", "optional": true }
+  ],
+  "postProcess": [
+    { "command": "postProcess", "args": "-case {caseDir} -func yPlus", "optional": false }
+  ]
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `command` | string | Executable name (must be on PATH or in OpenFOAM bin) |
+| `args` | string | Arguments with token substitution (see below) |
+| `optional` | bool | If `true`, failure is logged but does not abort the pipeline. Default `false`. |
+| `parallel` | bool | If `true` and cores > 1, runs with `mpirun -np <cores>`. Default `false`. |
+| `parallelOnly` | bool | If `true`, step is skipped in serial mode (cores = 1). Default `false`. |
+
+### Available Tokens
+
+Tokens in `args` are replaced at runtime with actual paths:
+
+| Token | Description | Example |
+|-------|-------------|---------|
+| `{caseDir}` | Absolute path to the current case directory | `/home/user/studies/Disc/Disc_0.0` |
+| `{geometryDir}` | Absolute path to the study's `geometry/` folder | `/home/user/studies/Disc/geometry` |
+| `{studyDir}` | Absolute path to the study root directory | `/home/user/studies/Disc` |
+| `{geometryStlPath}` | Absolute path to the primary STL in `triSurface/` | `.../constant/triSurface/disc.stl` |
+| `{cores}` | Number of CPU cores (postProcess only) | `8` |
+
+### Failure Handling
+
+- **Required hooks** (`optional: false`): If the command exits non-zero, the entire mesh or solve operation is aborted for that case.
+- **Optional hooks** (`optional: true`): Failure is logged as a warning, and the pipeline continues normally.
+
+### Example: Surface Validation Before Meshing
+
+```json
+{
+  "preProcess": [
+    {
+      "command": "surfaceCheck",
+      "args": "{geometryStlPath}",
+      "optional": true
+    }
+  ]
+}
+```
+
+This runs `surfaceCheck` on the STL before meshing each case. Since it's optional, a non-watertight STL warning won't block meshing.
+
+### Example: Post-Solve y+ Calculation
+
+```json
+{
+  "postProcess": [
+    {
+      "command": "postProcess",
+      "args": "-case {caseDir} -func yPlus",
+      "optional": false
+    }
+  ]
+}
+```
+
+This runs the OpenFOAM `postProcess` utility to compute wall y+ values after solving. Since it's required, failure will mark the case solve as failed.
+
+---
+
+## Creating Templates
+
+Templates are the core abstraction in FoamScript. Each template is a directory containing OpenFOAM case files (as Scriban templates) plus a `TEMPLATE.json` metadata file that tells FoamScript how to use them.
+
+### Template Directory Structure
+
+```
+Templates/
+└── my_template_name/
+    ├── TEMPLATE.json              # Required — metadata, parameters, pipelines
+    ├── TEMPLATE.md                # Optional — human-readable description
+    ├── 0/                         # Initial condition templates (Scriban)
+    │   ├── U
+    │   ├── p
+    │   ├── k
+    │   ├── omega
+    │   └── nut
+    ├── constant/                  # Physical properties templates
+    │   ├── transportProperties
+    │   ├── turbulenceProperties
+    │   └── MRFProperties          # Only if rotation.enabled
+    ├── system/                    # Solver/mesh configuration templates
+    │   ├── blockMeshDict
+    │   ├── controlDict
+    │   ├── decomposeParDict
+    │   ├── fvSchemes
+    │   ├── fvSolution
+    │   ├── snappyHexMeshDict
+    │   └── surfaceFeatureExtractDict
+    └── report/                    # Optional — custom report template
+        └── report.html
+```
+
+### Naming Convention
+
+Template directory names follow the pattern: `{flow}_{geometry}_{motion}_{timeScheme}`
+
+Examples:
+- `external_disc_rotatingwall_steady` — external flow, disc, rotating wall BC, steady-state
+- `external_airfoil_static_steady` — external flow, airfoil, no rotation, steady-state
+- `external_disc_rotating-ami_transient` — external flow, disc, AMI sliding mesh, transient
+
+### TEMPLATE.json Reference
+
+The `TEMPLATE.json` file is the heart of a template. It defines everything FoamScript needs to create, mesh, solve, and report on a study.
+
+#### Top-Level Fields
+
+```json
+{
+  "name": "my_template_name",
+  "description": "Human-readable description shown by list-templates",
+  "solver": "simpleFoam"
+}
+```
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `name` | Yes | Must match the directory name |
+| `description` | Yes | Shown by `foamscript list-templates` |
+| `solver` | Yes | OpenFOAM solver application (`simpleFoam`, `pimpleFoam`, etc.) |
+
+#### Geometry Section
+
+Defines what STL files the template expects and how to orient them.
+
+```json
+{
+  "geometry": {
+    "type": "disc",
+    "stlName": "disc.stl",
+    "requiredStlFiles": ["disc.stl"],
+    "surfaceOrient": { "outsidePoint": [0, 0, -1] }
+  }
+}
+```
+
+| Field | Description |
+|-------|-------------|
+| `type` | Geometry category (`disc`, `airfoil`, etc.) — used for reference dimension logic |
+| `stlName` | Primary STL filename (what the user-provided STL is renamed to) |
+| `requiredStlFiles` | All STL files needed in `constant/triSurface/`. Simple templates need only the user's STL; AMI templates may need `rotor.stl` and `tunnel.stl` in addition. |
+| `surfaceOrient` | If set, runs `surfaceOrient` with the given outside point to ensure consistent normals. Set to `null` to skip. |
+
+#### Reference Section
+
+Controls how force coefficients are normalized.
+
+```json
+{
+  "reference": {
+    "dimension": "diameter",
+    "areaFormula": "circular"
+  }
+}
+```
+
+| Field | Values | Description |
+|-------|--------|-------------|
+| `dimension` | `diameter`, `chord` | Which geometry dimension to use as reference length |
+| `areaFormula` | `circular`, `rectangular` | `circular` = π·r², `rectangular` = chord × span |
+
+#### Rotation Section
+
+```json
+{
+  "rotation": {
+    "enabled": true
+  }
+}
+```
+
+When `enabled: true`, the `--rpm` parameter becomes required and angular velocity is computed for template variables.
+
+#### Validation Section
+
+Optional geometry size checking. When defined, `new-study` checks the STL bounding box and warns if dimensions fall outside the expected range.
+
+```json
+{
+  "validation": {
+    "minSize": 0.18,
+    "maxSize": 0.35,
+    "warningMessage": "Disc diameter outside expected PDGA range (0.21-0.30m). Ensure correct --input-units."
+  }
+}
+```
+
+| Field | Description |
+|-------|-------------|
+| `minSize` | Minimum expected max extent in meters |
+| `maxSize` | Maximum expected max extent in meters |
+| `warningMessage` | Custom warning shown when size is out of range |
+
+If the STL max extent falls outside `[minSize, maxSize]`, FoamScript prints the warning along with a suggested `foamscript convert` command based on the likely source units (mm, cm, or inches). This is a **warning only** — it does not block study creation.
+
+Set `validation` to `null` to disable size checking (useful for templates that accept arbitrary geometry sizes).
+
+#### Parameters Section
+
+Declares all tunable parameters with defaults and descriptions. These map to CLI options and are used to fill template defaults when CLI values are omitted.
+
+```json
+{
+  "parameters": {
+    "velocity": { "required": true, "description": "Freestream velocity (m/s)" },
+    "rpm": { "required": true, "description": "Rotational speed (RPM)" },
+    "angles": { "required": true, "description": "Angle(s) of attack (degrees)" },
+    "refinementMin": { "required": false, "default": 5, "description": "Minimum refinement level" },
+    "nu": { "required": false, "default": 1.5e-5, "description": "Kinematic viscosity (m²/s)" },
+    "turbulenceIntensity": { "required": false, "default": 0.01, "description": "Freestream turbulence intensity" },
+    "maxIterations": { "required": false, "default": 500, "description": "Maximum solver iterations" },
+    "writeInterval": { "required": false, "default": 100, "description": "Write interval (iterations)" },
+    "endTime": { "required": false, "default": 500, "description": "Simulation end time" },
+    "nOuterCorrectors": { "required": false, "default": 1, "description": "SIMPLE/PIMPLE outer correctors" },
+    "mixingLengthRatio": { "required": false, "default": 0.07, "description": "Mixing length ratio" },
+    "nuTildaMultiplier": { "required": false, "default": 3.0, "description": "nu-tilda multiplier" }
+  }
+}
+```
+
+- **`required: true`** parameters must be provided on the CLI or in the JSON config file
+- **`required: false`** parameters use their `default` value when omitted from the CLI
+- `velocity`, `rpm`, and `angles` are the standard required parameters; `rpm` is only required when `rotation.enabled` is `true`
+
+#### Domain Section
+
+Controls how the computational domain is sized relative to the geometry.
+
+```json
+{
+  "domain": {
+    "upstream": 5.0,
+    "downstream": 10.0,
+    "radial": 5.0,
+    "margin": 1.1,
+    "spanRatio": null
+  }
+}
+```
+
+| Field | Description | Default |
+|-------|-------------|---------|
+| `upstream` | Upstream extent in reference lengths | - |
+| `downstream` | Downstream extent in reference lengths | - |
+| `radial` | Radial/lateral extent in reference lengths | - |
+| `margin` | Domain sizing margin multiplier (e.g., 1.1 = 10% extra) | `1.1` |
+| `spanRatio` | Span-to-reference-length ratio for 2D simulations. `null` = 3D. Values < 1.0 make STL protrude through symmetry planes for proper 2D meshing. | `null` |
+
+#### Pipeline Sections
+
+The `meshPipeline` and `solvePipeline` arrays define the OpenFOAM commands to run. Each step supports token substitution and parallel execution flags.
+
+```json
+{
+  "meshPipeline": [
+    { "command": "blockMesh", "args": "-case {caseDir}" },
+    { "command": "surfaceOrient", "args": "{geometryStlPath} \"({outsidePoint})\" {geometryStlPath}", "optional": true },
+    { "command": "surfaceFeatureExtract", "args": "-case {caseDir}" },
+    { "command": "decomposePar", "args": "-case {caseDir}", "parallelOnly": true },
+    { "command": "snappyHexMesh", "args": "-case {caseDir} -overwrite", "parallel": true },
+    { "command": "reconstructParMesh", "args": "-case {caseDir} -constant", "parallelOnly": true },
+    { "command": "checkMesh", "args": "-case {caseDir}" }
+  ],
+  "solvePipeline": [
+    { "command": "decomposePar", "args": "-case {caseDir} -force", "parallelOnly": true },
+    { "command": "simpleFoam", "args": "-case {caseDir}", "parallel": true },
+    { "command": "reconstructPar", "args": "-case {caseDir} -latestTime", "parallelOnly": true }
+  ]
+}
+```
+
+Key flags:
+- **`parallel: true`** — run with `mpirun -np <cores>` when cores > 1, or normally when cores = 1
+- **`parallelOnly: true`** — skip entirely when running in serial (cores = 1)
+- **`optional: true`** — failure doesn't abort the pipeline
+
+#### Pre/Post-Processing Hooks
+
+See [Pre/Post-Processing Hooks](#prepost-processing-hooks) above for full documentation. These are optional arrays that use the same pipeline step schema.
+
+#### Results Section
+
+Tells FoamScript where to find solver output and which columns contain which coefficients.
+
+```json
+{
+  "results": {
+    "type": "forceCoefficients",
+    "dataFile": "postProcessing/forces/0/coefficient.dat",
+    "columns": { "Cd": 1, "Cl": 4, "CmPitch": 7 }
+  }
+}
+```
+
+| Field | Description |
+|-------|-------------|
+| `type` | Results format (`forceCoefficients` is currently the only supported type) |
+| `dataFile` | Relative path to coefficient data file within the case directory |
+| `columns` | Map of coefficient names to column indices in the data file (0-indexed after the time column) |
+
+#### Report Section
+
+```json
+{
+  "report": {
+    "template": "report/report.html",
+    "standard": "AIAA"
+  }
+}
+```
+
+| Field | Description |
+|-------|-------------|
+| `template` | Path to the Scriban HTML report template (relative to template directory) |
+| `standard` | Reporting standard for formatting and conventions |
+
+### Scriban Template Variables
+
+OpenFOAM case files in the template directory are rendered using [Scriban](https://github.com/scriban/scriban) syntax. FoamScript computes a template context for each case and passes it to the renderer.
+
+#### Available Variables
+
+| Variable | Source | Description |
+|----------|--------|-------------|
+| `ux` | Computed | Velocity X component: `V × cos(AoA)` |
+| `uz` | Computed | Velocity Z component: `V × sin(AoA)` |
+| `p` | Constant (0) | Reference pressure |
+| `k` | Computed | Turbulent kinetic energy: `1.5 × (V × TI)²` |
+| `omega_turbulence` | Computed | Specific dissipation rate from k and mixing length |
+| `omega_rotation` | Computed | Disc angular velocity (rad/s): `RPM × 2π/60` |
+| `mag_u_inf` | Input | Velocity magnitude for force coefficients |
+| `disc_diameter` / `chord_length` | Measured | Reference length from STL bounding box |
+| `aref` | Computed | Reference area (circular or rectangular per template) |
+| `nu` | Config | Kinematic viscosity |
+| `max_iterations` | Config | Maximum solver iterations |
+| `write_interval` | Config | Write frequency |
+| `end_time` | Config | Simulation end time |
+| `n_outer_correctors` | Config | PIMPLE outer correctors |
+| `refinement_level_min` | Config | snappyHexMesh min refinement |
+| `refinement_level_max` | Config | snappyHexMesh max refinement |
+| `feature_level` | Computed | Edge feature refinement level |
+| `domain_upstream` | Computed | Domain upstream extent (meters) |
+| `domain_downstream` | Computed | Domain downstream extent (meters) |
+| `domain_radial` | Computed | Domain radial extent (meters) |
+| `domain_span` | Computed | Domain span (meters, 2D templates only) |
+| `cores` | Config | CPU core count for `decomposeParDict` |
+
+#### Scriban Syntax Example
+
+In an OpenFOAM template file (e.g., `0/U`):
+
+```
+internalField   uniform ({{ ux }} 0 {{ uz }});
+
+boundaryField
+{
+    inlet
+    {
+        type            fixedValue;
+        value           uniform ({{ ux }} 0 {{ uz }});
+    }
+}
+```
+
+### Checklist for Creating a New Template
+
+1. **Start from an OpenFOAM tutorial** — templates should be faithful parameterized copies of official tutorials, not invented configurations
+2. **Create the directory** under `Templates/` using the naming convention
+3. **Write `TEMPLATE.json`** with all required sections (name, description, solver, geometry, reference, rotation, parameters, domain, meshPipeline, solvePipeline, results, report)
+4. **Copy OpenFOAM case files** from the tutorial into `0/`, `constant/`, and `system/`
+5. **Parameterize** hardcoded values using `{{ variable_name }}` Scriban syntax — all physics values that a user might want to change should be parameters
+6. **Inline all values** — do not use OpenFOAM `#include` directives; all values must be present in the template files directly
+7. **Add validation rules** if the template targets a specific geometry size range
+8. **Add pre/post-process hooks** if the template needs custom scripts before meshing or after solving
+9. **Test with `list-templates`** to verify TEMPLATE.json parses correctly
+10. **E2E validate on Linux** — run the full pipeline (new-study → mesh → solve → report) to confirm the template produces correct results
 
 ---
 

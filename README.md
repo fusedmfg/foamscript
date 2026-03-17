@@ -5,28 +5,22 @@
 ## Quick Start
 
 ```bash
-# Validate OpenFOAM environment (writes ~/.foamscript/config.json)
+# 1. Validate OpenFOAM environment (writes ~/.foamscript/config.json)
 foamscript validate
 
-# Disc golf aerodynamics (rotating wall boundary condition)
+# 2. Convert STEP geometry to STL in meters (CAD file is in mm → output is meters)
+foamscript convert ~/models/disc.step ~/models/disc.stl --input-units mm
+
+# 3. Create parametric study (requires STL in meters — use convert for STEP/IGES)
 foamscript new-study \
   --template external_disc_rotatingwall_steady \
   --project-name DiscAnalysis \
   --output-dir ~/OpenFOAM/$USER-v2512/run \
-  --model-source ~/models/disc.step \
+  --model-source ~/models/disc.stl \
   --angles -5,0,5,10 \
   --velocity 27 --rpm 925
 
-# Airfoil analysis (static geometry, steady-state)
-foamscript new-study \
-  --template external_airfoil_static_steady \
-  --project-name AirfoilStudy \
-  --output-dir ~/OpenFOAM/$USER-v2512/run \
-  --model-source ~/models/airfoil.step \
-  --angles -5,0,5,10 \
-  --velocity 30
-
-# Mesh, solve, report (auto-detects CPU cores, runs parallel)
+# 4. Mesh, solve, report (auto-detects CPU cores, runs parallel)
 foamscript mesh -d ~/OpenFOAM/$USER-v2512/run/DiscAnalysis
 foamscript solve -d ~/OpenFOAM/$USER-v2512/run/DiscAnalysis
 foamscript report -d ~/OpenFOAM/$USER-v2512/run/DiscAnalysis
@@ -35,7 +29,9 @@ foamscript report -d ~/OpenFOAM/$USER-v2512/run/DiscAnalysis
 ## Features
 
 - **Full Pipeline**: STEP/IGES → STL → domain generation → templated case creation → meshing → solving → report generation
-- **Template-Driven**: Each template (`TEMPLATE.json`) defines geometry type, mesh/solve steps, post-processing, and report layout — `--template` selects the workflow
+- **Template-Driven**: Each template (`TEMPLATE.json`) defines geometry type, mesh/solve steps, pre/post-processing hooks, and report layout — `--template` selects the workflow
+- **Geometry Validation**: `new-study` checks STL bounding box against template rules and warns if dimensions suggest non-meter units (mm, cm, in) with a suggested `convert` command
+- **Pre/Post-Processing Hooks**: Templates can define `preProcess` and `postProcess` script arrays that run before meshing and after solving — with token substitution and optional/required failure handling
 - **AIAA-Quality Reports**: Publication-standard HTML + PDF + CSV reports with aerodynamic polars, convergence history, flow visualization, mesh statistics, and coefficient tables
 - **Pre-Flight Environment Guard**: All OpenFOAM-dependent commands auto-verify the environment before running; `foamscript validate` checks 23 dependencies across 7 categories
 - **Configurable Physics**: Turbulence intensity, viscosity, end time, refinement levels — all via CLI or JSON (AIAA defaults: TI 1%, PBiCGStab+DILU, refinement 5/6, 8 boundary layers)
@@ -58,14 +54,14 @@ Run `foamscript list-templates` to see all available templates with their metada
 | Command | Description |
 |---------|-------------|
 | `validate` | Auto-detect OpenFOAM, validate 23 dependencies across 7 groups, write `~/.foamscript/config.json` |
-| `convert` | Convert STEP/IGES → STL via gmsh with unit scaling |
+| `convert` | Convert STEP/IGES → STL in meters (prerequisite for `new-study` when starting from CAD files) |
 | `new-study` | Full pipeline: geometry → domain → templated cases for AoA sweep (`--template` required) |
 | `mesh` | Mesh a case or study directory (auto-detects cores, parallel by default) |
 | `solve` | Solve a case or study directory (auto-detects cores, parallel by default) |
 | `report` | Generate AIAA-quality HTML + PDF + CSV analysis report from a completed study |
 | `list-templates` | List available OpenFOAM case templates with metadata |
 
-See **[Commands.md](Docs/Commands.md)** for full reference with all options, JSON config format, and examples.
+See **[Commands.md](Docs/Commands.md)** for full reference with all options, JSON config format, template authoring guide, and examples.
 
 ## Installation
 
@@ -84,7 +80,7 @@ Run `foamscript validate` after installation to verify all 23 dependencies and a
 
 ```bash
 dotnet build
-dotnet test    # 241 tests
+dotnet test    # 271 tests
 ```
 
 ### Deploy to Linux
