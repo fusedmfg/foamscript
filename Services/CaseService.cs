@@ -94,13 +94,25 @@ namespace foamscript.Services
                 // Convert RPM to rad/s
                 var omega = RpmToRadPerSec(config.Rpm);
 
+                // Copy domain config from template metadata (margin, spanRatio)
+                // These may already be set by the handler from TEMPLATE.json, but for JSON config
+                // path (which skips the handler's template defaults), apply them from metadata.
+                if (config.Domain.Margin == 1.1 && metadata.Domain.Margin != 1.1)
+                    config.Domain.Margin = metadata.Domain.Margin;
+                config.Domain.SpanRatio ??= metadata.Domain.SpanRatio;
+
+                // Calculate spanHalf: if template specifies spanRatio (2D case), use it; else 0 (3D, uses radial)
+                var spanHalf = metadata.Domain.SpanRatio.HasValue
+                    ? bbox.Height / 2.0 * metadata.Domain.SpanRatio.Value
+                    : 0.0;
+
                 // Create case for each angle
                 foreach (var angle in angles)
                 {
                     var caseInfo = CreateCase(result.StudyDir, config.ProjectName, templatePath, angle,
                         config.Velocity, omega, config.Cores, geometryDir, refLength, aref,
                         metadata.RequiredStlFiles, config.Physics, config.Domain,
-                        spanHalf: bbox.Height / 2.0 * 0.8);  // STL must protrude through symmetryPlane faces
+                        spanHalf: spanHalf);
                     result.Cases.Add(caseInfo);
                 }
 
@@ -226,13 +238,20 @@ namespace foamscript.Services
         {
             const double cmu = 0.09; // Standard k-omega SST turbulence model constant
 
+            var nu = physics.Nu ?? 1.5e-5;
+            var turbulenceIntensity = physics.TurbulenceIntensity ?? 0.01;
+            var endTime = physics.EndTime ?? 1.0;
+            var nOuterCorrectors = physics.NOuterCorrectors ?? 1;
+            var maxIterations = physics.MaxIterations ?? 500;
+            var writeInterval = physics.WriteInterval ?? 100;
+
             var velocityMagnitude = Math.Sqrt(ux * ux + uz * uz);
-            var k = 1.5 * Math.Pow(velocityMagnitude * physics.TurbulenceIntensity, 2);
-            var mixingLength = 0.07 * refLength;
+            var k = 1.5 * Math.Pow(velocityMagnitude * turbulenceIntensity, 2);
+            var mixingLength = physics.MixingLengthRatio * refLength;
             var omegaTurbulence = Math.Sqrt(k) / (Math.Pow(cmu, 0.25) * mixingLength);
 
-            // Domain extents in meters (with 10% margin beyond tunnel STL)
-            const double margin = 1.1;
+            // Domain extents in meters (with configurable margin)
+            var margin = domain.Margin;
             var domainUpstream = domain.TunnelUpstream * refLength * margin;
             var domainDownstream = domain.TunnelDownstream * refLength * margin;
             var domainRadial = domain.TunnelRadial * refLength * margin;
@@ -242,18 +261,18 @@ namespace foamscript.Services
                 ux = ux,
                 uz = uz,
                 p = 0,
-                turbulence_intensity = physics.TurbulenceIntensity,
+                turbulence_intensity = turbulenceIntensity,
                 k = k,
                 cmu = cmu,
                 disc_diameter = refLength,  // backward compat alias
                 ref_length = refLength,
                 mixing_length = mixingLength,
                 omega_turbulence = omegaTurbulence,
-                nu = physics.Nu,
+                nu = nu,
                 omega_rotation = omegaRotation,
-                end_time = physics.EndTime,
+                end_time = endTime,
                 mag_u_inf = velocityMagnitude,
-                n_outer_correctors = physics.NOuterCorrectors,
+                n_outer_correctors = nOuterCorrectors,
                 refinement_level_min = physics.RefinementLevelMin ?? 0,
                 refinement_level_max = physics.RefinementLevelMax ?? 0,
                 feature_level = physics.RefinementLevelMax ?? 0,
@@ -262,9 +281,9 @@ namespace foamscript.Services
                 domain_upstream = domainUpstream,
                 domain_downstream = domainDownstream,
                 domain_radial = domainRadial,
-                max_iterations = physics.MaxIterations,
-                write_interval = physics.WriteInterval,
-                nu_tilda = 3.0 * physics.Nu,  // Spalart-Allmaras initial value (~3x molecular viscosity)
+                max_iterations = maxIterations,
+                write_interval = writeInterval,
+                nu_tilda = physics.NuTildaMultiplier * nu,  // Spalart-Allmaras initial value
                 domain_span_half = spanHalf > 0 ? spanHalf : domainRadial  // Y half-extent for 2D domains
             };
         }

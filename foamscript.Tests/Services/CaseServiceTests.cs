@@ -511,5 +511,108 @@ endsolid disc
             result.StudyName.Should().Be("MyDiscStudy");
             result.StudyDir.Should().EndWith("MyDiscStudy");
         }
+
+        // ── CalculateTemplateContext — Template-Driven Values ────────────────────────
+
+        [Fact]
+        public void CalculateTemplateContext_UsesMixingLengthRatio()
+        {
+            var physics = new StudyPhysicsConfig { MixingLengthRatio = 0.1 };
+            var domain = new StudyDomainConfig();
+            var refLength = 0.211;
+
+            var context = CaseService.CalculateTemplateContext(
+                ux: 20.0, uz: 0.0, omegaRotation: 100.0,
+                cores: 4, refLength: refLength, aref: 0.035,
+                physics: physics, domain: domain);
+
+            var mixingLength = (double)context.GetType().GetProperty("mixing_length")!.GetValue(context)!;
+            mixingLength.Should().BeApproximately(0.1 * refLength, 1e-10);
+        }
+
+        [Fact]
+        public void CalculateTemplateContext_UsesNuTildaMultiplier()
+        {
+            var physics = new StudyPhysicsConfig { Nu = 1.5e-5, NuTildaMultiplier = 5.0 };
+            var domain = new StudyDomainConfig();
+
+            var context = CaseService.CalculateTemplateContext(
+                ux: 20.0, uz: 0.0, omegaRotation: 100.0,
+                cores: 4, refLength: 0.211, aref: 0.035,
+                physics: physics, domain: domain);
+
+            var nuTilda = (double)context.GetType().GetProperty("nu_tilda")!.GetValue(context)!;
+            nuTilda.Should().BeApproximately(5.0 * 1.5e-5, 1e-15);
+        }
+
+        [Fact]
+        public void CalculateTemplateContext_UsesDomainMargin()
+        {
+            var physics = new StudyPhysicsConfig();
+            var domain = new StudyDomainConfig
+            {
+                Margin = 1.0,  // no margin
+                TunnelUpstream = 5.0,
+                TunnelDownstream = 10.0,
+                TunnelRadial = 5.0
+            };
+            var refLength = 1.0;
+
+            var context = CaseService.CalculateTemplateContext(
+                ux: 20.0, uz: 0.0, omegaRotation: 0.0,
+                cores: 4, refLength: refLength, aref: 1.0,
+                physics: physics, domain: domain);
+
+            var domainUpstream = (double)context.GetType().GetProperty("domain_upstream")!.GetValue(context)!;
+            var domainDownstream = (double)context.GetType().GetProperty("domain_downstream")!.GetValue(context)!;
+            var domainRadial = (double)context.GetType().GetProperty("domain_radial")!.GetValue(context)!;
+
+            // With margin 1.0, no expansion: upstream = 5.0 * 1.0 * 1.0 = 5.0
+            domainUpstream.Should().BeApproximately(5.0, 1e-10);
+            domainDownstream.Should().BeApproximately(10.0, 1e-10);
+            domainRadial.Should().BeApproximately(5.0, 1e-10);
+        }
+
+        [Fact]
+        public void CalculateTemplateContext_DefaultMargin_Applies10PercentExpansion()
+        {
+            var physics = new StudyPhysicsConfig();
+            var domain = new StudyDomainConfig();  // default Margin = 1.1
+            var refLength = 1.0;
+
+            var context = CaseService.CalculateTemplateContext(
+                ux: 20.0, uz: 0.0, omegaRotation: 0.0,
+                cores: 4, refLength: refLength, aref: 1.0,
+                physics: physics, domain: domain);
+
+            var domainUpstream = (double)context.GetType().GetProperty("domain_upstream")!.GetValue(context)!;
+            // With default margin 1.1: upstream = 5.0 * 1.0 * 1.1 = 5.5
+            domainUpstream.Should().BeApproximately(5.5, 1e-10);
+        }
+
+        [Fact]
+        public void CalculateTemplateContext_NullablePhysics_UseFallbackDefaults()
+        {
+            // All nullable physics params are null — should use fallback defaults
+            var physics = new StudyPhysicsConfig();
+            var domain = new StudyDomainConfig();
+
+            var context = CaseService.CalculateTemplateContext(
+                ux: 20.0, uz: 0.0, omegaRotation: 100.0,
+                cores: 4, refLength: 0.211, aref: 0.035,
+                physics: physics, domain: domain);
+
+            // nu fallback is 1.5e-5
+            var nu = (double)context.GetType().GetProperty("nu")!.GetValue(context)!;
+            nu.Should().BeApproximately(1.5e-5, 1e-10);
+
+            // end_time fallback is 1.0
+            var endTime = (double)context.GetType().GetProperty("end_time")!.GetValue(context)!;
+            endTime.Should().BeApproximately(1.0, 1e-10);
+
+            // max_iterations fallback is 500
+            var maxIter = (int)context.GetType().GetProperty("max_iterations")!.GetValue(context)!;
+            maxIter.Should().Be(500);
+        }
     }
 }

@@ -45,25 +45,25 @@ namespace foamscript.Models
         [Option("cores", Required = false, Default = 0, HelpText = "Number of CPU cores for parallel execution (0 = auto-detect, default: auto-detect)")]
         public int Cores { get; set; } = 0;
 
-        // ── Physics parameters ────────────────────────────────────────────────
+        // ── Physics parameters (nullable — template defaults apply when not specified) ──
 
-        [Option("nu", Required = false, Default = 1.5e-5, HelpText = "Kinematic viscosity of air (m²/s, default: 1.5e-5 for air at 20°C sea level)")]
-        public double Nu { get; set; } = 1.5e-5;
+        [Option("nu", Required = false, HelpText = "Kinematic viscosity of air (m²/s, template default: 1.5e-5 for air at 20°C sea level)")]
+        public double? Nu { get; set; }
 
-        [Option("turbulence-intensity", Required = false, Default = 0.01, HelpText = "Freestream turbulence intensity as a fraction (default: 0.01 = 1%)")]
-        public double TurbulenceIntensity { get; set; } = 0.01;
+        [Option("turbulence-intensity", Required = false, HelpText = "Freestream turbulence intensity as a fraction (template default: 0.01 = 1%)")]
+        public double? TurbulenceIntensity { get; set; }
 
-        [Option("end-time", Required = false, Default = 1.0, HelpText = "Simulation end time in seconds (default: 1.0)")]
-        public double EndTime { get; set; } = 1.0;
+        [Option("end-time", Required = false, HelpText = "Simulation end time (template default varies by solver type)")]
+        public double? EndTime { get; set; }
 
-        [Option("outer-correctors", Required = false, Default = 3, HelpText = "PIMPLE outer corrector iterations (default: 3)")]
-        public int NOuterCorrectors { get; set; } = 3;
+        [Option("outer-correctors", Required = false, HelpText = "PIMPLE outer corrector iterations (template default varies)")]
+        public int? NOuterCorrectors { get; set; }
 
-        [Option("max-iterations", Required = false, Default = 500, HelpText = "Maximum solver iterations for steady-state simpleFoam (default: 500)")]
-        public int MaxIterations { get; set; } = 500;
+        [Option("max-iterations", Required = false, HelpText = "Maximum solver iterations (template default varies)")]
+        public int? MaxIterations { get; set; }
 
-        [Option("write-interval", Required = false, Default = 100, HelpText = "Write results every N iterations (default: 100)")]
-        public int WriteInterval { get; set; } = 100;
+        [Option("write-interval", Required = false, HelpText = "Write results every N iterations (template default varies)")]
+        public int? WriteInterval { get; set; }
 
         [Option("refinement-min", Required = false, HelpText = "snappyHexMesh minimum refinement level (template-defined, fallback: 0)")]
         public int? RefinementLevelMin { get; set; }
