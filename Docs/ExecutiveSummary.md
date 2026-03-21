@@ -1,7 +1,7 @@
 # FoamScript Executive Summary
 
-**Last Updated:** March 17, 2026
-**Version:** 0.5.0 (Template Generalization + Environment Redesign)
+**Last Updated:** March 20, 2026
+**Version:** 0.6.0 (Documentation + Version Management)
 **Repository:** [fusedmfg/foamscript](https://github.com/fusedmfg/foamscript)
 
 *This is a living document revised alongside development. It serves two purposes: (1) document what FoamScript is and how it solves OpenFOAM complexity, and (2) provide an honest narrative on developing this application using a human/AI pair-coding approach.*
@@ -437,9 +437,9 @@ Based on the development history, approximately **70-75% of AI compute was produ
 | Production LOC | 6,880 | Substantial for CLI tool scope |
 | Test LOC | 5,588 | Strong investment |
 | Test/Prod Ratio | 81.2% | Well above industry average (~40-60% typical) |
-| Passing Tests | 241 | Zero failures |
+| Passing Tests | 271 | Zero failures |
 | Template Files | 64 | 3 geometry templates + report templates |
-| GitHub Issues | 39 total (29 closed, 10 open) | Comprehensive tracking |
+| GitHub Issues | 41 total (31 closed, 10 open) | Comprehensive tracking |
 | Build Status | Clean | Zero warnings |
 | Pipeline Validated | Yes | SimFlow match + grid convergence |
 
@@ -602,6 +602,6 @@ The largest cost-optimization opportunity is eliminating rate-limit downtime. Up
 
 ---
 
-*Last updated: March 16, 2026.*
+*Last updated: March 20, 2026.*
 *This is a living document revised alongside development.*
 *AI assistance provided by Anthropic Claude (Sonnet 4.5, Sonnet 4.6, Opus 4.6) via Claude Code.*
