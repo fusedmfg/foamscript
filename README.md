@@ -53,6 +53,8 @@ Run `foamscript list-templates` to see all available templates with their metada
 
 | Command | Description |
 |---------|-------------|
+| `--version` | Print version and exit |
+| `--help` | Print help and exit |
 | `validate` | Auto-detect OpenFOAM, validate 23 dependencies across 7 groups, write `~/.foamscript/config.json` |
 | `convert` | Convert STEP/IGES → STL in meters (prerequisite for `new-study` when starting from CAD files) |
 | `new-study` | Full pipeline: geometry → domain → templated cases for AoA sweep (`--template` required) |
@@ -110,8 +112,7 @@ foamscript/
 │   ├── CaseService.cs             # Study creation, template context calculation
 │   ├── TemplateMetadataService.cs # TEMPLATE.json loading and validation
 │   ├── StlConversionService.cs    # STEP→STL conversion, validation, scaling
-│   ├── DomainService.cs           # Domain generation (rotor/tunnel STL)
-│   ├── GeometryService.cs         # Facade over StlConversion + Domain services
+│   ├── GeometryService.cs         # Facade over StlConversionService
 │   ├── MeshService.cs             # Template-driven mesh pipeline execution
 │   ├── SolverService.cs           # Template-driven solver execution + log persistence
 │   ├── ResultsService.cs          # Metadata-driven coefficient extraction
@@ -134,7 +135,7 @@ foamscript/
 │       ├── extract_slice.py       # pvpython slice data extraction
 │       └── render_slice.py        # matplotlib contour plot rendering
 ├── Docs/Commands.md     # Full command reference
-├── foamscript.Tests/    # xUnit + Moq + FluentAssertions (241 tests)
+├── foamscript.Tests/    # xUnit + Moq + FluentAssertions (271 tests)
 └── study.example.jsonc  # Example JSON config file
 ```
 

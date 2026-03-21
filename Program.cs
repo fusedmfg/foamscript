@@ -43,9 +43,16 @@ namespace foamscript
                 // Use the documented overload for dynamic type arrays
                 var result = Parser.Default.ParseArguments(args, verbTypes);
 
-                // Check the result of the command-line parsing. If the parsing fails (i.e., if the result is NotParsed), set the exit code to -1 to indicate an error and return immediately, preventing the application from starting with invalid arguments.
+                // Handle parse results: --help and --version are NotParsed but not errors.
                 if (result.Tag == ParserResultType.NotParsed)
                 {
+                    var errors = ((NotParsed<object>)result).Errors;
+                    if (errors.IsHelp() || errors.IsVersion())
+                    {
+                        exitCode = 0;
+                        return;
+                    }
+
                     Log.Fatal("Failed to parse command-line arguments. Exiting application.");
                     exitCode = -1;
                     return;
