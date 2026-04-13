@@ -51,26 +51,38 @@ namespace foamscript.Services
             // Execute gmsh
             var gmshResult = _processExecutor.Execute("gmsh", gmshArgs);
 
+            // Verify output file was created — gmsh may return non-zero exit code
+            // due to volume meshing errors even when the surface STL is written successfully
+            var outputCheckResult = _processExecutor.Execute("test", $"-f {outputFile}");
+
             if (gmshResult.ExitCode != 0)
             {
-                result.IsSuccess = false;
-                result.ErrorMessage = $"gmsh conversion failed with exit code {gmshResult.ExitCode}";
-
-                // Log detailed error output to file
-                _loggingService.LogError($"gmsh conversion failed with exit code {gmshResult.ExitCode}");
-                _loggingService.LogError($"gmsh command: gmsh {gmshArgs}");
-                _loggingService.LogError($"gmsh stdout:\n{gmshResult.Output}");
-                if (!string.IsNullOrEmpty(gmshResult.Error))
+                if (outputCheckResult.ExitCode == 0)
                 {
-                    _loggingService.LogError($"gmsh stderr:\n{gmshResult.Error}");
+                    // gmsh reported errors but still wrote the STL — surface mesh succeeded,
+                    // volume meshing issues (overlapping facets, empty volumes) don't affect STL output
+                    _loggingService.LogInformation($"gmsh exited with code {gmshResult.ExitCode} but output file was created — continuing");
+                    if (!string.IsNullOrEmpty(gmshResult.Error))
+                    {
+                        _loggingService.LogInformation($"gmsh stderr:\n{gmshResult.Error}");
+                    }
                 }
-
-                return result;
+                else
+                {
+                    // gmsh failed and no output — true failure
+                    result.IsSuccess = false;
+                    result.ErrorMessage = $"gmsh conversion failed with exit code {gmshResult.ExitCode}";
+                    _loggingService.LogError($"gmsh conversion failed with exit code {gmshResult.ExitCode}");
+                    _loggingService.LogError($"gmsh command: gmsh {gmshArgs}");
+                    _loggingService.LogError($"gmsh stdout:\n{gmshResult.Output}");
+                    if (!string.IsNullOrEmpty(gmshResult.Error))
+                    {
+                        _loggingService.LogError($"gmsh stderr:\n{gmshResult.Error}");
+                    }
+                    return result;
+                }
             }
-
-            // Verify output file was created
-            var outputCheckResult = _processExecutor.Execute("test", $"-f {outputFile}");
-            if (outputCheckResult.ExitCode != 0)
+            else if (outputCheckResult.ExitCode != 0)
             {
                 result.IsSuccess = false;
                 result.ErrorMessage = $"Output file was not created: {outputFile}";

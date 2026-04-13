@@ -97,6 +97,11 @@ namespace foamscript.Tests.Services
                     Error = "Error   : Could not parse file 'model.step'"
                 });
 
+            // Mock: output file does not exist (true failure — no STL produced)
+            _mockProcessExecutor
+                .Setup(x => x.Execute("test", "-f /path/to/model.stl"))
+                .Returns(new ProcessResult { ExitCode = 1, Output = "" });
+
             // Act
             var result = _service.ConvertStepToStl(inputFile, outputFile);
 

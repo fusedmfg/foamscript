@@ -528,10 +528,13 @@ endsolid disc");
                 .Setup(x => x.Execute("test", It.Is<string>(a => a.Contains(fileName))))
                 .Returns(new ProcessResult { ExitCode = 0, Output = "" });
 
-            // Mock: gmsh conversion fails
+            // Mock: gmsh conversion fails and produces no output file
             _mockProcessExecutor
                 .Setup(x => x.Execute("gmsh", It.IsAny<string>()))
                 .Returns(new ProcessResult { ExitCode = 1, Output = "", Error = "gmsh: unknown option" });
+            _mockProcessExecutor
+                .Setup(x => x.Execute("test", It.Is<string>(a => a.Contains("disc.stl"))))
+                .Returns(new ProcessResult { ExitCode = 1, Output = "" });
 
             var config = CreateDefaultConfig(tempDir, stepFile);
             config.Angles = "0";
