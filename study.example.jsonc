@@ -16,6 +16,8 @@
   "modelSourceUnits": "mm",   // Source geometry units: mm | cm | m | in | ft (default: mm, ignored for .stl)
   "meshSize": 1.0,            // gmsh mesh size scaling factor for STEP/IGES conversion (default: 1.0, ignored for .stl)
   "cores": 0,                 // CPU cores (0 = auto-detect all available; set FOAMSCRIPT_MAX_CORES to limit)
+  "run": true,                // Run full pipeline after study creation (mesh → solve → report)
+  "skipReport": false,         // Skip report generation when run is true
 
   // ── Physics parameters ───────────────────────────────────────────────────────
   // Fluid properties and solver settings. All optional — defaults shown.

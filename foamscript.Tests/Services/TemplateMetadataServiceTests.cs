@@ -355,5 +355,61 @@ namespace foamscript.Tests.Services
 
             metadata.Geometry.SurfaceOrient.Should().BeNull();
         }
+
+        [Fact]
+        public void LoadMetadata_WithPipeline_ReturnsPipelineStages()
+        {
+            var dir = CreateTempDir();
+            File.WriteAllText(Path.Combine(dir, "TEMPLATE.json"), """
+            {
+              "name": "test",
+              "pipeline": ["mesh", "solve", "report"],
+              "geometry": { "type": "disc", "stlName": "disc.stl", "requiredStlFiles": ["disc.stl"] },
+              "reference": { "dimension": "diameter", "areaFormula": "circular" },
+              "rotation": { "enabled": false }
+            }
+            """);
+
+            var metadata = _service.LoadMetadata(dir);
+
+            metadata.Pipeline.Should().BeEquivalentTo(new[] { "mesh", "solve", "report" });
+        }
+
+        [Fact]
+        public void LoadMetadata_WithoutPipeline_DefaultsToMeshSolveReport()
+        {
+            var dir = CreateTempDir();
+            File.WriteAllText(Path.Combine(dir, "TEMPLATE.json"), """
+            {
+              "name": "test",
+              "geometry": { "type": "disc", "stlName": "disc.stl", "requiredStlFiles": ["disc.stl"] },
+              "reference": { "dimension": "diameter", "areaFormula": "circular" },
+              "rotation": { "enabled": false }
+            }
+            """);
+
+            var metadata = _service.LoadMetadata(dir);
+
+            metadata.Pipeline.Should().BeEquivalentTo(new[] { "mesh", "solve", "report" });
+        }
+
+        [Fact]
+        public void LoadMetadata_WithCustomPipeline_ReturnsCustomStages()
+        {
+            var dir = CreateTempDir();
+            File.WriteAllText(Path.Combine(dir, "TEMPLATE.json"), """
+            {
+              "name": "test",
+              "pipeline": ["mesh"],
+              "geometry": { "type": "disc", "stlName": "disc.stl", "requiredStlFiles": ["disc.stl"] },
+              "reference": { "dimension": "diameter", "areaFormula": "circular" },
+              "rotation": { "enabled": false }
+            }
+            """);
+
+            var metadata = _service.LoadMetadata(dir);
+
+            metadata.Pipeline.Should().BeEquivalentTo(new[] { "mesh" });
+        }
     }
 }

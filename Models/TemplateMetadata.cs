@@ -47,6 +47,13 @@ namespace foamscript.Models
         [JsonPropertyName("postProcess")]
         public List<PipelineStep> PostProcess { get; set; } = new();
 
+        /// <summary>
+        /// High-level pipeline stages to execute with --run flag.
+        /// Each entry maps to a handler: "mesh", "solve", "report".
+        /// </summary>
+        [JsonPropertyName("pipeline")]
+        public List<string> Pipeline { get; set; } = new() { "mesh", "solve", "report" };
+
         [JsonPropertyName("results")]
         public ResultsConfig Results { get; set; } = new();
 

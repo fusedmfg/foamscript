@@ -9,12 +9,20 @@ namespace foamscript.Handlers
         private readonly LoggingService _loggingService;
         private readonly CaseService _caseService;
         private readonly TemplateMetadataService _metadataService;
+        private readonly MeshHandler _meshHandler;
+        private readonly SolveHandler _solveHandler;
+        private readonly ReportHandler _reportHandler;
 
-        public NewStudyHandler(LoggingService loggingService, CaseService caseService, TemplateMetadataService metadataService)
+        public NewStudyHandler(LoggingService loggingService, CaseService caseService,
+            TemplateMetadataService metadataService, MeshHandler meshHandler,
+            SolveHandler solveHandler, ReportHandler reportHandler)
         {
             _loggingService = loggingService;
             _caseService = caseService;
             _metadataService = metadataService;
+            _meshHandler = meshHandler;
+            _solveHandler = solveHandler;
+            _reportHandler = reportHandler;
         }
 
         public int Handle(NewStudyModel model)
@@ -312,6 +320,14 @@ namespace foamscript.Handlers
 
                 _loggingService.LogInformation("Study creation completed successfully.");
                 Console.WriteLine();
+
+                // Execute pipeline stages if --run flag is set (CLI or config)
+                if (model.Run || config.Run)
+                {
+                    return ExecutePipeline(result.StudyDir!, config.Cores, templatePath,
+                        model.SkipReport || config.SkipReport);
+                }
+
                 return 0;
             }
             else
@@ -321,6 +337,60 @@ namespace foamscript.Handlers
                 Console.WriteLine();
                 return -1;
             }
+        }
+
+        /// <summary>
+        /// Executes the template-defined pipeline stages (mesh → solve → report) after study creation.
+        /// </summary>
+        private int ExecutePipeline(string studyDir, int cores, string templatePath, bool skipReport)
+        {
+            var metadata = _metadataService.LoadMetadata(templatePath);
+            var stages = metadata.Pipeline;
+
+            var activeStages = skipReport
+                ? stages.Where(s => s != "report").ToList()
+                : stages;
+            int totalStages = activeStages.Count;
+            int stageNum = 0;
+
+            Console.WriteLine($"=== Running Pipeline: {string.Join(" → ", activeStages)} ===");
+            Console.WriteLine();
+
+            foreach (var stage in stages)
+            {
+                if (stage == "report" && skipReport)
+                {
+                    Console.WriteLine("  Skipping stage: report (--skip-report)");
+                    continue;
+                }
+
+                stageNum++;
+                Console.WriteLine($"=== Pipeline Stage {stageNum}/{totalStages}: {stage} ===");
+                Console.WriteLine();
+
+                int stageResult = stage switch
+                {
+                    "mesh" => _meshHandler.Handle(new MeshModel { Dir = studyDir, Cores = cores }),
+                    "solve" => _solveHandler.Handle(new SolveModel { Dir = studyDir, Cores = cores }),
+                    "report" => _reportHandler.Handle(new ReportModel { Dir = studyDir }),
+                    _ => throw new NotSupportedException($"Unknown pipeline stage '{stage}' in template. Valid stages: mesh, solve, report")
+                };
+
+                if (stageResult != 0)
+                {
+                    Console.WriteLine();
+                    Console.WriteLine($"✗ Pipeline failed at stage: {stage}");
+                    _loggingService.LogError($"Pipeline failed at stage: {stage}", null!);
+                    return stageResult;
+                }
+
+                Console.WriteLine();
+            }
+
+            Console.WriteLine("=== Pipeline Complete ===");
+            Console.WriteLine($"Study directory: {studyDir}");
+            Console.WriteLine();
+            return 0;
         }
 
         /// <summary>
@@ -358,6 +428,18 @@ namespace foamscript.Handlers
                 // Ensure nested config objects exist (they may be null if omitted from JSON)
                 config.Physics ??= new StudyPhysicsConfig();
                 config.Domain ??= new StudyDomainConfig();
+
+                // Backward compat: map old "inputUnits" field to ModelSourceUnits
+                using var doc = JsonDocument.Parse(json, new JsonDocumentOptions
+                {
+                    CommentHandling = JsonCommentHandling.Skip,
+                    AllowTrailingCommas = true
+                });
+                if (doc.RootElement.TryGetProperty("inputUnits", out var inputUnitsEl) &&
+                    inputUnitsEl.ValueKind == JsonValueKind.String)
+                {
+                    config.ModelSourceUnits = inputUnitsEl.GetString() ?? "mm";
+                }
 
                 return (config, null);
             }

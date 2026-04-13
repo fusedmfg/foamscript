@@ -37,6 +37,7 @@
     "margin": 1.0,
     "spanRatio": 0.8
   },
+  "pipeline": ["mesh", "solve", "report"],
   "meshPipeline": [
     { "command": "blockMesh", "args": "-case {caseDir}" },
     { "command": "surfaceFeatureExtract", "args": "-case {caseDir}" },

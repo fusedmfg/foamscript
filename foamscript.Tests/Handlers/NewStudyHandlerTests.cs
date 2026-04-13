@@ -33,7 +33,10 @@ namespace foamscript.Tests.Handlers
                 templateService,
                 metadataService);
 
-            _handler = new NewStudyHandler(_mockLoggingService.Object, _mockCaseService.Object, metadataService);
+            // Pipeline handlers are not called in these tests (--run is not set).
+            // Pass null — they are only invoked when model.Run or config.Run is true.
+            _handler = new NewStudyHandler(_mockLoggingService.Object, _mockCaseService.Object, metadataService,
+                null!, null!, null!);
         }
 
         public void Dispose()

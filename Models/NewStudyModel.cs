@@ -48,6 +48,12 @@ namespace foamscript.Models
         [Option("cores", Required = false, Default = 0, HelpText = "Number of CPU cores for parallel execution (0 = auto-detect, default: auto-detect)")]
         public int Cores { get; set; } = 0;
 
+        [Option("run", Required = false, Default = false, HelpText = "After creating the study, run the full pipeline (mesh, solve, report) as defined by the template")]
+        public bool Run { get; set; }
+
+        [Option("skip-report", Required = false, Default = false, HelpText = "Skip report generation when using --run")]
+        public bool SkipReport { get; set; }
+
         // ── Physics parameters (nullable — template defaults apply when not specified) ──
 
         [Option("nu", Required = false, HelpText = "Kinematic viscosity of air (m²/s, template default: 1.5e-5 for air at 20°C sea level)")]

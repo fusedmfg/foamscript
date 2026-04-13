@@ -20,6 +20,13 @@ namespace foamscript.Models
         public double MeshSize { get; set; } = 1.0;
 
         public int Cores { get; set; } = 0;
+
+        /// <summary>When true, execute the full pipeline (mesh → solve → report) after creating the study.</summary>
+        public bool Run { get; set; }
+
+        /// <summary>Skip report generation when Run is true.</summary>
+        public bool SkipReport { get; set; }
+
         public StudyPhysicsConfig Physics { get; set; } = new();
         public StudyDomainConfig Domain { get; set; } = new();
     }

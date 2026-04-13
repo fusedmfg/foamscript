@@ -32,6 +32,7 @@
     "downstream": 10.0,
     "radial": 5.0
   },
+  "pipeline": ["mesh", "solve", "report"],
   "meshPipeline": [
     { "command": "blockMesh", "args": "-case {caseDir}" },
     { "command": "surfaceOrient", "args": "{geometryStlPath} \"({outsidePoint})\" {geometryStlPath}", "optional": true },

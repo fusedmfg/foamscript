@@ -185,6 +185,19 @@ foamscript new-study --config study.json
 | `--model-source-units` | | Source geometry units: mm, cm, m, in, ft (STEP/IGES auto-convert) | `mm` |
 | `--mesh-size` | | gmsh mesh size scaling for STEP/IGES conversion | `1.0` |
 | `--cores` | | Number of CPU cores (0 = auto-detect all available) | `0` |
+| `--run` | | Run full pipeline after study creation (mesh, solve, report) | `false` |
+| `--skip-report` | | Skip report generation when using --run | `false` |
+
+### Full Pipeline (--run)
+
+The `--run` flag executes the template-defined pipeline after creating the study. Pipeline stages are defined in the template's `TEMPLATE.json` (default: mesh → solve → report). The pipeline stops on the first failure.
+
+```bash
+# One command, full pipeline — from STEP file to report
+foamscript new-study --config study.jsonc --run
+
+# Or set "run": true in the config file
+```
 
 ### Physics Parameters
 
