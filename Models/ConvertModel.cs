@@ -17,9 +17,6 @@ namespace foamscript.Models
         [Option('s', "mesh-size", Required = false, HelpText = "Mesh size scaling factor (default: 1.0). Smaller values create finer meshes.")]
         public double MeshSize { get; set; } = 1.0;
 
-        [Option('a', "feature-angle", Required = false, HelpText = "Feature angle in degrees (default: none). Preserves sharp edges above this angle threshold.")]
-        public double? FeatureAngle { get; set; }
-
         [Option('u', "input-units", Required = false, HelpText = "Input file units (mm, cm, m, in, ft). Output will be scaled to meters for OpenFOAM. Default: m (no conversion).")]
         public string InputUnits { get; set; } = "m";
 

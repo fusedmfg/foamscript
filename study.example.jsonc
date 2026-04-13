@@ -11,12 +11,11 @@
   // ── Study options ────────────────────────────────────────────────────────────
   // All optional. Templates may provide defaults for velocity and rpm.
 
-  "velocity": 27.0,        // Freestream velocity magnitude (m/s) — template may provide default
-  "rpm": 925.0,            // Rotation speed (RPM) — only for rotating templates
-  "inputUnits": "mm",      // Source geometry units: mm | cm | m | in | ft  (STEP/IGES only)
-  "meshSize": 0.05,        // gmsh mesh size factor for STEP/IGES conversion (lower = finer)
-  "featureAngle": null,    // Edge preservation angle in degrees, or null to disable
-  "cores": 0,              // CPU cores (0 = auto-detect all available; set FOAMSCRIPT_MAX_CORES to limit)
+  "velocity": 27.0,           // Freestream velocity magnitude (m/s) — template may provide default
+  "rpm": 925.0,               // Rotation speed (RPM) — only for rotating templates
+  "modelSourceUnits": "mm",   // Source geometry units: mm | cm | m | in | ft (default: mm, ignored for .stl)
+  "meshSize": 1.0,            // gmsh mesh size scaling factor for STEP/IGES conversion (default: 1.0, ignored for .stl)
+  "cores": 0,                 // CPU cores (0 = auto-detect all available; set FOAMSCRIPT_MAX_CORES to limit)
 
   // ── Physics parameters ───────────────────────────────────────────────────────
   // Fluid properties and solver settings. All optional — defaults shown.
@@ -25,9 +24,13 @@
     "nu": 1.5e-5,               // Kinematic viscosity (m²/s) — air at ~20°C sea level
     "turbulenceIntensity": 0.01, // Freestream turbulence intensity (0.01 = 1%, AIAA default)
     "maxIterations": 500,        // Maximum solver iterations (steady-state simpleFoam)
+    "writeInterval": 100,        // Write results every N iterations
     "endTime": 1.0,              // Simulation end time in seconds (transient pimpleFoam only)
-    "refinementLevelMin": 5,    // snappyHexMesh minimum refinement level around geometry
-    "refinementLevelMax": 6     // snappyHexMesh maximum refinement level around geometry
+    "nOuterCorrectors": 1,       // PIMPLE outer corrector iterations
+    "refinementLevelMin": 5,     // snappyHexMesh minimum refinement level around geometry
+    "refinementLevelMax": 6,     // snappyHexMesh maximum refinement level around geometry
+    "mixingLengthRatio": 0.07,   // Mixing length as fraction of reference length
+    "nuTildaMultiplier": 3.0     // nu-tilda initial value multiplier (x nu)
   },
 
   // ── Domain geometry parameters ───────────────────────────────────────────────

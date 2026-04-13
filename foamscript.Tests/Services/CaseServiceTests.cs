@@ -450,28 +450,97 @@ endsolid disc
             controlDict.Should().Contain("2.5");
         }
 
-        // ── CreateStudy — STEP/IGES File Rejection ─────────────────────────────────
+        // ── CreateStudy — STEP/IGES Auto-Conversion ──────────────────────────────
 
         [Theory]
         [InlineData("disc.step")]
         [InlineData("disc.stp")]
         [InlineData("disc.iges")]
         [InlineData("disc.igs")]
-        public void CreateStudy_WithNonStlFile_ReturnsErrorWithConvertHint(string fileName)
+        public void CreateStudy_WithStepFile_CallsGmshForConversion(string fileName)
         {
             var tempDir = CreateTempDir();
             var templateDir = CreateMinimalTemplate(tempDir);
-            var nonStlFile = Path.Combine(tempDir, fileName);
-            File.WriteAllText(nonStlFile, "fake content");
+            var stepFile = Path.Combine(tempDir, fileName);
+            File.WriteAllText(stepFile, "fake content");
 
-            var config = CreateDefaultConfig(tempDir, nonStlFile);
+            // Mock: all test -f checks succeed (StlConversionService checks input + output file existence)
+            _mockProcessExecutor
+                .Setup(x => x.Execute("test", It.IsAny<string>()))
+                .Returns(new ProcessResult { ExitCode = 0, Output = "" });
+
+            // Mock: gmsh conversion succeeds and produces output STL
+            _mockProcessExecutor
+                .Setup(x => x.Execute("gmsh", It.Is<string>(a =>
+                    a.Contains("-3") && a.Contains("-format stl"))))
+                .Returns(new ProcessResult { ExitCode = 0, Output = "Info    : 100 nodes 200 triangles" })
+                .Callback<string, string>((_, args) =>
+                {
+                    // Parse output file from gmsh args: "... -o <output> <input>"
+                    var parts = args.Split(' ');
+                    var oIndex = Array.IndexOf(parts, "-o");
+                    if (oIndex >= 0 && oIndex + 1 < parts.Length)
+                    {
+                        var outputPath = parts[oIndex + 1];
+                        // Create a minimal STL so bounding box extraction works
+                        File.WriteAllText(outputPath, @"solid disc
+  facet normal 0 1 0
+    outer loop
+      vertex -0.13 0.01 -0.13
+      vertex  0.13 0.01 -0.13
+      vertex  0.13 0.01  0.13
+    endloop
+  endfacet
+  facet normal 0 -1 0
+    outer loop
+      vertex -0.13 -0.01 -0.13
+      vertex  0.13 -0.01  0.13
+      vertex  0.13 -0.01 -0.13
+    endloop
+  endfacet
+endsolid disc");
+                    }
+                });
+
+            var config = CreateDefaultConfig(tempDir, stepFile);
             config.Angles = "0";
+            config.ModelSourceUnits = "mm";
+
+            var result = _service.CreateStudy(config, templateDir);
+
+            result.IsSuccess.Should().BeTrue();
+            _mockProcessExecutor.Verify(x => x.Execute("gmsh", It.Is<string>(a =>
+                a.Contains("-3") && a.Contains("-format stl"))), Times.Once);
+        }
+
+        [Theory]
+        [InlineData("disc.step")]
+        [InlineData("disc.stp")]
+        public void CreateStudy_WithStepFile_WhenConversionFails_ReturnsError(string fileName)
+        {
+            var tempDir = CreateTempDir();
+            var templateDir = CreateMinimalTemplate(tempDir);
+            var stepFile = Path.Combine(tempDir, fileName);
+            File.WriteAllText(stepFile, "fake content");
+
+            // Mock: file-exists check
+            _mockProcessExecutor
+                .Setup(x => x.Execute("test", It.Is<string>(a => a.Contains(fileName))))
+                .Returns(new ProcessResult { ExitCode = 0, Output = "" });
+
+            // Mock: gmsh conversion fails
+            _mockProcessExecutor
+                .Setup(x => x.Execute("gmsh", It.IsAny<string>()))
+                .Returns(new ProcessResult { ExitCode = 1, Output = "", Error = "gmsh: unknown option" });
+
+            var config = CreateDefaultConfig(tempDir, stepFile);
+            config.Angles = "0";
+            config.ModelSourceUnits = "mm";
 
             var result = _service.CreateStudy(config, templateDir);
 
             result.IsSuccess.Should().BeFalse();
-            result.ErrorMessage.Should().Contain("STL file");
-            result.ErrorMessage.Should().Contain("foamscript convert");
+            result.ErrorMessage.Should().Contain("conversion failed");
         }
 
         [Fact]
@@ -489,7 +558,6 @@ endsolid disc
 
             result.IsSuccess.Should().BeFalse();
             result.ErrorMessage.Should().Contain("Unsupported file format");
-            result.ErrorMessage.Should().Contain("foamscript convert");
         }
 
         // ── CreateStudy — StudyResult Metadata ──────────────────────────────────────

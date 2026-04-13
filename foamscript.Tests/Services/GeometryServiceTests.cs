@@ -165,37 +165,7 @@ namespace foamscript.Tests.Services
         }
 
         [Fact]
-        public void ConvertStepToStl_WithFeatureAngle_PassesAngleToGmsh()
-        {
-            // Arrange
-            var inputFile = "/path/to/model.step";
-            var outputFile = "/path/to/model.stl";
-            var featureAngle = 30.0;
-
-            _mockProcessExecutor
-                .Setup(x => x.Execute("test", "-f /path/to/model.step"))
-                .Returns(new ProcessResult { ExitCode = 0, Output = "" });
-
-            _mockProcessExecutor
-                .Setup(x => x.Execute("gmsh", It.Is<string>(args =>
-                    args.Contains($"-angle {featureAngle}"))))
-                .Returns(new ProcessResult { ExitCode = 0, Output = "Info    : Done meshing" });
-
-            _mockProcessExecutor
-                .Setup(x => x.Execute("test", "-f /path/to/model.stl"))
-                .Returns(new ProcessResult { ExitCode = 0, Output = "" });
-
-            // Act
-            var result = _service.ConvertStepToStl(inputFile, outputFile, meshSize: 1.0, featureAngle: featureAngle);
-
-            // Assert
-            result.IsSuccess.Should().BeTrue();
-            _mockProcessExecutor.Verify(x => x.Execute("gmsh", It.Is<string>(args =>
-                args.Contains($"-angle {featureAngle}"))), Times.Once);
-        }
-
-        [Fact]
-        public void ConvertStepToStl_WithoutFeatureAngle_DoesNotPassAngleToGmsh()
+        public void ConvertStepToStl_BuildsCorrectGmshCommand()
         {
             // Arrange
             var inputFile = "/path/to/model.step";
@@ -207,6 +177,11 @@ namespace foamscript.Tests.Services
 
             _mockProcessExecutor
                 .Setup(x => x.Execute("gmsh", It.Is<string>(args =>
+                    args.Contains("-3") &&
+                    args.Contains("-format stl") &&
+                    args.Contains("-clscale 1") &&
+                    args.Contains($"-o {outputFile}") &&
+                    args.Contains(inputFile) &&
                     !args.Contains("-angle"))))
                 .Returns(new ProcessResult { ExitCode = 0, Output = "Info    : Done meshing" });
 
@@ -220,7 +195,7 @@ namespace foamscript.Tests.Services
             // Assert
             result.IsSuccess.Should().BeTrue();
             _mockProcessExecutor.Verify(x => x.Execute("gmsh", It.Is<string>(args =>
-                !args.Contains("-angle"))), Times.Once);
+                args.Contains("-3") && args.Contains("-format stl") && !args.Contains("-angle"))), Times.Once);
         }
 
         [Fact]
@@ -474,7 +449,7 @@ Number of zones (connected area with consistent normal) : 5
                 .Returns(new ProcessResult { ExitCode = 0, Output = "" });
 
             // Act
-            var result = _service.ConvertStepToStl(inputFile, outputFile, meshSize: 1.0, featureAngle: null, inputUnits: "m");
+            var result = _service.ConvertStepToStl(inputFile, outputFile, meshSize: 1.0, inputUnits: "m");
 
             // Assert - conversion succeeds (no scaling needed for meters)
             result.IsSuccess.Should().BeTrue();

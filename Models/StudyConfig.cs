@@ -12,7 +12,13 @@ namespace foamscript.Models
         public string Angles { get; set; } = string.Empty;
         public double Velocity { get; set; } = 27.0;
         public double Rpm { get; set; } = 925.0;
-        public double? FeatureAngle { get; set; }
+
+        /// <summary>Units of the model source file: mm, cm, m, in, ft. Default: mm (most common CAD unit). Ignored for STL files.</summary>
+        public string ModelSourceUnits { get; set; } = "mm";
+
+        /// <summary>gmsh mesh size scaling factor for STEP/IGES → STL conversion. Default: 1.0. Ignored for STL files.</summary>
+        public double MeshSize { get; set; } = 1.0;
+
         public int Cores { get; set; } = 0;
         public StudyPhysicsConfig Physics { get; set; } = new();
         public StudyDomainConfig Domain { get; set; } = new();

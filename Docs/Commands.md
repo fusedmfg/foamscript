@@ -99,7 +99,6 @@ foamscript convert <input> <output> [OPTIONS]
 | `<output>` | | Output STL file path (positional, required) | - |
 | `--input-units` | `-u` | Input file units: mm, cm, m, in, ft | `m` |
 | `--mesh-size` | `-s` | Mesh size scaling factor (lower = finer mesh) | `1.0` |
-| `--feature-angle` | `-a` | Feature angle for edge preservation (degrees) | - |
 | `--validate` | | Run surfaceCheck validation after conversion | `false` |
 | `--verbose` | `-v` | Show detailed gmsh output | `false` |
 
@@ -117,12 +116,11 @@ foamscript convert disc.step disc.stl \
   --input-units mm
 ```
 
-**Convert with edge preservation and finer mesh:**
+**Convert with finer mesh:**
 ```bash
 foamscript convert disc.step disc.stl \
   --input-units mm \
-  --mesh-size 0.05 \
-  --feature-angle 30
+  --mesh-size 0.05
 ```
 
 **Convert and validate:**
@@ -184,7 +182,8 @@ foamscript new-study --config study.json
 | `--config` | `-c` | Path to JSON config file (replaces all CLI options) | - |
 | `--velocity` | `-v` | Freestream velocity magnitude (m/s) | Template-defined |
 | `--rpm` | `-r` | Rotation speed (RPM) — only for rotating templates | Template-defined |
-| `--feature-angle` | | Feature angle for edge preservation (degrees) | - |
+| `--model-source-units` | | Source geometry units: mm, cm, m, in, ft (STEP/IGES auto-convert) | `mm` |
+| `--mesh-size` | | gmsh mesh size scaling for STEP/IGES conversion | `1.0` |
 | `--cores` | | Number of CPU cores (0 = auto-detect all available) | `0` |
 
 ### Physics Parameters
@@ -321,11 +320,12 @@ An alternative to specifying all CLI options is to provide a JSON config file wi
   "projectName": "MyStudy",
   "outputDir": "~/studies",
   "templateName": "external_disc_rotatingwall_steady",
-  "modelSource": "~/my_disc.stl",
+  "modelSource": "~/my_disc.step",
   "angles": "-5,0,5,10",
   "velocity": 27.0,
   "rpm": 925.0,
-  "featureAngle": null,
+  "modelSourceUnits": "mm",
+  "meshSize": 1.0,
   "cores": 0,
   "physics": {
     "nu": 1.5e-5,
@@ -348,11 +348,12 @@ An alternative to specifying all CLI options is to provide a JSON config file wi
 ### Notes
 
 - **Required fields**: `projectName`, `outputDir`, `templateName`, `modelSource`, `angles`
-- **`modelSource` must be an STL file in meters** — run `foamscript convert` first if you have STEP/IGES geometry
+- **`modelSource` accepts STL, STEP (.step/.stp), or IGES (.iges/.igs) files** — STEP/IGES files are auto-converted to STL using gmsh
+- **`modelSourceUnits`**: units of the source geometry (default: `"mm"`). Ignored for STL files. Used during STEP/IGES → STL conversion to scale to meters.
+- **`meshSize`**: gmsh mesh size scaling factor for STEP/IGES conversion (default: `1.0`). Ignored for STL files.
 - **All other fields are optional** — omitted physics/domain fields use defaults from the template's `TEMPLATE.json`
 - **JSON keys are case-insensitive** — `projectName`, `ProjectName`, and `project_name` are all accepted
 - The `physics` and `domain` sections can be omitted entirely if template defaults are acceptable
-- `featureAngle` accepts `null` or a numeric value in degrees
 
 ---
 
@@ -1104,8 +1105,7 @@ foamscript list-templates
 
 ### Conversion takes too long
 
-- Increase `--mesh-size` (0.1 for quick tests)
-- Remove `--feature-angle` if not needed
+- Increase `--mesh-size` (e.g. 2.0 for quick tests, lower values = finer mesh)
 - Consider pre-converting geometry once and reusing STL
 
 ### Cases have incorrect velocity

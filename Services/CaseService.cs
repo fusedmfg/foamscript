@@ -134,8 +134,8 @@ namespace foamscript.Services
         }
 
         /// <summary>
-        /// Processes geometry: validates STL input, copies to geometry directory, extracts bounding box.
-        /// STEP/IGES files are no longer accepted — users must run 'foamscript convert' first.
+        /// Processes geometry: accepts STL directly or auto-converts STEP/IGES to STL.
+        /// STEP/IGES files are converted using gmsh with the config's modelSourceUnits (default: mm → meters).
         /// </summary>
         private (bool Success, string? ErrorMessage, double RefLength, BoundingBox? BoundingBox) ProcessGeometry(
             string geometryDir, StudyConfig config, TemplateMetadata metadata)
@@ -149,27 +149,37 @@ namespace foamscript.Services
                 }
 
                 var sourceExt = Path.GetExtension(config.ModelSource).ToLowerInvariant();
-
-                // Reject STEP/IGES files — users must convert first
-                if (sourceExt == ".step" || sourceExt == ".stp" || sourceExt == ".iges" || sourceExt == ".igs")
-                {
-                    return (false,
-                        $"new-study requires an STL file (in meters), but received '{Path.GetFileName(config.ModelSource)}'. " +
-                        $"To convert STEP/IGES files, run: foamscript convert -i {Path.GetFileName(config.ModelSource)} -o model.stl -u <units>",
-                        0.0, null);
-                }
-
-                // Only accept STL files
-                if (sourceExt != ".stl")
-                {
-                    return (false, $"Unsupported file format: {sourceExt}. Only STL files are accepted. " +
-                        "To convert STEP/IGES files, run: foamscript convert -i <input> -o <output.stl> -u <units>", 0.0, null);
-                }
-
-                // Copy STL to geometry directory with the expected name
                 var geomStlName = metadata.GeometryStlName;
                 var geomStlPath = Path.Combine(geometryDir, geomStlName);
-                File.Copy(config.ModelSource, geomStlPath, overwrite: true);
+
+                // Auto-convert STEP/IGES files to STL
+                if (sourceExt == ".step" || sourceExt == ".stp" || sourceExt == ".iges" || sourceExt == ".igs")
+                {
+                    Console.WriteLine($"  Converting {Path.GetFileName(config.ModelSource)} ({config.ModelSourceUnits}) → STL (meters)...");
+
+                    var conversionResult = _geometryService.ConvertStepToStl(
+                        config.ModelSource, geomStlPath, config.MeshSize, config.ModelSourceUnits);
+
+                    if (!conversionResult.IsSuccess)
+                    {
+                        return (false, $"STEP/IGES conversion failed: {conversionResult.ErrorMessage}", 0.0, null);
+                    }
+
+                    Console.WriteLine($"  ✓ Converted to {geomStlName}");
+                    if (conversionResult.NodeCount.HasValue && conversionResult.TriangleCount.HasValue)
+                    {
+                        Console.WriteLine($"    Nodes: {conversionResult.NodeCount:N0}, Triangles: {conversionResult.TriangleCount:N0}");
+                    }
+                }
+                else if (sourceExt == ".stl")
+                {
+                    // Copy STL directly to geometry directory
+                    File.Copy(config.ModelSource, geomStlPath, overwrite: true);
+                }
+                else
+                {
+                    return (false, $"Unsupported file format: {sourceExt}. Accepted formats: .stl, .step, .stp, .iges, .igs", 0.0, null);
+                }
 
                 // Extract bounding box from the geometry STL
                 var bbox = GeometryService.CalculateBoundingBox(geomStlPath);

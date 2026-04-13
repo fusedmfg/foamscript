@@ -15,8 +15,8 @@ namespace foamscript.Services
             _conversionService = conversionService;
         }
 
-        public GeometryConversionResult ConvertStepToStl(string inputFile, string outputFile, double meshSize = 1.0, double? featureAngle = null, string inputUnits = "m")
-            => _conversionService.ConvertStepToStl(inputFile, outputFile, meshSize, featureAngle, inputUnits);
+        public GeometryConversionResult ConvertStepToStl(string inputFile, string outputFile, double meshSize = 1.0, string inputUnits = "m")
+            => _conversionService.ConvertStepToStl(inputFile, outputFile, meshSize, inputUnits);
 
         public StlValidationResult ValidateStl(string stlFile)
             => _conversionService.ValidateStl(stlFile);

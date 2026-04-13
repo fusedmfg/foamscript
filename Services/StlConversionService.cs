@@ -23,10 +23,9 @@ namespace foamscript.Services
         /// <param name="inputFile">Path to input STEP file</param>
         /// <param name="outputFile">Path to output STL file</param>
         /// <param name="meshSize">Mesh size scaling factor (default 1.0)</param>
-        /// <param name="featureAngle">Feature angle in degrees (null = no angle constraint)</param>
         /// <param name="inputUnits">Input file units (mm, cm, m, in, ft) - output will be scaled to meters</param>
         /// <returns>Conversion result with success status and details</returns>
-        public GeometryConversionResult ConvertStepToStl(string inputFile, string outputFile, double meshSize = 1.0, double? featureAngle = null, string inputUnits = "m")
+        public GeometryConversionResult ConvertStepToStl(string inputFile, string outputFile, double meshSize = 1.0, string inputUnits = "m")
         {
             var result = new GeometryConversionResult();
 
@@ -46,16 +45,8 @@ namespace foamscript.Services
             // -3: 3D meshing
             // -format stl: output format
             // -clscale: mesh size scaling factor
-            // -angle: feature angle threshold (preserves sharp edges)
             // -o: output file
-            var gmshArgs = $"-3 -format stl -clscale {meshSize}";
-
-            if (featureAngle.HasValue)
-            {
-                gmshArgs += $" -angle {featureAngle.Value}";
-            }
-
-            gmshArgs += $" -o {outputFile} {inputFile}";
+            var gmshArgs = $"-3 -format stl -clscale {meshSize} -o {outputFile} {inputFile}";
 
             // Execute gmsh
             var gmshResult = _processExecutor.Execute("gmsh", gmshArgs);
