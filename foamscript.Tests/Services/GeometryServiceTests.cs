@@ -97,11 +97,6 @@ namespace foamscript.Tests.Services
                     Error = "Error   : Could not parse file 'model.step'"
                 });
 
-            // Mock: output file does not exist (true failure — no STL produced)
-            _mockProcessExecutor
-                .Setup(x => x.Execute("test", "-f /path/to/model.stl"))
-                .Returns(new ProcessResult { ExitCode = 1, Output = "" });
-
             // Act
             var result = _service.ConvertStepToStl(inputFile, outputFile);
 
@@ -182,7 +177,7 @@ namespace foamscript.Tests.Services
 
             _mockProcessExecutor
                 .Setup(x => x.Execute("gmsh", It.Is<string>(args =>
-                    args.Contains("-3") &&
+                    args.Contains("-2") &&
                     args.Contains("-format stl") &&
                     args.Contains("-clscale 1") &&
                     args.Contains($"-o {outputFile}") &&
@@ -200,7 +195,7 @@ namespace foamscript.Tests.Services
             // Assert
             result.IsSuccess.Should().BeTrue();
             _mockProcessExecutor.Verify(x => x.Execute("gmsh", It.Is<string>(args =>
-                args.Contains("-3") && args.Contains("-format stl") && !args.Contains("-angle"))), Times.Once);
+                args.Contains("-2") && args.Contains("-format stl") && !args.Contains("-angle"))), Times.Once);
         }
 
         [Fact]

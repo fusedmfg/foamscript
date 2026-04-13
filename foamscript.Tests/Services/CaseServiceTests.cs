@@ -472,7 +472,7 @@ endsolid disc
             // Mock: gmsh conversion succeeds and produces output STL
             _mockProcessExecutor
                 .Setup(x => x.Execute("gmsh", It.Is<string>(a =>
-                    a.Contains("-3") && a.Contains("-format stl"))))
+                    a.Contains("-2") && a.Contains("-format stl"))))
                 .Returns(new ProcessResult { ExitCode = 0, Output = "Info    : 100 nodes 200 triangles" })
                 .Callback<string, string>((_, args) =>
                 {
@@ -510,7 +510,7 @@ endsolid disc");
 
             result.IsSuccess.Should().BeTrue();
             _mockProcessExecutor.Verify(x => x.Execute("gmsh", It.Is<string>(a =>
-                a.Contains("-3") && a.Contains("-format stl"))), Times.Once);
+                a.Contains("-2") && a.Contains("-format stl"))), Times.Once);
         }
 
         [Theory]
@@ -528,13 +528,10 @@ endsolid disc");
                 .Setup(x => x.Execute("test", It.Is<string>(a => a.Contains(fileName))))
                 .Returns(new ProcessResult { ExitCode = 0, Output = "" });
 
-            // Mock: gmsh conversion fails and produces no output file
+            // Mock: gmsh conversion fails
             _mockProcessExecutor
                 .Setup(x => x.Execute("gmsh", It.IsAny<string>()))
                 .Returns(new ProcessResult { ExitCode = 1, Output = "", Error = "gmsh: unknown option" });
-            _mockProcessExecutor
-                .Setup(x => x.Execute("test", It.Is<string>(a => a.Contains("disc.stl"))))
-                .Returns(new ProcessResult { ExitCode = 1, Output = "" });
 
             var config = CreateDefaultConfig(tempDir, stepFile);
             config.Angles = "0";
